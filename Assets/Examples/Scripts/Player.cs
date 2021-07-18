@@ -145,9 +145,9 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
             transform.forward = movementDirection;
     }
 
-    public ITickerBase CreateTicker()
+    public ITickerBase GetTicker()
     {
-        return new Ticker<PlayerInput, PlayerState>(this);
+        return ticker;
     }
 
     [Command(channel = Channels.Unreliable)]

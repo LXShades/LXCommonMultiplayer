@@ -61,9 +61,9 @@ public interface ITickerInputFunctions<TInput> where TInput : ITickerInput<TInpu
 public interface ITickableBase
 {
     /// <summary>
-    /// Should return a new Ticker with the TInput and TState used by this class
+    /// Should return this class's own Ticker instance with its chosen TInput and TState
     /// </summary>
-    ITickerBase CreateTicker();
+    ITickerBase GetTicker();
 } 
 
 /// <summary>

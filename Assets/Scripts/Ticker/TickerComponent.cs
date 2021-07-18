@@ -9,6 +9,6 @@ public class TickerComponent : MonoBehaviour
 
     private void Awake()
     {
-        ticker = GetComponent<ITickableBase>().CreateTicker();
+        ticker = GetComponent<ITickableBase>().GetTicker();
     }
 }
