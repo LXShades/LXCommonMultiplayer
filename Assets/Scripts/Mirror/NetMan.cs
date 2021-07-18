@@ -59,12 +59,17 @@ public class NetMan : NetworkManager
         else
             transport.GetComponent<IgnoranceTransport.Ignorance>().port = defaultPort;
 
+        if (onlineScene == null)
+        {
+            // we basically need to do this for the command line-based level selection to work effectively
+            // bugs will occur if we don't inform ourselves somehow that we're starting in this scene
+            onlineScene = SceneManager.GetActiveScene().path;
+        }
+
         if (withLocalPlayer)
             StartHost();
         else
             StartServer();
-
-        networkSceneName = SceneManager.GetActiveScene().name;
     }
 
     public void Connect(string ip)
@@ -119,6 +124,11 @@ public class NetMan : NetworkManager
     {
         onServerDisconnect?.Invoke(conn);
         base.OnServerDisconnect(conn);
+    }
+
+    public override void OnStartHost()
+    {
+        base.OnStartHost();
     }
 
     public override void OnStartServer()

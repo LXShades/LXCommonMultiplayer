@@ -276,7 +276,7 @@ MonoBehaviour:
   serverBatching: 1
   serverBatchInterval: 0
   offlineScene: 
-  onlineScene: 
+  onlineScene: Assets/Examples-Mirror/Scenes/TickerCharacterMovement.unity
   transport: {fileID: 621646189}
   networkAddress: localhost
   maxConnections: 100
@@ -396,6 +396,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ab1057685cb325d41828ba1e0e547cdd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  disableInReleaseBuilds: 1
 --- !u!4 &1556933233
 Transform:
   m_ObjectHideFlags: 0
