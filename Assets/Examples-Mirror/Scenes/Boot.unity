@@ -204,7 +204,7 @@ MonoBehaviour:
     before the real game starts.
 
 
-    NetMan will persist with DontDestoryOnLoad.
+    NetMan will persist with DontDestroyOnLoad.
     (There should be only one, so don''t place it in your other scenes).'
 --- !u!222 &432640402
 CanvasRenderer:
@@ -276,7 +276,7 @@ MonoBehaviour:
   serverBatching: 1
   serverBatchInterval: 0
   offlineScene: 
-  onlineScene: Assets/Examples-Mirror/Scenes/TickerCharacterMovement.unity
+  onlineScene: 
   transport: {fileID: 621646189}
   networkAddress: localhost
   maxConnections: 100

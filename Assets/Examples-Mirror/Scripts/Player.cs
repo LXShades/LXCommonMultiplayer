@@ -2,7 +2,9 @@ using Mirror;
 using UnityEngine;
 
 /// <summary>
-/// Basic player that moves towards the given direction in a predicted-reconciled way
+/// Basic player that moves towards the given direction in a predicted-reconciled way.
+/// 
+/// Handles all movement and prediction-reconciliation by itself.
 /// </summary>
 public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.PlayerState>
 {
@@ -26,6 +28,15 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
     {
         public float horizontal;
         public float vertical;
+
+        public PlayerInput GenerateLocal()
+        {
+            return new PlayerInput()
+            {
+                horizontal = Input.GetAxisRaw("Horizontal"),
+                vertical = Input.GetAxisRaw("Vertical")
+            };
+        }
 
         public PlayerInput WithDeltas(PlayerInput previousInput) => this;
 
@@ -51,38 +62,16 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
         ticker.settings = tickerSettings;
     }
 
-    public override void OnStartLocalPlayer()
-    {
-        base.OnStartLocalPlayer();
-
-        /*TickerTimelineDebugUI timeline = FindObjectOfType<TickerTimelineDebugUI>();
-
-        if (timeline != null)
-            timeline.targetTicker = ticker;*/
-    }
-
-    public override void OnStartClient()
-    {
-        base.OnStartClient();
-
-        TickerTimelineDebugUI timeline = FindObjectOfType<TickerTimelineDebugUI>();
-
-        if (!isLocalPlayer && timeline != null)
-            timeline.targetTicker = ticker;
-    }
-
     private void Update()
     {
         if (isLocalPlayer)
         {
-            // build inputs, send to the ticker and immediately Seek locally
-            PlayerInput nextInput = new PlayerInput()
-            {
-                horizontal = Input.GetAxisRaw("Horizontal"),
-                vertical = Input.GetAxisRaw("Vertical")
-            };
+            // build inputs, send to the ticker
+            PlayerInput nextInput = new PlayerInput().GenerateLocal();
 
             ticker.PushInput(nextInput, Time.time);
+
+            // seek to the current Time.time. this may amount to a mixture of reverting/confirming states and ticking forward with delta time
             ticker.Seek(Time.time, Time.time);
 
             // send our inputs and times to the server
@@ -99,7 +88,7 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
             if (NetworkServer.active)
             {
                 // server receiving client's state - just process the inputs, moving to the latest client time (no speedhack tests)
-                ticker.Seek(ticker.inputHistoryBase.LatestTime, ticker.inputHistoryBase.LatestTime);
+                ticker.Seek(ticker.inputTimelineBase.LatestTime, ticker.inputTimelineBase.LatestTime);
             }
             else
             {
@@ -120,21 +109,16 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
             RpcPlayerState(ticker.lastConfirmedState, ticker.latestInput, ticker.confirmedStateTime, Mathf.Min(isLocalPlayer ? Time.time - ticker.confirmedStateTime : Time.time - timeOfLastReceivedClientInput, 0.5f));
     }
 
-    public PlayerState MakeState()
-    {
-        return new PlayerState()
-        {
-            position = transform.position,
-            rotation = transform.rotation
-        };
-    }
-
-    public void ApplyState(PlayerState state)
-    {
-        transform.position = state.position;
-        transform.rotation = state.rotation;
-    }
-
+    #region ITickable
+    /// <summary>
+    /// Ticks the object. In a networked game, you may put most important gameplay things in this function, as though it were an Update function.
+    /// 
+    /// * Do NOT use Time.deltaTime, or anything from Time (except debugging info)!
+    /// * Do not read live inputs from here (except, again, debugging). Put everything you need into TInput and ensure it is passed into the ticker timeline.
+    /// * Always remember Tick() may be called during states in the past, where Time.deltaTime may completely inaccurate.
+    /// * Always remember Tick() may be called multiple times in a single frame. As such, avoid playing sounds or spawning objects unless isRealtime is true.
+    /// * You can still use Update for things that don't affect gameplay, such as visual effects.
+    /// </summary>
     public void Tick(float deltaTime, PlayerInput input, bool isRealtime)
     {
         Vector3 movementDirection = new Vector3(movementSpeed * input.horizontal, 0f, movementSpeed * input.vertical);
@@ -145,18 +129,44 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
             transform.forward = movementDirection;
     }
 
+    /// <summary>
+    /// Returns the ticker owned by this player
+    /// </summary>
     public ITickerBase GetTicker()
     {
         return ticker;
     }
 
+    /// <summary>
+    /// Used to restore to a previous state by the ticker. Store all important ticker-affected information here.
+    /// </summary>
+    public PlayerState MakeState()
+    {
+        return new PlayerState()
+        {
+            position = transform.position,
+            rotation = transform.rotation
+        };
+    }
+
+    /// <summary>
+    /// Used to restore a previous state by the ticker. Apply all important ticker-affected information here.
+    /// Remember that for physics simulations, you may need to call Physics.SyncTransforms() or just turn Physics.autoSyncTransforms on.
+    /// </summary>
+    public void ApplyState(PlayerState state)
+    {
+        transform.position = state.position;
+        transform.rotation = state.rotation;
+    }
+#endregion
+
     [Command(channel = Channels.Unreliable)]
     private void CmdPlayerInput(PlayerInput[] inputs, float[] times)
     {
-        float lastLatest = ticker.inputHistory.LatestTime;
+        float lastLatest = ticker.inputTimeline.LatestTime;
         ticker.PushInputPack(new TickerInputPack<PlayerInput>(inputs, times));
 
-        if (ticker.inputHistory.LatestTime > lastLatest)
+        if (ticker.inputTimeline.LatestTime > lastLatest)
             timeOfLastReceivedClientInput = Time.time;
     }
 

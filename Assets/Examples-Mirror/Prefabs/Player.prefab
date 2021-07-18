@@ -172,6 +172,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09d09a3c948450f43bd4cc81fa52eceb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncMode: 0
+  syncInterval: 0.1
 --- !u!114 &7589299674989415057
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -191,7 +193,7 @@ MonoBehaviour:
   tickerSettings:
     maxDeltaTime: 0.03
     maxSeekIterations: 15
-    maxInputRate: 5
+    maxInputRate: 20
     alwaysReconcile: 0
     historyLength: 1
     debugLogReconciles: 0

@@ -31,12 +31,12 @@ public interface ITickerBase
     /// <summary>
     /// Input history in this Ticker
     /// </summary>
-    public HistoryListBase inputHistoryBase { get; }
+    public TimelineListBase inputTimelineBase { get; }
 
     /// <summary>
     /// State history in this Ticker
     /// </summary>
-    public HistoryListBase stateHistoryBase { get; }
+    public TimelineListBase stateTimelineBase { get; }
 }
 
 /// <summary>
@@ -58,10 +58,13 @@ public interface ITickerInputFunctions<TInput> where TInput : ITickerInput<TInpu
     public TickerInputPack<TInput> MakeInputPack(float maxLength);
 }
 
+/// <summary>
+/// Enables you to get the ticker out of a tickable regardless of generic types
+/// </summary>
 public interface ITickableBase
 {
     /// <summary>
-    /// Should return this class's own Ticker instance with its chosen TInput and TState
+    /// Should return this object's Ticker instance with its chosen TInput and TState.
     /// </summary>
     ITickerBase GetTicker();
 } 
@@ -69,18 +72,34 @@ public interface ITickableBase
 /// <summary>
 /// Qualifies something as tickable.
 /// 
-/// This class can be simulated, reverted to a previous state, and "Seek" to an earlier _or_ future time in its history
+/// This class can be ticked, reverted to a previous state, and "Seek" to an earlier _or_ future time in its history
 /// 
-/// Inputs are used to generate future times. Snapshots store earlier times. A Seek is able to revert to an earlier time, or extrapolate to a later time, based either on recorded inputs or the last known input.
+/// Inputs are used to Tick and generate future states. Earlier states are stores and can be loaded. A Seek is able to revert to an earlier time, or extrapolate to a later time, based either on recorded inputs or the last known input.
 /// 
 /// This interface should implement MakeState(), ApplyState() and Tick().
 /// </summary>
 public interface ITickable<TInput, TState> : ITickableBase
 {
+    /// <summary>
+    /// Ticks the object. In a networked game, you may put most important gameplay things in this function, as though it were an Update function.
+    /// 
+    /// * Do NOT use Time.deltaTime, or anything from Time (except debugging info)!
+    /// * Do not read live inputs from here (except, again, debugging). Put everything you need into TInput and ensure it is passed into the ticker timeline.
+    /// * Always remember Tick() may be called during states in the past, where Time.deltaTime may completely inaccurate.
+    /// * Always remember Tick() may be called multiple times in a single frame. As such, avoid playing sounds or spawning objects unless isRealtime is true.
+    /// * You can still use Update for things that don't affect gameplay, such as visual effects.
+    /// </summary>
     void Tick(float deltaTime, TInput input, bool isRealtime);
 
+    /// <summary>
+    /// Used to restore to a previous state by the ticker. Store all important ticker-affected information here.
+    /// </summary>
     TState MakeState();
 
+    /// <summary>
+    /// Used to restore a previous state by the ticker. Apply all important ticker-affected information here.
+    /// Remember that for anything that affects physics, you may need to call Physics.SyncTransforms() or just turn Physics.autoSyncTransforms on so that positional chanegs are propagated into the physics system.
+    /// </summary>
     void ApplyState(TState state);
 }
 
@@ -94,6 +113,11 @@ public interface ITickable<TInput, TState> : ITickableBase
 /// </summary>
 public interface ITickerInput<TOwner>
 {
+    /// <summary>
+    /// Returns an input representing current live input state
+    /// </summary>
+    public TOwner GenerateLocal();
+
     /// <summary>
     /// Returns an input with optional deltas compared to the previous input. e.g. btnJumpPressed, btnJumpReleased
     /// </summary>
@@ -132,9 +156,9 @@ public struct TickerInputPack<TInput>
     /// Makes an InputPack from a given input history
     /// </summary>
     /// <returns></returns>
-    public static TickerInputPack<TInput> MakeFromHistory(HistoryList<TInput> inputHistory, float sendBufferLength)
+    public static TickerInputPack<TInput> MakeFromHistory(TimelineList<TInput> inputTimeline, float sendBufferLength)
     {
-        int startIndex = inputHistory.ClosestIndexBeforeOrEarliest(inputHistory.LatestTime - sendBufferLength);
+        int startIndex = inputTimeline.ClosestIndexBeforeOrEarliest(inputTimeline.LatestTime - sendBufferLength);
 
         if (startIndex != -1)
         {
@@ -143,8 +167,8 @@ public struct TickerInputPack<TInput>
 
             for (int i = startIndex; i >= 0; i--)
             {
-                times[i] = inputHistory.TimeAt(i);
-                inputs[i] = inputHistory[i];
+                times[i] = inputTimeline.TimeAt(i);
+                inputs[i] = inputTimeline[i];
             }
 
             return new TickerInputPack<TInput>()
