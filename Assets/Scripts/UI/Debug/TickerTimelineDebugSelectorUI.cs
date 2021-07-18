@@ -20,7 +20,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         EventTrigger events = dropdown.gameObject.AddComponent<EventTrigger>();
         EventTrigger.Entry eventHandler = new EventTrigger.Entry()
         {
-            eventID = EventTriggerType.PointerClick
+            eventID = EventTriggerType.PointerEnter
         };
         eventHandler.callback.AddListener(OnDropdownEvent);
 

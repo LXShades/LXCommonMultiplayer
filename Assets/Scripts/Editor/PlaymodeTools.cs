@@ -3,9 +3,10 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
-/// Tools to decide how the editor behaves and loads in playmode
+/// Tools to decide how the editor loads in playmode
 /// 
-/// Typically this loads the Boot scene and passes a fake command line for CommandLine to pick up in play
+/// Typically this loads the Boot scene - defined as scene 0 - and passes a fake command line for CommandLine to pick up in play mode, 
+/// which changes the scene and potentially hosts or connects.
 /// </summary>
 [InitializeOnLoad]
 public static class PlaymodeTools
@@ -30,23 +31,32 @@ public static class PlaymodeTools
         set => EditorPrefs.SetString("_playModeCommandLineParms", value);
     }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [InitializeOnLoadMethod]
     private static void OnInit()
     {
+        ReloadBootScene();
 
         // Be prepared to set editor commands on play mode
         EditorApplication.playModeStateChanged += OnPlayStateChanged;
 
+        // To cover when user changes the boot scene. The boot scene is always assumed to be scene 0.
+        EditorBuildSettings.sceneListChanged += ReloadBootScene;
+
         // Set default command parameters
         SetEditorCommands();
     }
-
-    private static void OnPlayStateChanged(PlayModeStateChange change)
+    
+    private static void ReloadBootScene()
     {
         // before starting, make sure the boot scene loads first
         if (EditorBuildSettings.scenes.Length > 0)
             EditorSceneManager.playModeStartScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[0].path);
+        else
+            EditorSceneManager.playModeStartScene = null;
+    }
 
+    private static void OnPlayStateChanged(PlayModeStateChange change)
+    {
         // when finished playing, do not let previous editor commands persist to the next test
         if (change == PlayModeStateChange.ExitingPlayMode)
             CommandLine.editorCommands = new string[0];
