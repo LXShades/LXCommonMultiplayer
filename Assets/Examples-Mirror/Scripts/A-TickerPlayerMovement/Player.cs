@@ -8,9 +8,6 @@ using UnityEngine;
 /// </summary>
 public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.PlayerState>
 {
-    /// <summary>
-    /// Used to reconcile player position
-    /// </summary>
     public struct PlayerState : ITickerState<PlayerState>
     {
         public Vector3 position;

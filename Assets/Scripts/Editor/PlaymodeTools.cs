@@ -67,10 +67,11 @@ public static class PlaymodeTools
         if (CommandLine.editorCommands.Length == 0 || (CommandLine.editorCommands.Length == 1 && CommandLine.editorCommands[0] == ""))
         {
             string[] editorCommands = new string[0];
+
             switch (playModeCommandType)
             {
                 case PlayModeCommands.Host:
-                    editorCommands = new string[] { "-host" };
+                    editorCommands = new string[] { "-host", "-scene", UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex.ToString() };
                     break;
                 case PlayModeCommands.Connect:
                     editorCommands = new string[] { "-connect", "127.0.0.1" };
