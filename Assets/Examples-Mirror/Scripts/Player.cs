@@ -153,8 +153,11 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
     [Command(channel = Channels.Unreliable)]
     private void CmdPlayerInput(PlayerInput[] inputs, float[] times)
     {
+        float lastLatest = ticker.inputHistory.LatestTime;
         ticker.PushInputPack(new TickerInputPack<PlayerInput>(inputs, times));
-        timeOfLastReceivedClientInput = Time.time;
+
+        if (ticker.inputHistory.LatestTime > lastLatest)
+            timeOfLastReceivedClientInput = Time.time;
     }
 
     [ClientRpc(channel = Channels.Unreliable)]
