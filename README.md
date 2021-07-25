@@ -30,6 +30,7 @@ Among current todo's are:
 * More examples
 
 ### Fixes
+* Example Player Character still needs to be changed for each example scene
 * DeltaTime substepping in Seek between confirmed states
 
 ## Warrantn't!!

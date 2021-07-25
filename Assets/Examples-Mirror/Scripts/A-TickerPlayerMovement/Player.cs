@@ -66,7 +66,7 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
             // build inputs, send to the ticker
             PlayerInput nextInput = new PlayerInput().GenerateLocal();
 
-            ticker.PushInput(nextInput, Time.time);
+            ticker.InsertInput(nextInput, Time.time);
 
             // seek to the current Time.time. this may amount to a mixture of reverting/confirming states and ticking forward with delta time
             ticker.Seek(Time.time, Time.time);
@@ -161,7 +161,7 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
     private void CmdPlayerInput(PlayerInput[] inputs, float[] times)
     {
         float lastLatest = ticker.inputTimeline.LatestTime;
-        ticker.PushInputPack(new TickerInputPack<PlayerInput>(inputs, times));
+        ticker.InsertInputPack(new TickerInputPack<PlayerInput>(inputs, times));
 
         if (ticker.inputTimeline.LatestTime > lastLatest)
             timeOfLastReceivedClientInput = Time.time;
@@ -172,7 +172,7 @@ public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.Pla
     {
         if (!NetworkServer.active) // don't affect host player
         {
-            ticker.PushInput(input, time);
+            ticker.InsertInput(input, time);
             ticker.Reconcile(state, time, TickerSeekFlags.DontConfirm);
             timeOnServer = time + serverExtrapolation;
             timeOfLastReceivedServerUpdate = Time.time;

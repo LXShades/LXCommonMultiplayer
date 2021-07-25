@@ -118,6 +118,11 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// </summary>
     public float confirmedStateTime { get; private set; }
 
+    /// <summary>
+    /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
+    /// </summary>
+    public bool isDebugPaused { get; private set; }
+
     public TState lastConfirmedState { get; private set; }
 
 
@@ -138,9 +143,9 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     }
 
     /// <summary>
-    /// Refreshes the input, event and state history 
+    /// Inserts a single input into the input history. Old inputs at hte same time will be replaced.
     /// </summary>
-    public void PushInput(TInput input, float time)
+    public void InsertInput(TInput input, float time)
     {
         float timeSinceLastInput = time - inputTimeline.LatestTime;
 
@@ -152,9 +157,9 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     }
 
     /// <summary>
-    /// Stores an input pack into input history
+    /// Stores an input pack into input history. Old inputs at the same time will be replaced.
     /// </summary>
-    public void PushInputPack(TickerInputPack<TInput> inputPack)
+    public void InsertInputPack(TickerInputPack<TInput> inputPack)
     {
         for (int i = inputPack.inputs.Length - 1; i >= 0; i--)
         {
@@ -226,6 +231,9 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     public void Seek(float targetTime, float realtimePlaybackTime, TickerSeekFlags flags = TickerSeekFlags.None)
     {
         Debug.Assert(settings.maxDeltaTime > 0f);
+
+        if (isDebugPaused)
+            targetTime = playbackTime;
 
         float initialPlaybackTime = playbackTime;
 
@@ -369,12 +377,21 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     }
 
     /// <summary>
+    /// Enables or disables debug pause. When paused, the Seek() function may run, but will always tick to the time it was originally.
+    /// </summary>
+    public void SetDebugPaused(bool isDebugPaused)
+    {
+        this.isDebugPaused = isDebugPaused;
+    }
+
+    /// <summary>
     /// Draws the current character state
     /// </summary>
     public void DebugDrawCurrentState(Color colour)
     {
         target.MakeState().DebugDraw(colour);
     }
+
     private string PrintStructDifferences<T>(string aName, string bName, T structureA, T structureB)
     {
         StringBuilder stringBuilder = new StringBuilder(512);

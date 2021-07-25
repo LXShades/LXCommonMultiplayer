@@ -1,6 +1,7 @@
 ﻿using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Tools to decide how the editor loads in playmode
@@ -35,6 +36,8 @@ public static class PlaymodeTools
     private static void OnInit()
     {
         ReloadBootScene();
+
+        EditorSceneManager.sceneLoaded += (UnityEngine.SceneManagement.Scene scn, LoadSceneMode loadSceneMode) => ReloadBootScene();
 
         // Be prepared to set editor commands on play mode
         EditorApplication.playModeStateChanged += OnPlayStateChanged;

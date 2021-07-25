@@ -400,7 +400,7 @@ GameObject:
   - component: {fileID: 6439931222723612264}
   - component: {fileID: 6439931222723612263}
   m_Layer: 5
-  m_Name: TickerTimelineMonitorUI
+  m_Name: TickerTimelineUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

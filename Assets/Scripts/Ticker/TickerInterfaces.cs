@@ -8,6 +8,8 @@ public interface ITickerBase
     public void Seek(float targetTime, float realtimePlaybackTime, TickerSeekFlags flags = TickerSeekFlags.None);
     public void SeekBy(float deltaTime, float realtimePlaybackTime);
 
+    public void SetDebugPaused(bool isDebugPaused);
+
     /// <summary>
     /// The name of the target component or struct
     /// </summary>
@@ -27,6 +29,11 @@ public interface ITickerBase
     /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
     /// </summary>
     public float confirmedStateTime { get; }
+
+    /// <summary>
+    /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
+    /// </summary>
+    public bool isDebugPaused { get; }
 
     /// <summary>
     /// Input history in this Ticker
@@ -53,8 +60,8 @@ public interface ITickerStateFunctions<TState> where TState : ITickerState<TStat
 /// </summary>
 public interface ITickerInputFunctions<TInput> where TInput : ITickerInput<TInput>
 {
-    public void PushInput(TInput input, float time);
-    public void PushInputPack(TickerInputPack<TInput> inputPack);
+    public void InsertInput(TInput input, float time);
+    public void InsertInputPack(TickerInputPack<TInput> inputPack);
     public TickerInputPack<TInput> MakeInputPack(float maxLength);
 }
 

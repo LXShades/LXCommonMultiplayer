@@ -4,13 +4,22 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// Handles Ticker timeline debuggers with a ticker selection dropdown box
+/// Extra optional tools for the Ticker timeline visualiser, with a ticker selection dropdown box and optional play/pause button
+/// 
+/// * Populates the dropdown with a selection of tickers in the game and reassigns the tickerTimeline's target when it changes.
+/// * If isControllable is enabled, the target ticker may be played, paused, and seeked.
 /// </summary>
 [RequireComponent(typeof(Event))]
 public class TickerTimelineDebugSelectorUI : MonoBehaviour
 {
     public Dropdown dropdown;
     public TickerTimelineDebugUI tickerTimeline;
+
+    [Header("Controllable")]
+    [Tooltip("Whether the mouse and a play/pause button can be used to play, pause andor seek the selected ticker")]
+    public bool isControllable = false;
+    public Button playPauseButton;
+    public Text playPauseButtonText;
 
     private readonly List<ITickableBase> selectableTickers = new List<ITickableBase>(32);
 
@@ -26,11 +35,17 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
         events.triggers.Add(eventHandler);
 
-        // handle dropsdown selection actually changing
+        // handle when dropdown selection is changed
         dropdown.onValueChanged.AddListener(OnDropdownSelectionChanged);
+
+        // play/pause feature
+        if (playPauseButton)
+            playPauseButton.onClick.AddListener(OnPlayPauseClicked);
 
         // give dropdown initial values
         RepopulateDropdown();
+        // initial play/pause text
+        UpdatePlayPauseButtonText();
     }
 
     private void RepopulateDropdown()
@@ -75,6 +90,20 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         RepopulateDropdown();
     }
 
+    private void OnPlayPauseClicked()
+    {
+        if (isControllable && tickerTimeline.targetTicker != null)
+            tickerTimeline.targetTicker.SetDebugPaused(!tickerTimeline.targetTicker.isDebugPaused);
+
+        UpdatePlayPauseButtonText();
+    }
+
+    private void UpdatePlayPauseButtonText()
+    {
+        if (playPauseButtonText && tickerTimeline.targetTicker != null)
+            playPauseButtonText.text = tickerTimeline.targetTicker.isDebugPaused ? ">" : "II";
+    }
+
     private void OnValidate()
     {
         if (dropdown == null)
@@ -82,5 +111,12 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
         if (tickerTimeline == null)
             tickerTimeline = GetComponentInChildren<TickerTimelineDebugUI>();
+
+        if (isControllable && playPauseButton == null)
+        {
+            playPauseButton = GetComponentInChildren<Button>();
+            if (playPauseButton)
+                playPauseButtonText = playPauseButton.GetComponentInChildren<Text>();
+        }
     }
 }
