@@ -2,11 +2,11 @@
 ## Description
 A set of **unconditionally free reusable tools** for online multiplayer Unity game development:
 
-* Quick **building and playtesting** with an in-editor Playtest menu
-* Basic **command-line support** for hosting and connecting to games upon boot
+* Two-click **quick building and playtesting menu** for multiplayer testing
+* **Command-line support** for hosting and connecting to sessions upon boot
 * **Generic, despecialised** `Ticker` class for the **client prediction and reconciliation** technique, using simple timeline terminology such as "Seek" and "Rewind".
-* **Timeline UI graphics for debugging**
-* * Includes **debug timeline visualiser** for Tickers in particular.
+* **Timeline visualiser** for Ticker debugging
+* Examples that can be easily built upon
 
 It also includes [Mirror](https://github.com/vis2k/Mirror)-specific features using a [custom Mirror fork](https://github.com/LXShades/Mirror):
 * (WIP - I can't remember if this works lol) **Predictive object spawning** enabling clients to produce networked objects before the server knows they exist.
@@ -18,7 +18,8 @@ These tools are designed to accelerate iterative multiplayer development in Unit
 * Simplicity
 * Fast iteration and testing
 * An **easy, minimally confusing** solution to **hack-proof character movement**
-* Prediction abilities and debugging tools.
+* Prediction abilities
+* Debugging tools (especially to make prediction techniques more understandable and approachable)
 
 ## Todo
 Among current todo's are:
