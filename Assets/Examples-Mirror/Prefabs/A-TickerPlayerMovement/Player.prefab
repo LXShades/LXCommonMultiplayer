@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 3784785160989643854}
   - component: {fileID: 3784785160989643849}
   - component: {fileID: 3784785160989643848}
-  - component: {fileID: 3784785160989643855}
+  - component: {fileID: 5090463105240219645}
   m_Layer: 0
   m_Name: Noot
   m_TagString: Untagged
@@ -83,8 +83,8 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!136 &3784785160989643855
-CapsuleCollider:
+--- !u!64 &5090463105240219645
+MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -93,10 +93,10 @@ CapsuleCollider:
   m_Material: {fileID: 0}
   m_IsTrigger: 0
   m_Enabled: 1
-  m_Radius: 0.5000001
-  m_Height: 2
-  m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
+  serializedVersion: 4
+  m_Convex: 1
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &3784785161027906916
 GameObject:
   m_ObjectHideFlags: 0

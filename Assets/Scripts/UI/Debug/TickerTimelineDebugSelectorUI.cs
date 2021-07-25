@@ -44,6 +44,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
         List<Dropdown.OptionData> options = new List<Dropdown.OptionData>();
         dropdown.ClearOptions();
+        selectableTickers.Clear();
 
         // add new items
         foreach (MonoBehaviour tickableComponent in FindObjectsOfType<MonoBehaviour>())

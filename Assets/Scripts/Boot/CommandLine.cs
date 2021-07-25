@@ -65,4 +65,9 @@ public static class CommandLine
 
         return false;
     }
+
+    public static string GetAllCommandsAsString()
+    {
+        return string.Join(" ", commands);
+    }
 }

@@ -241,21 +241,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 621646188}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 872fa23ef6e77334ca452ce16f6cd091, type: 3}
+  m_Script: {fileID: 11500000, guid: 6b0fecffa3f624585964b0d0eb21b18e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  port: 7777
-  LogType: 1
-  DebugDisplay: 0
-  serverBindsAll: 1
-  serverBindAddress: 
-  serverMaxPeerCapacity: 50
-  serverMaxNativeWaitTime: 1
-  clientMaxNativeWaitTime: 3
-  clientStatusUpdateInterval: -1
-  Channels: 0100000002000000
-  PacketBufferCapacity: 4096
-  MaxAllowedPacketSize: 33554432
+  Port: 7777
+  NoDelay: 1
+  Interval: 10
+  FastResend: 2
+  CongestionWindow: 0
+  SendWindowSize: 4096
+  ReceiveWindowSize: 4096
+  debugLog: 0
+  statisticsGUI: 0
+  statisticsLog: 0
 --- !u!114 &621646190
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -283,10 +281,11 @@ MonoBehaviour:
   disconnectInactiveConnections: 0
   disconnectInactiveTimeout: 60
   authenticator: {fileID: 0}
-  playerPrefab: {fileID: 3784785161027906916, guid: 14287757445895a409a4724e6a7a44b3, type: 3}
+  playerPrefab: {fileID: 6503358966875659586, guid: b4d88983bb06c394fbbcd622a1f6fa42, type: 3}
   autoCreatePlayer: 1
   playerSpawnMethod: 0
-  spawnPrefabs: []
+  spawnPrefabs:
+  - {fileID: 8645287420545827495, guid: b2236b49afcde0b44887e98c437157b7, type: 3}
 --- !u!4 &621646191
 Transform:
   m_ObjectHideFlags: 0
@@ -397,6 +396,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   disableInReleaseBuilds: 1
+  defaultScene: 1
 --- !u!4 &1556933233
 Transform:
   m_ObjectHideFlags: 0

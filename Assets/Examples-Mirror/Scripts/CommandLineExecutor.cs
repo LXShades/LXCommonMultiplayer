@@ -19,23 +19,24 @@ public class CommandLineExecutor : MonoBehaviour
 {
     public bool disableInReleaseBuilds = true;
 
+    public string defaultScene = "1";
+
     void Start()
     {
         if (disableInReleaseBuilds && !Debug.isDebugBuild)
         {
+            SetScene(defaultScene);
             return; // removed in release builds
         }
+
+        Debug.Log($"Running command line: {CommandLine.GetAllCommandsAsString()}");
 
         // Set the scene first
         AsyncOperation op = null;
         if (CommandLine.GetCommand("-scene", 1, out string[] sceneParams))
-        {
             op = SetScene(sceneParams[0]);
-        }
         else if (SceneManager.GetActiveScene().buildIndex == 0)
-        {
-            op = SetScene("1");
-        }
+            op = SetScene(defaultScene);
 
         // execute remaining command line commands
         op.completed += (AsyncOperation operation) => ExecuteCommandLine();
@@ -47,6 +48,10 @@ public class CommandLineExecutor : MonoBehaviour
             NetMan.singleton.Connect(ip[0]);
         else if (CommandLine.HasCommand("-host"))
             NetMan.singleton.Host(true);
+        else if (CommandLine.HasCommand("-server"))
+            NetMan.singleton.Host(false);
+        else
+            Debug.LogWarning("No -connect, -host or -server parameter was specified. Doing nothing.");
     }
 
     private AsyncOperation SetScene(string scene)
@@ -57,13 +62,9 @@ public class CommandLineExecutor : MonoBehaviour
         Debug.Log($"Loading scene {scene}...");
 
         if (isInt)
-        {
             return SceneManager.LoadSceneAsync(sceneIndex);
-        }
         else
-        {
             return SceneManager.LoadSceneAsync(scene);
-        }
     }
 
 #if UNITY_STANDALONE_WIN
@@ -95,8 +96,8 @@ public class CommandLineExecutor : MonoBehaviour
 
         if (CommandLine.GetCommand("-pos", 2, out string[] posParams))
         {
-            System.Int32.TryParse(posParams[0], out windowX);
-            System.Int32.TryParse(posParams[1], out windowY);
+            int.TryParse(posParams[0], out windowX);
+            int.TryParse(posParams[1], out windowY);
         }
 
         SetForegroundWindow(GetActiveWindow());

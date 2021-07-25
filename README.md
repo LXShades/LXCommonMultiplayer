@@ -23,8 +23,13 @@ These tools are designed to accelerate iterative multiplayer development in Unit
 ## Todo
 Among current todo's are:
 
+### General
 * Speedhack prevention
+* Faster play mode boot, ideally skipping boot scene and using a boot prefab instead.
 * More examples
+
+### Fixes
+* DeltaTime substepping in Seek between confirmed states
 
 ## Warrantn't!!
 Although public-facing, this toolset currently comes with no warranty or instruction manual. Code should be considered beta, with inline documentation and usage examples under occasional ongoing development.

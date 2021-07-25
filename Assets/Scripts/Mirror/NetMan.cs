@@ -41,13 +41,44 @@ public class NetMan : NetworkManager
     /// </summary>
     public ConnectionEvent onServerAddPlayer;
 
+    private int transportPort
+    {
+        get
+        {
+            switch (transport)
+            {
+                case IgnoranceTransport.Ignorance asIgnorance:
+                    return asIgnorance.port;
+                case kcp2k.KcpTransport asKcp:
+                    return asKcp.Port;
+                case TelepathyTransport asTelepathy:
+                    return asTelepathy.port;
+            }
+            return -1;
+        }
+        set
+        {
+            switch (transport)
+            {
+                case IgnoranceTransport.Ignorance asIgnorance:
+                    asIgnorance.port = value;
+                    break;
+                case kcp2k.KcpTransport asKcp:
+                    asKcp.Port = (ushort)value;
+                    break;
+                case TelepathyTransport asTelepathy:
+                    asTelepathy.port = (ushort)value;
+                    break;
+            }
+        }
+    }
+
     public override void Awake()
     {
         base.Awake();
 
-        Debug.Assert(transport.GetComponent<IgnoranceTransport.Ignorance>() != null);
         singleton = this;
-        defaultPort = transport.GetComponent<IgnoranceTransport.Ignorance>().port;
+        defaultPort = transportPort;
         transform.SetParent(null, false);
         DontDestroyOnLoad(gameObject);
     }
@@ -55,27 +86,33 @@ public class NetMan : NetworkManager
     public void Host(bool withLocalPlayer, int port = -1)
     {
         if (port != -1)
-            transport.GetComponent<IgnoranceTransport.Ignorance>().port = port;
+            transportPort = port;
         else
-            transport.GetComponent<IgnoranceTransport.Ignorance>().port = defaultPort;
+            transportPort = defaultPort;
 
-        if (onlineScene == null)
+        bool useNullOnlineScene = false;
+        if (string.IsNullOrEmpty(onlineScene))
         {
             // we basically need to do this for the command line-based level selection to work effectively
             // bugs will occur if we don't inform ourselves somehow that we're starting in this scene
             onlineScene = SceneManager.GetActiveScene().path;
+            useNullOnlineScene = true;
         }
 
         if (withLocalPlayer)
             StartHost();
         else
             StartServer();
+
+        if (useNullOnlineScene)
+        {
+            onlineScene = null;
+            networkSceneName = SceneManager.GetActiveScene().path;
+        }
     }
 
     public void Connect(string ip)
     {
-        Debug.Assert(transport.GetComponent<IgnoranceTransport.Ignorance>() != null);
-
         if (ip.Contains(":"))
         {
             networkAddress = ip.Substring(0, ip.IndexOf(":"));
@@ -83,18 +120,18 @@ public class NetMan : NetworkManager
 
             if (int.TryParse(ip.Substring(ip.IndexOf(":") + 1), out port))
             {
-                transport.GetComponent<IgnoranceTransport.Ignorance>().port = port;
+                transportPort = port;
             }
             else
             {
                 Debug.LogWarning($"Could not read port {ip.Substring(ip.IndexOf(":") + 1)}, using default of {defaultPort}.");
-                transport.GetComponent<IgnoranceTransport.Ignorance>().port = defaultPort;
+                transportPort = defaultPort;
             }
         }
         else
         {
             networkAddress = ip;
-            transport.GetComponent<IgnoranceTransport.Ignorance>().port = defaultPort;
+            transportPort = defaultPort;
         }
         
         StartClient();
