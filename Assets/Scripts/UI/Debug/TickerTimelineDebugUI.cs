@@ -20,7 +20,7 @@ public class TickerTimelineDebugUI : MonoBehaviour
     public Color32 stateColor = Color.cyan;
     public Color32 inputColor = Color.yellow;
 
-    private TimelineGraphic timeline;
+    public TimelineGraphic timeline { get; private set; }
 
     private void Start()
     {

@@ -2,6 +2,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// Draws a timeline with "Ticks" that can be added to it
+/// Drawing is fairly immediate. You can draw to it by calling ClearDraw() followed by all ticks you'd like to add to it.
+/// </summary>
 public class TimelineGraphic : MaskableGraphic
 {
     private struct Tick
@@ -35,6 +39,8 @@ public class TimelineGraphic : MaskableGraphic
     private GUIStyle labelStyleRight;
     private GUIStyle labelStyleCentre;
 
+    public float timePerScreenX => (timeEnd - timeStart) / rectTransform.rect.width / rectTransform.lossyScale.x;
+
     /// <summary>
     /// Prepares the timeline for drawing
     /// </summary>
@@ -45,7 +51,11 @@ public class TimelineGraphic : MaskableGraphic
     }
 
     /// <summary>
-    /// Inserts a tick into the timeline
+    /// Inserts a tick into the timeline.
+    /// * HeightScale multiplies the height compared to the standard (1f) tick
+    /// * Offset adds a vertical offset compared to the standard tick
+    /// * An optional label can appear on the tick
+    /// * labelLine defines the "line number" that the label can appear at, allowing multiple labels to share a spot without overlapping
     /// </summary>
     public void DrawTick(float time, float heightScale, float offset, Color32 color, string label = "", int labelLine = 0)
     {
@@ -65,7 +75,6 @@ public class TimelineGraphic : MaskableGraphic
         });
     }
 
-    // Draws a tick
     private void DrawTickInternal(float time, float heightScale, float offset, Color32 color)
     {
         Vector2 centre = new Vector2(rectTransform.rect.xMin + (time - timeStart) / (timeEnd - timeStart) * rectTransform.rect.width, rectTransform.rect.center.y);

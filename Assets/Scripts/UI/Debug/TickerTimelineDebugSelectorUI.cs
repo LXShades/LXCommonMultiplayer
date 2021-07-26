@@ -35,6 +35,16 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
         events.triggers.Add(eventHandler);
 
+        // handle when mouse clicks on timeline
+        events = tickerTimeline.gameObject.AddComponent<EventTrigger>();
+        eventHandler = new EventTrigger.Entry()
+        {
+            eventID = EventTriggerType.Drag
+        };
+        eventHandler.callback.AddListener(OnTimelineDrag);
+
+        events.triggers.Add(eventHandler);
+
         // handle when dropdown selection is changed
         dropdown.onValueChanged.AddListener(OnDropdownSelectionChanged);
 
@@ -83,6 +93,22 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     {
         if (value > -1 && value < selectableTickers.Count)
             tickerTimeline.targetTicker = selectableTickers[value].GetTicker();
+    }
+
+    private void OnTimelineDrag(BaseEventData eventData)
+    {
+        if (isControllable && tickerTimeline.targetTicker != null && tickerTimeline.targetTicker.isDebugPaused && eventData is PointerEventData pointerEvent)
+        {
+            float timeDifference = tickerTimeline.timeline.timePerScreenX * pointerEvent.delta.x;
+            float targetTime = tickerTimeline.targetTicker.playbackTime + timeDifference;
+
+            if (timeDifference != 0f)
+            {
+                tickerTimeline.targetTicker.SetDebugPaused(false); // briefly allow seek
+                tickerTimeline.targetTicker.Seek(targetTime, targetTime);
+                tickerTimeline.targetTicker.SetDebugPaused(true); // briefly allow seek
+            }
+        }
     }
 
     private void OnDropdownEvent(BaseEventData data)
