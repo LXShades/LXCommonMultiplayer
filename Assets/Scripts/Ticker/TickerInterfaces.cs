@@ -51,7 +51,7 @@ public interface ITickerBase
 /// </summary>
 public interface ITickerStateFunctions<TState> where TState : ITickerState<TState>
 {
-    public void Rewind(TState state, float time);
+    public void ConfirmStateAt(TState state, float time);
     public void Reconcile(TState pastState, float pastStateTime, TickerSeekFlags seekFlags);
 }
 

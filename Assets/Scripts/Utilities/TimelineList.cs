@@ -59,6 +59,11 @@ public class TimelineListBase
     public virtual void TrimBefore(float minTime) { }
 
     /// <summary>
+    /// Clears all items before the given time, except for the latest item in the list - useful for times when you need at least one item in your list
+    /// </summary>
+    public virtual void TrimBeforeExceptLatest(float minTime) { }
+
+    /// <summary>
     /// Clears all items after the given time
     /// </summary>
     public virtual void TrimAfter(float maxTime) { }
@@ -199,6 +204,19 @@ public class TimelineList<T> : TimelineListBase
     {
         // start newest, end oldest
         for (int i = 0; i < items.Count; i++)
+        {
+            if (items[i].time < minTime)
+            {
+                items.RemoveRange(i, items.Count - i);
+                break;
+            }
+        }
+    }
+
+    public override void TrimBeforeExceptLatest(float minTime)
+    {
+        // start newest, end oldest
+        for (int i = 1; i < items.Count; i++)
         {
             if (items[i].time < minTime)
             {

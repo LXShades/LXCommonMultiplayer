@@ -116,16 +116,19 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
     /// </summary>
-    public float confirmedStateTime { get; private set; }
+    public float confirmedStateTime => stateTimeline.Count > 0 ? stateTimeline.LatestTime : -1f;
+
+    /// <summary>
+    /// The most recent confirmed state
+    /// </summary>
+    public TState lastConfirmedState => stateTimeline.Count > 0 ? stateTimeline.Latest : default;
 
     /// <summary>
     /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
     /// </summary>
     public bool isDebugPaused { get; private set; }
 
-    public TState lastConfirmedState { get; private set; }
-
-
+    // Timelines!
     public readonly TimelineList<TInput> inputTimeline = new TimelineList<TInput>();
 
     public readonly TimelineList<TState> stateTimeline = new TimelineList<TState>();
@@ -177,43 +180,6 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     }
 
     /// <summary>
-    /// Loads a state and sets the playback time to that state
-    /// </summary>
-    public void Rewind(TState state, float time)
-    {
-        int index = stateTimeline.IndexAt(time, 0.0001f);
-
-        // do we need to reconcile (recalculate from this point next time we seek?)
-        if (settings.alwaysReconcile || index == -1 || !stateTimeline[index].Equals(state))
-        {
-            if (settings.debugLogReconciles)
-            {
-                Debug.Log(
-                    $"Reconcile {targetName}:\n" +
-                    $"Time: {time.ToString("F2")}\n" +
-                    $"Index: {index}\n" +
-                    $"Diffs: {(index != -1 ? PrintStructDifferences("recv", "old", state, stateTimeline[index]) : "N/A")}");
-            }
-
-            target.ApplyState(state);
-            lastConfirmedState = state;
-            confirmedStateTime = time;
-            playbackTime = time;
-        }
-    }
-
-    /// <summary>
-    /// Confirms the current character state. Needed to teleport or otherwise influence movement (except where events are used)
-    /// </summary>
-    public void ConfirmCurrentState()
-    {
-        lastConfirmedState = target.MakeState();
-        confirmedStateTime = playbackTime;
-
-        stateTimeline.Set(playbackTime, lastConfirmedState);
-    }
-
-    /// <summary>
     /// Seeks forward by the given deltaTime, if possible
     /// </summary>
     public void SeekBy(float deltaTime, float realtimePlaybackTime)
@@ -230,18 +196,31 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// </summary>
     public void Seek(float targetTime, float realtimePlaybackTime, TickerSeekFlags flags = TickerSeekFlags.None)
     {
+        float initialPlaybackTime = playbackTime;
         Debug.Assert(settings.maxDeltaTime > 0f);
 
+        // in debug mode we never seek to other times
         if (isDebugPaused)
             targetTime = playbackTime;
 
-        float initialPlaybackTime = playbackTime;
+        // Rewind to relevant keyframe (should we call states keyframes? which one is the easiest to comprehend?)
+        bool isRewinding = targetTime < playbackTime;
+        bool canAttemptConfirmNextState = (flags & TickerSeekFlags.DontConfirm) == 0 && confirmedStateTime < inputTimeline.LatestTime && targetTime > playbackTime;
 
-        if ((flags & TickerSeekFlags.DontConfirm) == 0 && confirmedStateTime < inputTimeline.LatestTime)
+        if (isRewinding || canAttemptConfirmNextState)
         {
-            // Restore our actual non-extrapolated position
-            target.ApplyState(lastConfirmedState);
-            playbackTime = confirmedStateTime;
+            // Rewind to the closest earlier keyframe. If canAttemptConfirmNextState, the closest earlier keyframe will happen to be the latest confirmed state
+            int closestStateBeforeTargetTime = stateTimeline.ClosestIndexBefore(targetTime, 0f);
+
+            if (closestStateBeforeTargetTime != -1)
+            {
+                target.ApplyState(stateTimeline[closestStateBeforeTargetTime]);
+                playbackTime = stateTimeline.TimeAt(closestStateBeforeTargetTime);
+            }
+            else
+            {
+                Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): reverse seek could not find earlier state to seek to. Using current state.");
+            }
         }
 
         // Playback our latest movements
@@ -252,59 +231,42 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
             // Execute ticks, grabbing and consuming inputs if they are available, or using the latest inputs
             while (playbackTime < targetTime)
             {
-                int index = inputTimeline.ClosestIndexBefore(playbackTime, 0.001f);
-                TInput input;
+                TInput input = default;
+                int inputIndex = inputTimeline.ClosestIndexBeforeOrEarliest(playbackTime, 0.001f);
                 float deltaTime = Mathf.Min(targetTime - playbackTime, settings.maxDeltaTime);
                 bool canConfirmState = false;
                 bool isRealtime = false;
                 float confirmableTime = 0f;
 
-                if (index == -1)
+                if (inputIndex != -1)
                 {
-                    // Sometimes we fall behind of the inputs and only a crazy amount of extrapolation would get us there
-                    // That is bad, but we have a half-baked solution which is to just skip to the oldest input we have and start from there. We need to get there somehow.
-                    int nextAfter = inputTimeline.ClosestIndexAfter(playbackTime, 0.001f);
+                    float inputTime = inputTimeline.TimeAt(inputIndex);
 
-                    if (nextAfter != -1 && inputTimeline.TimeAt(nextAfter) < targetTime)
-                    {
-                        index = nextAfter;
-                        playbackTime = inputTimeline.TimeAt(nextAfter);
-                    }
-                }
-
-                if (index != -1)
-                {
-                    float inputTime = inputTimeline.TimeAt(index);
-
-                    if (index > 0)
+                    if (inputIndex > 0)
                     {
                         // tick using the deltas between inputs, or the delta up to targetTime, whichever's smaller
                         // if we can do a full previous->next input tick, we can "confirm" this state
-                        float inputDeltaTime = inputTimeline.TimeAt(index - 1) - inputTimeline.TimeAt(index);
+                        float inputDeltaTime = inputTimeline.TimeAt(inputIndex - 1) - inputTimeline.TimeAt(inputIndex);
 
                         deltaTime = Mathf.Min(inputDeltaTime, targetTime - playbackTime);
 
                         if (deltaTime == inputDeltaTime && (flags & TickerSeekFlags.DontConfirm) == 0)
                         {
                             canConfirmState = true;
-                            confirmableTime = inputTimeline.TimeAt(index - 1);
+                            confirmableTime = inputTimeline.TimeAt(inputIndex - 1);
                         }
                     }
 
                     // use a delta if it's the crossing the beginning part of the input, otherwise extrapolate without delta
-                    if (index + 1 < inputTimeline.Count && playbackTime <= inputTime && playbackTime + deltaTime > inputTime && (flags & TickerSeekFlags.IgnoreDeltas) == 0)
-                        input = inputTimeline[index].WithDeltas(inputTimeline[index + 1]);
+                    if (inputIndex + 1 < inputTimeline.Count && playbackTime <= inputTime && playbackTime + deltaTime > inputTime && (flags & TickerSeekFlags.IgnoreDeltas) == 0)
+                        input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex + 1]);
                     else
-                        input = inputTimeline[index].WithoutDeltas();
+                        input = inputTimeline[inputIndex].WithoutDeltas();
 
                     // on the server, the true non-reconciled state is the one that uses full inputs
                     // on the client, the same is true except when replaying things we've already played - i.e. Reconciles - and we pass forceReconciliation for that.
                     if (canConfirmState && playbackTime >= realtimePlaybackTime)
                         isRealtime = true;
-                }
-                else
-                {
-                    input = inputTimeline.Latest.WithoutDeltas();
                 }
 
                 if (deltaTime > 0f)
@@ -325,7 +287,6 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                     {
                         // direct assignment of target time can reduce tiny floating point differences (these differences can accumulate _fast_) and reduce reconciles
                         playbackTime = confirmableTime;
-                        confirmedStateTime = confirmableTime;
 
                         // since this tick is a complete one, save the result as our next confirmed state
                         ConfirmCurrentState();
@@ -339,7 +300,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
 
                 if (numIterations == settings.maxSeekIterations)
                 {
-                    Debug.LogWarning($"Ticker.Seek(): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({confirmedStateTime}) Target: {initialPlaybackTime.ToString("F2")}-{targetTime.ToString("F2")}");
+                    Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({confirmedStateTime})");
 
                     if ((flags & TickerSeekFlags.DontConfirm) == 0)
                     {
@@ -372,8 +333,49 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     {
         float originalPlaybackTime = playbackTime;
 
-        Rewind(pastState, pastStateTime);
+        ConfirmStateAt(pastState, pastStateTime);
         Seek(originalPlaybackTime, originalPlaybackTime);
+    }
+
+    /// <summary>
+    /// Applies a state into the history. If the state differs from earlier state, or the state is old, a rewind will occur.
+    /// 
+    /// CAUTION: If the state differs from the original state at that time:
+    /// * The new state is confirmed
+    /// * All future confirmed states are removed (as they will likely be different when seeked again)
+    /// * The current playback time is set to the time provided.
+    /// </summary>
+    public void ConfirmStateAt(TState state, float time)
+    {
+        int index = stateTimeline.IndexAt(time, 0.0001f);
+
+        // if we have a state at that time which is already equal, we don't need to rewind or do anything! things are as they should be.
+        if (settings.alwaysReconcile || index == -1 || !stateTimeline[index].Equals(state))
+        {
+            if (settings.debugLogReconciles)
+            {
+                Debug.Log(
+                    $"Reconcile {targetName}:\n" +
+                    $"Time: {time.ToString("F2")}\n" +
+                    $"Index: {index}\n" +
+                    $"Diffs: {(index != -1 ? PrintStructDifferences("recv", "old", state, stateTimeline[index]) : "N/A")}");
+            }
+
+            target.ApplyState(state);
+
+            stateTimeline.Set(time, state);
+            stateTimeline.TrimAfter(time);
+
+            playbackTime = time;
+        }
+    }
+
+    /// <summary>
+    /// Confirms the current character state. Needed to teleport or otherwise influence movement (except where events are used)
+    /// </summary>
+    public void ConfirmCurrentState()
+    {
+        stateTimeline.Set(playbackTime, target.MakeState());
     }
 
     /// <summary>
@@ -434,9 +436,10 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     {
         float trimTo = playbackTime - settings.historyLength;
 
-        inputTimeline.TrimBefore(trimTo);
-        eventTimeline.TrimBefore(trimTo);
-        stateTimeline.TrimBefore(trimTo);
+        // we always want to have a confirmed state ready for us among other things, so we tend to preserve at least one item in each list as the "last known"
+        inputTimeline.TrimBeforeExceptLatest(trimTo);
+        eventTimeline.TrimBeforeExceptLatest(trimTo);
+        stateTimeline.TrimBeforeExceptLatest(trimTo);
     }
 
     /// <summary>
