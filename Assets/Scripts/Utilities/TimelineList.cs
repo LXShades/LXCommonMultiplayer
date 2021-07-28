@@ -244,4 +244,12 @@ public class TimelineList<T> : TimelineListBase
         TrimBefore(minTime);
         TrimAfter(maxTime);
     }
+
+    /// <summary>
+    /// Should be called if using Serializable timelines. Reorders the list ensuring all is correct
+    /// </summary>
+    public void Validate()
+    {
+        items.Sort((TimelineItem a, TimelineItem b) => (int)Mathf.Sign(b.time - a.time));
+    }
 }

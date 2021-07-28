@@ -146,13 +146,13 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     }
 
     /// <summary>
-    /// Inserts a single input into the input history. Old inputs at hte same time will be replaced.
+    /// Inserts a single input into the input history. Old inputs at the same time will be replaced.
     /// </summary>
     public void InsertInput(TInput input, float time)
     {
-        float timeSinceLastInput = time - inputTimeline.LatestTime;
+        int closestPriorInputIndex = inputTimeline.ClosestIndexBefore(time);
 
-        if (settings.maxInputRate <= 0 || timeSinceLastInput >= 1f / settings.maxInputRate - 0.0001f)
+        if (settings.maxInputRate <= 0 || closestPriorInputIndex == -1 || time - inputTimeline.TimeAt(closestPriorInputIndex) >= 1f / settings.maxInputRate - 0.0001f)
         {
             // Add current player input to input history
             inputTimeline.Set(time, input);
@@ -165,10 +165,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     public void InsertInputPack(TickerInputPack<TInput> inputPack)
     {
         for (int i = inputPack.inputs.Length - 1; i >= 0; i--)
-        {
-            // TODO: max input rate enforcement
-            inputTimeline.Set(inputPack.times[i], inputPack.inputs[i], 0.001f);
-        }
+            InsertInput(inputPack.inputs[i], inputPack.times[i]);
     }
 
     /// <summary>
@@ -313,9 +310,9 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                 {
                     Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({confirmedStateTime})");
 
-                    if ((flags & TickerSeekFlags.DontConfirm) == 0)
+                    if (canAttemptConfirmNextState)
                     {
-                        // we can't process everything, so stop here, accept the time we're given and call it confirmed
+                        // we can't process everything, risking a lockup, so accept the time we're given and call it confirmed
                         playbackTime = targetTime;
                         ConfirmCurrentState();
                     }

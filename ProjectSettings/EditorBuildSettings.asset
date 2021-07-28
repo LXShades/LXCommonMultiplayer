@@ -14,4 +14,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Examples-Mirror/Scenes/B-TickerPhysics.unity
     guid: e64670e5bebab0041aa42828d9024b9f
+  - enabled: 1
+    path: Assets/Examples-Mirror/Scenes/C-SimpleSeek.unity
+    guid: f294af9b5adf2f441b293ffcaef10109
   m_configObjects: {}
