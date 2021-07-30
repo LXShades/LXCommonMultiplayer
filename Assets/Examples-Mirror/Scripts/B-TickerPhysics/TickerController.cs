@@ -5,7 +5,7 @@ public class TickerController : NetworkBehaviour
 {
     PhysicsTickable physTickable;
 
-    Ticker<PhysicsPlayer.Input, PhysicsTickable.State> physTicker;
+    Ticker<PhysicsTickable.Input, PhysicsTickable.State> physTicker;
 
     private float timeOnServer;
     private float timeOfLastServerUpdate;
@@ -17,7 +17,7 @@ public class TickerController : NetworkBehaviour
     private void Start()
     {
         physTickable = FindObjectOfType<PhysicsTickable>();
-        physTicker = physTickable.GetTicker() as Ticker<PhysicsPlayer.Input, PhysicsTickable.State>;
+        physTicker = physTickable.GetTicker() as Ticker<PhysicsTickable.Input, PhysicsTickable.State>;
     }
 
     // Update is called once per frame
@@ -29,11 +29,9 @@ public class TickerController : NetworkBehaviour
         else
             physTicker.Seek(timeOnServer + Time.time - timeOfLastServerUpdate + clientExtrapolation, timeOnServer, TickerSeekFlags.IgnoreDeltas);
 
-        // Physics ticker: none of the states get confirmed because we're not adding inputs. We need to do that! A steady flow of inputs is required....
-
         // send target ticker's state to clients
         if (NetworkServer.active && (int)(Time.time * updatesPerSecond) != (int)((Time.time - Time.deltaTime) * updatesPerSecond))
-            RpcState(physTicker.target.MakeState(), physTicker.confirmedStateTime, 0f/*Time.time - physTicker.confirmedStateTime*/);
+            RpcState(physTicker.lastConfirmedState, physTicker.confirmedStateTime, Time.time - physTicker.confirmedStateTime);
     }
 
     [ClientRpc(channel = Channels.Unreliable)]

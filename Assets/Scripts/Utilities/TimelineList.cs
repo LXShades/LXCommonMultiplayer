@@ -22,7 +22,7 @@ public class TimelineListBase
     /// <summary>
     /// Returns the index of the item at the given time, within the tolerance, or -1 if not available
     /// </summary>
-    public virtual int IndexAt(float time, float tolerance = 0.01f) => -1;
+    public virtual int IndexAt(float time, float tolerance = 0f) => -1;
 
     /// <summary>
     /// Returns the time of the item at the given index
@@ -33,20 +33,20 @@ public class TimelineListBase
     /// Returns the nearest item after the given time, or within the tolerance range
     /// If there are multiple items within the tolerance, the closest one after the time is returned
     /// </summary>
-    public virtual int ClosestIndexAfter(float time, float tolerance = 0.01f) => -1;
+    public virtual int ClosestIndexAfter(float time, float tolerance = 0f) => -1;
 
     /// <summary>
     /// Returns the nearest item before the given time, or within the tolerance range
     /// If there are multiple items within the tolerance, the closest one before the time is returned
     /// </summary>
-    public virtual int ClosestIndexBefore(float time, float tolerance = 0.01f) => -1;
+    public virtual int ClosestIndexBefore(float time, float tolerance = 0f) => -1;
 
     /// <summary>
     /// Returns the nearest item before the given time, or within the tolerance range
     /// If there are multiple items within the tolerance, the closest one before the time is returned.
     /// If there are no items within or before the tolerance, the earliest index in the timeline is returned
     /// </summary>
-    public virtual int ClosestIndexBeforeOrEarliest(float time, float tolerance = 0.01f) => -1;
+    public virtual int ClosestIndexBeforeOrEarliest(float time, float tolerance = 0f) => -1;
 
     /// <summary>
     /// Removes the item at the given index
@@ -107,12 +107,12 @@ public class TimelineList<T> : TimelineListBase
 
     public override float LatestTime => items.Count > 0 ? items[0].time : 0.0f;
 
-    public T ItemAt(float time, float tolerance = 0.01f)
+    public T ItemAt(float time, float tolerance = 0f)
     {
         return items.Find(a => a.time >= time - tolerance && a.time <= time + tolerance).item;
     }
 
-    public override int IndexAt(float time, float tolerance = 0.01f)
+    public override int IndexAt(float time, float tolerance = 0f)
     {
         return items.FindIndex(a => a.time >= time - tolerance && a.time <= time + tolerance);
     }
@@ -124,7 +124,7 @@ public class TimelineList<T> : TimelineListBase
         return items[index].time;
     }
 
-    public override int ClosestIndexAfter(float time, float tolerance = 0.01f)
+    public override int ClosestIndexAfter(float time, float tolerance = 0f)
     {
         if (items.Count > 0)
         {
@@ -138,7 +138,7 @@ public class TimelineList<T> : TimelineListBase
         return -1;
     }
 
-    public override int ClosestIndexBefore(float time, float tolerance = 0.01f)
+    public override int ClosestIndexBefore(float time, float tolerance = 0f)
     {
         for (int index = 0; index < items.Count; index++)
         {
@@ -149,7 +149,7 @@ public class TimelineList<T> : TimelineListBase
         return -1;
     }
 
-    public override int ClosestIndexBeforeOrEarliest(float time, float tolerance = 0.01f)
+    public override int ClosestIndexBeforeOrEarliest(float time, float tolerance = 0f)
     {
         int index = ClosestIndexBefore(time, tolerance);
         
@@ -163,7 +163,7 @@ public class TimelineList<T> : TimelineListBase
         }
     }
 
-    public void Set(float time, T item, float tolerance = 0.01f)
+    public void Set(float time, T item, float tolerance = 0f)
     {
         for (int index = 0; index < items.Count; index++)
         {

@@ -18,15 +18,15 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
         }
 
         public Input WithDeltas(Input previousInput) => previousInput;
-
-        public Input WithoutDeltas() => this;
     }
 
     public float accelerationSpeed = 8f;
 
-    public Input latestInput;
-
     private Rigidbody rb;
+
+    private PhysicsTickable physicsTickable;
+
+    private readonly TimelineList<Input> myInputs = new TimelineList<Input>();
 
     public int updatesPerSecond = 30;
 
@@ -38,39 +38,86 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
     public override void OnStartClient()
     {
         base.OnStartClient();
-        FindObjectOfType<PhysicsTickable>().TrackPhysicsObject(netIdentity, rb);
+
+        physicsTickable = FindObjectOfType<PhysicsTickable>();
+        physicsTickable.TrackPhysicsObject(netIdentity, rb);
     }
     public override void OnStartServer()
     {
         base.OnStartServer();
-        FindObjectOfType<PhysicsTickable>().TrackPhysicsObject(netIdentity, rb);
+
+        physicsTickable = FindObjectOfType<PhysicsTickable>();
+        physicsTickable.TrackPhysicsObject(netIdentity, rb);
     }
 
     private void Update()
     {
-        if (hasAuthority && (int)(Time.time * updatesPerSecond) != (int)((Time.time - Time.deltaTime) * updatesPerSecond))
+        if (TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
         {
-            CmdInput(new Input[1] { new Input().GenerateLocal() }, new float[1] { Time.time });
-        }
+            // send local input to the server, and to our own input history
+            if (hasAuthority)
+            {
+                Input[] inputs = new Input[1] { new Input().GenerateLocal() };
+                float[] times = new float[1] { physicsTickable.GetTicker().playbackTime };
+
+                CmdInput(inputs, times);
+                myInputs.Set(times[0], inputs[0]);
+            }
+
+            // for other players to predict other players, they need to know the latest input
+            if (NetworkServer.active && !isLocalPlayer)
+            {
+                RpcLatestInput(myInputs.Latest, myInputs.LatestTime);
+            }
+        }    
     }
 
     [Command(channel = Channels.Unreliable)]
-    private void CmdInput(PhysicsPlayer.Input[] inputs, float[] times)
+    private void CmdInput(Input[] inputs, float[] times)
     {
-        // send the inputs to the target player
-        latestInput = inputs[0];
+        if (inputs != null && times != null && inputs.Length == times.Length)
+        {
+            for (int i = 0; i < inputs.Length; i++)
+                myInputs.Set(times[i], inputs[i]);
+        }
+
+        // avoid overloading inputs
+        TrimInputs();
     }
 
-    public void PhysicsTick(float deltaTime, PhysicsPlayer.Input input, bool isRealtime)
+    private void RpcLatestInput(Input input, float time)
     {
-        input = latestInput; // hack...
+        myInputs.Set(time, input);
 
+        // avoid overloading inputs
+        TrimInputs();
+    }
+
+    private void TrimInputs()
+    {
+        float time = physicsTickable.GetTicker().playbackTime;
+
+        myInputs.Trim(time - 1f, time + 1f);
+    }
+
+    public void PhysicsTick(float deltaTime, Input input, bool isRealtime)
+    {
         Vector3 moveDirection = Camera.main.transform.right * input.horizontal + Camera.main.transform.forward * input.vertical;
         moveDirection.y = 0f;
 
         // if we get reconciliation issues, we should consider that we possibly don't have a valid FixedDeltaTime setup and AddForce might not work correctly
         if (moveDirection.sqrMagnitude > 0f)
             rb.AddForce(moveDirection.normalized * (accelerationSpeed * deltaTime), ForceMode.Impulse);
+    }
+
+    public Input GetInputAtTime(float time)
+    {
+        int index = myInputs.ClosestIndexBeforeOrEarliest(TimeTool.Quantize(time, physicsTickable.inputsPerSecond));
+
+        if (index != -1)
+            return myInputs[index];
+        else
+            return default;
     }
 
     public Rigidbody GetRigidbody() => rb;

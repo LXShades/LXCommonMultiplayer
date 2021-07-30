@@ -7,9 +7,11 @@ public interface IPhysicsTick
     Rigidbody GetRigidbody();
 
     void PhysicsTick(float deltaTime, PhysicsPlayer.Input input, bool isRealtime);
+
+    PhysicsPlayer.Input GetInputAtTime(float time);
 }
 
-public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsPlayer.Input, PhysicsTickable.State>
+public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsTickable.Input, PhysicsTickable.State>
 {
     public struct RbState : ITickerState<RbState>
     {
@@ -52,30 +54,30 @@ public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsPlayer.Input, 
         public bool Equals(State other) => false; // todo - but allow it to reconcile
     }
 
-    public struct InputCollection : ITickerInput<InputCollection>
+    public struct Input : ITickerInput<Input>
     {
-        public PhysicsPlayer.Input[] input;
-        public ushort[] targetObjects;
+        public Input GenerateLocal() => this;
 
-        public InputCollection GenerateLocal() => new InputCollection();
-        public InputCollection WithDeltas(InputCollection previousInput) => this;
-        public InputCollection WithoutDeltas() => this;
+        public Input WithDeltas(Input previousInput) => this;
     }
 
     public TickerSettings tickerSettings = TickerSettings.Default;
 
-    Ticker<PhysicsPlayer.Input, State> ticker = null;
+    Ticker<Input, State> ticker = null;
 
     public GameObject physicsObjectPrefab;
     public int numPhysicsObjectsToGenerate = 10;
 
+    public int inputsPerSecond = 30;
+
+    /// <summary>List of physics objects tracked by this tickable, ordered by netId. Only contains networked objects.</summary>
     private SortedList<uint, Rigidbody> physObjects = new SortedList<uint, Rigidbody>();
 
     public float clientExtrapolation = 0.5f;
 
     void Awake()
     {
-        ticker = new Ticker<PhysicsPlayer.Input, State>(this);
+        ticker = new Ticker<Input, State>(this);
         ticker.settings = tickerSettings;
 
         // disable auto physics simulation, we'll do that in Tick
@@ -104,7 +106,7 @@ public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsPlayer.Input, 
         TrackAllPhysicsObjects();
     }
 
-    public void Tick(float deltaTime, PhysicsPlayer.Input input, bool isRealtime)
+    public void Tick(float deltaTime, Input input, bool isRealtime)
     {
         // run physics ticks
         for (int i = 0; i < physObjects.Count; i++)
@@ -114,7 +116,9 @@ public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsPlayer.Input, 
             if (physObj)
             {
                 foreach (IPhysicsTick physTick in physObj.GetComponents<IPhysicsTick>())
-                    physTick.PhysicsTick(deltaTime, input, isRealtime);
+                {
+                    physTick.PhysicsTick(deltaTime, physTick.GetInputAtTime(ticker.playbackTime), isRealtime);
+                }
             }
             else if (hasAuthority) // server should cleanup invalid objects asap
             {

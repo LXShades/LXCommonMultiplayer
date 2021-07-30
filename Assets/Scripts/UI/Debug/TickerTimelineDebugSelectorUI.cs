@@ -99,14 +99,34 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     {
         if (isControllable && tickerTimeline.targetTicker != null && tickerTimeline.targetTicker.isDebugPaused && eventData is PointerEventData pointerEvent)
         {
-            float timeDifference = tickerTimeline.timeline.timePerScreenX * pointerEvent.delta.x;
-            float targetTime = tickerTimeline.targetTicker.playbackTime + timeDifference;
-
-            if (timeDifference != 0f)
+            // scroll target time
+            if (pointerEvent.button == PointerEventData.InputButton.Left)
             {
-                tickerTimeline.targetTicker.SetDebugPaused(false); // briefly allow seek
+                float timeDifference = tickerTimeline.timeline.timePerScreenX * pointerEvent.delta.x;
+                float targetTime = tickerTimeline.targetTicker.playbackTime + timeDifference;
+
+                if (timeDifference != 0f)
+                {
+                    tickerTimeline.targetTicker.SetDebugPaused(false); // briefly allow seek
+                    tickerTimeline.targetTicker.Seek(targetTime, targetTime);
+                    tickerTimeline.targetTicker.SetDebugPaused(true); // briefly allow seek
+                }
+            }
+        }
+
+        if (eventData is PointerEventData pointerEvent2)
+        {
+            // scroll source time
+            if (pointerEvent2.button == PointerEventData.InputButton.Right)
+            {
+                float sourceTime = tickerTimeline.timeline.TimeAtScreenX(pointerEvent2.position.x);
+                float targetTime = tickerTimeline.targetTicker.playbackTime;
+
+                tickerTimeline.targetTicker.SetDebugPaused(false);
+                tickerTimeline.targetTicker.Seek(sourceTime, targetTime);
+                tickerTimeline.targetTicker.stateTimelineBase.TrimAfter(sourceTime); // force reconfirmation
                 tickerTimeline.targetTicker.Seek(targetTime, targetTime);
-                tickerTimeline.targetTicker.SetDebugPaused(true); // briefly allow seek
+                tickerTimeline.targetTicker.SetDebugPaused(true);
             }
         }
     }

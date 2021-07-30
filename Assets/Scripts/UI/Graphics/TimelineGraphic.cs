@@ -41,6 +41,12 @@ public class TimelineGraphic : MaskableGraphic
 
     public float timePerScreenX => (timeEnd - timeStart) / rectTransform.rect.width / rectTransform.lossyScale.x;
 
+    public float TimeAtScreenX(float screenX)
+    {
+        Vector3 relativePosition = rectTransform.InverseTransformPoint(new Vector3(screenX, 0, 0)) - new Vector3(rectTransform.rect.min.x, 0, 0);
+        return timeStart + relativePosition.x * (timeEnd - timeStart) / rectTransform.rect.width;
+    }
+
     /// <summary>
     /// Prepares the timeline for drawing
     /// </summary>
