@@ -52,6 +52,16 @@ public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsPlayer.Input, 
         public bool Equals(State other) => false; // todo - but allow it to reconcile
     }
 
+    public struct InputCollection : ITickerInput<InputCollection>
+    {
+        public PhysicsPlayer.Input[] input;
+        public ushort[] targetObjects;
+
+        public InputCollection GenerateLocal() => new InputCollection();
+        public InputCollection WithDeltas(InputCollection previousInput) => this;
+        public InputCollection WithoutDeltas() => this;
+    }
+
     public TickerSettings tickerSettings = TickerSettings.Default;
 
     Ticker<PhysicsPlayer.Input, State> ticker = null;
