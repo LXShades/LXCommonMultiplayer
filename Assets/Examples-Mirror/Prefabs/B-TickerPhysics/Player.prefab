@@ -406,7 +406,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   syncMode: 0
   syncInterval: 0.1
-  accelerationSpeed: 8
+  accelerationSpeed: 40
+  updatesPerSecond: 30
 --- !u!33 &6503358966875659590
 MeshFilter:
   m_ObjectHideFlags: 0

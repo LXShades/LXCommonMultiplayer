@@ -70,7 +70,7 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
 
         // if we get reconciliation issues, we should consider that we possibly don't have a valid FixedDeltaTime setup and AddForce might not work correctly
         if (moveDirection.sqrMagnitude > 0f)
-            rb.AddForce(moveDirection.normalized * accelerationSpeed, ForceMode.Acceleration);
+            rb.AddForce(moveDirection.normalized * (accelerationSpeed * deltaTime), ForceMode.Impulse);
     }
 
     public Rigidbody GetRigidbody() => rb;

@@ -31,7 +31,6 @@ Among current todo's are:
 
 ### Fixes
 * Example Player Character still needs to be changed for each example scene
-* DeltaTime substepping in Seek between confirmed states
 
 ## Warrantn't!!
 Although public-facing, this toolset currently comes with no warranty or instruction manual. Code should be considered beta, with inline documentation and usage examples under occasional ongoing development.
