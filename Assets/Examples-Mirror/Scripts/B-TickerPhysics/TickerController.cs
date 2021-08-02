@@ -30,7 +30,7 @@ public class TickerController : NetworkBehaviour
             physTicker.Seek(timeOnServer + Time.time - timeOfLastServerUpdate + clientExtrapolation, timeOnServer, TickerSeekFlags.IgnoreDeltas);
 
         // send target ticker's state to clients
-        if (NetworkServer.active && (int)(Time.time * updatesPerSecond) != (int)((Time.time - Time.deltaTime) * updatesPerSecond))
+        if (NetworkServer.active && TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
             RpcState(physTicker.lastConfirmedState, physTicker.confirmedStateTime, Time.time - physTicker.confirmedStateTime);
     }
 
@@ -39,7 +39,7 @@ public class TickerController : NetworkBehaviour
     {
         if (!NetworkServer.active)
         {
-            physTicker.Reconcile(state, time, TickerSeekFlags.DontConfirm);
+            physTicker.Reconcile(state, time, 0/*TickerSeekFlags.DontConfirm*/);
             timeOnServer = time + serverExtrapolation;
             timeOfLastServerUpdate = Time.time;
         }

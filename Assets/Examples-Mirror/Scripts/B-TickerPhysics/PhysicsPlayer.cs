@@ -42,6 +42,7 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
         physicsTickable = FindObjectOfType<PhysicsTickable>();
         physicsTickable.TrackPhysicsObject(netIdentity, rb);
     }
+
     public override void OnStartServer()
     {
         base.OnStartServer();
@@ -65,11 +66,11 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
             }
 
             // for other players to predict other players, they need to know the latest input
-            if (NetworkServer.active && !isLocalPlayer)
+            if (NetworkServer.active)
             {
                 RpcLatestInput(myInputs.Latest, myInputs.LatestTime);
             }
-        }    
+        }
     }
 
     [Command(channel = Channels.Unreliable)]
@@ -85,6 +86,7 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
         TrimInputs();
     }
 
+    [ClientRpc(channel = Channels.Unreliable)]
     private void RpcLatestInput(Input input, float time)
     {
         myInputs.Set(time, input);
@@ -97,7 +99,7 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
     {
         float time = physicsTickable.GetTicker().playbackTime;
 
-        myInputs.Trim(time - 1f, time + 1f);
+        myInputs.Trim(time - 3f, time + 3f);
     }
 
     public void PhysicsTick(float deltaTime, Input input, bool isRealtime)
@@ -107,7 +109,12 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
 
         // if we get reconciliation issues, we should consider that we possibly don't have a valid FixedDeltaTime setup and AddForce might not work correctly
         if (moveDirection.sqrMagnitude > 0f)
+        {
             rb.AddForce(moveDirection.normalized * (accelerationSpeed * deltaTime), ForceMode.Impulse);
+            //rb.velocity += moveDirection.normalized * (accelerationSpeed * deltaTime);
+        }
+
+        numStepsMade += input.horizontal;
     }
 
     public Input GetInputAtTime(float time)
