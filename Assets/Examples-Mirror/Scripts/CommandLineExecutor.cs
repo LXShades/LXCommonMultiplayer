@@ -39,7 +39,8 @@ public class CommandLineExecutor : MonoBehaviour
             op = SetScene(defaultScene);
 
         // execute remaining command line commands
-        op.completed += (AsyncOperation operation) => ExecuteCommandLine();
+        if (op != null)
+            op.completed += (AsyncOperation operation) => ExecuteCommandLine();
     }
 
     private void ExecuteCommandLine()
@@ -56,10 +57,18 @@ public class CommandLineExecutor : MonoBehaviour
 
     private AsyncOperation SetScene(string scene)
     {
-        int sceneIndex;
-        bool isInt = int.TryParse(scene, out sceneIndex);
+        bool isInt = int.TryParse(scene, out int sceneIndex);
+        int activeSceneIndex = SceneManager.GetActiveScene().buildIndex;
 
         Debug.Log($"Loading scene {scene}...");
+
+        if ((isInt && sceneIndex == activeSceneIndex)
+            || SceneManager.GetSceneByName(scene).IsValid() && SceneManager.GetSceneByName(scene).buildIndex == activeSceneIndex
+            || SceneManager.GetSceneByPath(scene).IsValid() && SceneManager.GetSceneByPath(scene).buildIndex == activeSceneIndex)
+        {
+            Debug.LogError($"Infinite loop detected: we appear to be loading the scene we're already in. Stopping.");
+            return null;
+        }
 
         if (isInt)
             return SceneManager.LoadSceneAsync(sceneIndex);

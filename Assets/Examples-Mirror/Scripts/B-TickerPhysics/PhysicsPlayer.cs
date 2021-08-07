@@ -55,14 +55,21 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
     {
         if (TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
         {
-            // send local input to the server, and to our own input history
+            // add inputs to our input history, then send recent inputs to server
             if (hasAuthority)
             {
-                Input[] inputs = new Input[1] { new Input().GenerateLocal() };
-                float[] times = new float[1] { physicsTickable.GetTicker().playbackTime };
+                myInputs.Set(physicsTickable.GetTicker().playbackTime, new Input().GenerateLocal());
+
+                int numInputsToSend = Mathf.Min(5, myInputs.Count);
+                Input[] inputs = new Input[numInputsToSend];
+                float[] times = new float[numInputsToSend];
+                for (int i = 0; i < numInputsToSend; i++)
+                {
+                    inputs[i] = myInputs[i];
+                    times[i] = myInputs.TimeAt(i);
+                }
 
                 CmdInput(inputs, times);
-                myInputs.Set(times[0], inputs[0]);
             }
 
             // for other players to predict other players, they need to know the latest input
@@ -113,8 +120,6 @@ public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
             rb.AddForce(moveDirection.normalized * (accelerationSpeed * deltaTime), ForceMode.Impulse);
             //rb.velocity += moveDirection.normalized * (accelerationSpeed * deltaTime);
         }
-
-        numStepsMade += input.horizontal;
     }
 
     public Input GetInputAtTime(float time)

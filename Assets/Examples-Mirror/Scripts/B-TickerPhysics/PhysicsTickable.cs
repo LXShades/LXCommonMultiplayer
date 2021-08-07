@@ -34,10 +34,55 @@ public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsTickable.Input
             target.angularVelocity = angularVelocity;
         }
 
-        public Vector3 position;
-        public Quaternion rotation;
-        public Vector3 velocity;
-        public Vector3 angularVelocity;
+        const ulong kMask48 = ~(~0L << 48);
+        const ulong kMask40 = ~(~0L << 40);
+        const ulong kMask32 = ~0U; // << 32 produces no shift at all, C# quirk.
+        const ulong kMask24 = ~(~0 << 24);
+        const ulong kMask16 = ~(~0 << 16);
+
+        public Vector3 position
+        {
+            get => Compressor.DecompressVectorVariable((compressedB >> 32 & kMask32) | ((ulong)compressedC << 32), 20f, 48);
+            set
+            {
+                ulong valCompressed = Compressor.CompressVectorVariable(value, 20f, 48);
+                compressedB = (compressedB & kMask32) | (valCompressed << 32);
+                compressedC = (ushort)(valCompressed >> 32);
+            }
+        }
+
+        public Quaternion rotation
+        {
+            get => Compressor.DecompressQuaternion32(rotationCompressed);
+            set => rotationCompressed = Compressor.CompressQuaternion32(value);
+        }
+
+        public Vector3 velocity
+        {
+            get => Compressor.DecompressVectorVariable((compressedA >> 48) | ((compressedB & kMask32) << 16), 20f, 48);
+            set
+            {
+                ulong valCompressed = Compressor.CompressVectorVariable(value, 20f, 48);
+                compressedA = (compressedA & kMask48) | (valCompressed << 48);              // valCompressed:0-16 to compressedA:48-64
+                compressedB = ((valCompressed >> 16) & kMask32) | (compressedB & ~kMask32); // valCompressed:16-48 to compressedB:0-32
+            }
+        }
+
+        public Vector3 angularVelocity
+        {
+            get => Compressor.DecompressVectorVariable(compressedA & kMask48, 20f, 48);
+            set
+            {
+                compressedA = (Compressor.CompressVectorVariable(value, 20f, 48) & kMask48) | (compressedA & ~kMask48);
+            }
+        }
+
+        // these below compressed variables are the ones read/written by Mirror (Mirror does not read the properties above, it works with actual data only)
+        // we use unsigned ints where possible because we do a lot of shifting. right-shifts do funky arithmetics on signed ints that we don't want
+        public uint rotationCompressed;
+        public ulong compressedA;
+        public ulong compressedB;
+        public ushort compressedC;
 
         public void DebugDraw(Color colour) { }
 
@@ -46,7 +91,6 @@ public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsTickable.Input
 
     public struct State : ITickerState<State>
     {
-        // 52 bytes per object, pain
         public RbState[] states;
 
         public void DebugDraw(Color colour) { }
