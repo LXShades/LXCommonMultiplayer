@@ -52,13 +52,13 @@ public static class Compressor
         return (uint)result;
     }
 
-    public static Vector3 DecompressNormal24(int normalVector)
+    public static Vector3 DecompressNormal24(uint normalVector)
     {
         Vector3 result = default;
 
-        result.x = (normalVector << (32 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
-        result.y = (normalVector << (24 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
-        result.z = (normalVector << (16 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
+        result.x = ((int)normalVector << (32 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
+        result.y = ((int)normalVector << (24 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
+        result.z = ((int)normalVector << (16 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
 
         return result;
     }
