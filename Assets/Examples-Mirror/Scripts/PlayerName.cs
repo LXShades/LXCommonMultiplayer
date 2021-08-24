@@ -1,26 +1,30 @@
 using Mirror;
 
-/// <summary>
-/// Holds the player's name and assigns it to the GameObject
-/// </summary>
-public class PlayerName : NetworkBehaviour
+
+namespace MultiplayerToolset.Examples.Mirror
 {
-    [SyncVar(hook = nameof(AssignName))]
-    private string playerName;
-
-    public override void OnStartServer()
+    /// <summary>
+    /// Holds the player's name and assigns it to the GameObject
+    /// </summary>
+    public class PlayerName : NetworkBehaviour
     {
-        base.OnStartServer();
+        [SyncVar(hook = nameof(AssignName))]
+        private string playerName;
 
-        if (isLocalPlayer)
-            AssignName("", "Host");
-        else
-            AssignName("", $"{connectionToClient.address}");
-    }
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
 
-    public void AssignName(string oldName, string newName)
-    {
-        playerName = newName;
-        gameObject.name = $"[Player] {newName} {(isLocalPlayer ? "(local)" : "")}";
+            if (isLocalPlayer)
+                AssignName("", "Host");
+            else
+                AssignName("", $"{connectionToClient.address}");
+        }
+
+        public void AssignName(string oldName, string newName)
+        {
+            playerName = newName;
+            gameObject.name = $"[Player] {newName} {(isLocalPlayer ? "(local)" : "")}";
+        }
     }
 }

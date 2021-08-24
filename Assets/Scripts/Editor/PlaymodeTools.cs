@@ -35,7 +35,7 @@ public static class PlaymodeTools
     [InitializeOnLoadMethod]
     private static void OnInit()
     {
-        if (EditorApplication.isPlaying)
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
             return;
 
         ReloadBootSceneAsStartScene();

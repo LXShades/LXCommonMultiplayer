@@ -26,7 +26,11 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     private void Start()
     {
         // repopulate list when mouse interacts with the dropdown
-        EventTrigger events = dropdown.gameObject.AddComponent<EventTrigger>();
+        EventTrigger events = dropdown.gameObject.GetComponent<EventTrigger>();
+
+        if (events == null)
+            events = dropdown.gameObject.AddComponent<EventTrigger>();
+
         EventTrigger.Entry eventHandler = new EventTrigger.Entry()
         {
             eventID = EventTriggerType.PointerEnter
@@ -36,7 +40,11 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         events.triggers.Add(eventHandler);
 
         // handle when mouse clicks on timeline
-        events = tickerTimeline.gameObject.AddComponent<EventTrigger>();
+        events = tickerTimeline.gameObject.GetComponent<EventTrigger>();
+
+        if (events == null)
+            events = tickerTimeline.gameObject.AddComponent<EventTrigger>();
+
         eventHandler = new EventTrigger.Entry()
         {
             eventID = EventTriggerType.Drag
@@ -56,6 +64,25 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         RepopulateDropdown();
         // initial play/pause text
         UpdatePlayPauseButtonText();
+
+        StartCoroutine(nameof(TickerFinderCoroutine));
+    }
+
+    private System.Collections.IEnumerator TickerFinderCoroutine()
+    {
+        while (enabled)
+        {
+            if (tickerTimeline.targetTicker == null)
+            {
+                RepopulateDropdown();
+            }
+            yield return new WaitForSeconds(1.0f);
+        }
+    }
+
+    private void OnEnable()
+    {
+        RepopulateDropdown();
     }
 
     private void RepopulateDropdown()

@@ -1,75 +1,79 @@
 using UnityEngine;
 
-/// <summary>
-/// Simple tickable object with a pre-determined set of inputs to cycle through
-/// </summary>
-public class SimpleSeekObject : MonoBehaviour, ITickable<SimpleSeekObject.Input, SimpleSeekObject.State>
+
+namespace MultiplayerToolset.Examples.Mirror
 {
-    [System.Serializable]
-    public struct Input : ITickerInput<Input>
+    /// <summary>
+    /// Simple tickable object with a pre-determined set of inputs to cycle through
+    /// </summary>
+    public class SimpleSeekObject : MonoBehaviour, ITickable<SimpleSeekObject.Input, SimpleSeekObject.State>
     {
-        public Vector2 movementDirection;
-
-        public Input GenerateLocal() => new Input(); // we don't read real inputs for this example
-
-        public Input WithDeltas(Input previousInput) => this; // no applicable deltas
-
-        public Input WithoutDeltas() => this;
-    }
-
-    public struct State : ITickerState<State>
-    {
-        public Vector3 position;
-
-        public void DebugDraw(Color colour) { }
-
-        public bool Equals(State other) => false;
-    }
-
-    public TimelineList<Input> inputs;
-
-    public float movementSpeed;
-
-    private Ticker<Input, State> ticker;
-
-    private void Awake()
-    {
-        ticker = new Ticker<Input, State>(this);
-
-        TickerSettings settings = TickerSettings.Default;
-        settings.historyLength = 10f;
-        ticker.settings = settings;
-    }
-
-    private void Start()
-    {
-        inputs.Validate();
-        for (int i = 0; i < inputs.Count; i++)
-            ticker.InsertInput(inputs[i], inputs.TimeAt(i));
-    }
-
-    private void Update()
-    {
-        ticker.Seek(Time.time % inputs.LatestTime, Time.time % inputs.LatestTime, TickerSeekFlags.None);
-    }
-
-    public void Tick(float deltaTime, Input input, bool isRealtime)
-    {
-        transform.position += new Vector3(input.movementDirection.x, 0f, input.movementDirection.y) * (movementSpeed * deltaTime);
-    }
-
-    public State MakeState()
-    {
-        return new State()
+        [System.Serializable]
+        public struct Input : ITickerInput<Input>
         {
-            position = transform.position
-        };
-    }
+            public Vector2 movementDirection;
 
-    public void ApplyState(State state)
-    {
-        transform.position = state.position;
-    }
+            public Input GenerateLocal() => new Input(); // we don't read real inputs for this example
 
-    public ITickerBase GetTicker() => ticker;
+            public Input WithDeltas(Input previousInput) => this; // no applicable deltas
+
+            public Input WithoutDeltas() => this;
+        }
+
+        public struct State : ITickerState<State>
+        {
+            public Vector3 position;
+
+            public void DebugDraw(Color colour) { }
+
+            public bool Equals(State other) => false;
+        }
+
+        public TimelineList<Input> inputs;
+
+        public float movementSpeed;
+
+        private Ticker<Input, State> ticker;
+
+        private void Awake()
+        {
+            ticker = new Ticker<Input, State>(this);
+
+            TickerSettings settings = TickerSettings.Default;
+            settings.historyLength = 10f;
+            ticker.settings = settings;
+        }
+
+        private void Start()
+        {
+            inputs.Validate();
+            for (int i = 0; i < inputs.Count; i++)
+                ticker.InsertInput(inputs[i], inputs.TimeAt(i));
+        }
+
+        private void Update()
+        {
+            ticker.Seek(Time.time % inputs.LatestTime, Time.time % inputs.LatestTime, TickerSeekFlags.None);
+        }
+
+        public void Tick(float deltaTime, Input input, bool isRealtime)
+        {
+            transform.position += new Vector3(input.movementDirection.x, 0f, input.movementDirection.y) * (movementSpeed * deltaTime);
+        }
+
+        public State MakeState()
+        {
+            return new State()
+            {
+                position = transform.position
+            };
+        }
+
+        public void ApplyState(State state)
+        {
+            transform.position = state.position;
+        }
+
+        public ITickerBase GetTicker() => ticker;
+    }
 }

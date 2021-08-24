@@ -198,10 +198,10 @@ RectTransform:
   m_Father: {fileID: 6439931222723612267}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -340, y: 0}
-  m_SizeDelta: {x: 107.83, y: 21.87}
+  m_AnchorMin: {x: 0, y: 0.5}
+  m_AnchorMax: {x: 0, y: 0.5}
+  m_AnchoredPosition: {x: 60, y: 0}
+  m_SizeDelta: {x: 107.83002, y: 21.87}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6439931222426164549
 CanvasRenderer:
@@ -478,7 +478,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   dropdown: {fileID: 6439931222426164551}
-  tickerTimeline: {fileID: 6439931223584922571}
+  tickerTimeline: {fileID: 6439931223584922570}
+  isControllable: 0
+  playPauseButton: {fileID: 0}
+  playPauseButtonText: {fileID: 0}
 --- !u!1 &6439931222766617004
 GameObject:
   m_ObjectHideFlags: 0
@@ -871,35 +874,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6439931223584922572}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eec178d00fd487045a6352208b27d7ef, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  timelineColour:
-    serializedVersion: 2
-    rgba: 4294967295
-  timelineThickness: 2
-  timeStart: 0
-  timeEnd: 5
-  tickHeight: 20
-  labelSize: 14
---- !u!114 &6439931223584922571
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6439931223584922572}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2968d09c19e23f44788e00c6f19891a8, type: 3}
+  m_Script: {fileID: 11500000, guid: 8e7c5dd016a81b4499e86b7b6d3db840, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   timelineLength: 5
@@ -921,6 +896,34 @@ MonoBehaviour:
   inputColor:
     serializedVersion: 2
     rgba: 4278512639
+--- !u!114 &6439931223584922571
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6439931223584922572}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d486ddf429a1344a8062a6ff821fdc1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  timelineColour:
+    serializedVersion: 2
+    rgba: 4294967295
+  timelineThickness: 5
+  timeStart: 10
+  timeEnd: 20
+  tickHeight: 20
+  labelSize: 14
 --- !u!1 &6439931223826116138
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,4 +1,5 @@
 ﻿using Mirror;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -47,28 +48,39 @@ public class NetMan : NetworkManager
         {
             switch (transport)
             {
-                case IgnoranceTransport.Ignorance asIgnorance:
-                    return asIgnorance.port;
                 case kcp2k.KcpTransport asKcp:
                     return asKcp.Port;
                 case TelepathyTransport asTelepathy:
                     return asTelepathy.port;
             }
+
+            // other known transports, we can't access these directly without introducing more dependencies... it's horrible. Oh well
+            // this works for Ignorance (http://github.com/SoftwareGuy/Ignorance)
+            FieldInfo portFieldIgnorance = transport.GetType().GetField("port");
+            if (portFieldIgnorance != null && portFieldIgnorance.FieldType == typeof(int))
+            {
+                return (int)portFieldIgnorance.GetValue(transport);
+            }
+
+            // unknown, or not supported. lol, sup port
             return -1;
         }
         set
         {
             switch (transport)
             {
-                case IgnoranceTransport.Ignorance asIgnorance:
-                    asIgnorance.port = value;
-                    break;
                 case kcp2k.KcpTransport asKcp:
                     asKcp.Port = (ushort)value;
                     break;
                 case TelepathyTransport asTelepathy:
                     asTelepathy.port = (ushort)value;
                     break;
+            }
+
+            FieldInfo portFieldIgnorance = transport.GetType().GetField("port");
+            if (portFieldIgnorance != null && portFieldIgnorance.FieldType == typeof(int))
+            {
+                portFieldIgnorance.SetValue(transport, value);
             }
         }
     }
