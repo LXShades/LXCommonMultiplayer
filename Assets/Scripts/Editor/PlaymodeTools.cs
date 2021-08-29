@@ -32,39 +32,63 @@ public static class PlaymodeTools
         set => EditorPrefs.SetString("_playModeCommandLineParms", value);
     }
 
+    private static int editorSceneBuildIndex
+    {
+        get => EditorPrefs.GetInt("_playModeEditorSceneBuildIndex", -1); // we need to remember the value during reloads
+        set => EditorPrefs.SetInt("_playModeEditorSceneBuildIndex", value);
+    }
+
     [InitializeOnLoadMethod]
-    private static void OnInit()
+    private static void OnEditorInit()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
             return;
 
-        ReloadBootSceneAsStartScene();
-
-        EditorSceneManager.sceneOpened += (Scene scn, OpenSceneMode mode) =>
+        EditorSceneManager.activeSceneChangedInEditMode += (Scene scn, Scene scn2) =>
         {
-            ReloadBootSceneAsStartScene();
+            ReassignBootScene();
 
-            // Change editor commands to load this current scene
-            UpdateEditorCommands();
+            editorSceneBuildIndex = scn2.buildIndex;
+        };
+        EditorSceneManager.sceneLoaded += (Scene scn, LoadSceneMode loadMode) =>
+        {
+            ReassignBootScene();
+
+            editorSceneBuildIndex = scn.buildIndex;
         };
 
         // Be prepared to set editor commands on play mode
         EditorApplication.playModeStateChanged += OnPlayStateChanged;
 
         // To cover when user changes the boot scene. The boot scene is always assumed to be scene 0.
-        EditorBuildSettings.sceneListChanged += ReloadBootSceneAsStartScene;
+        EditorBuildSettings.sceneListChanged += ReassignBootScene;
+    }
 
-        // Set default command parameters
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void OnGameInit()
+    {
+        // Set default command parameters if they haven't been set
         UpdateEditorCommands();
     }
     
-    private static void ReloadBootSceneAsStartScene()
+    private static void ReassignBootScene()
     {
         // before starting, make sure the boot scene loads first
         if (playModeCommandType != PlayModeCommands.Disabled && EditorBuildSettings.scenes.Length > 0)
-            EditorSceneManager.playModeStartScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[0].path);
-        else
+        {
+            SceneAsset bootScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[0].path);
+
+            if (EditorSceneManager.playModeStartScene == null || EditorSceneManager.playModeStartScene.name != bootScene.name)
+            {
+                Debug.Log($"PlaymodeTools: Reassigned boot scene to {bootScene.name}");
+                EditorSceneManager.playModeStartScene = bootScene;
+            }
+        }
+        else if (EditorSceneManager.playModeStartScene != null)
+        {
+            Debug.Log($"PlaymodeTools: Cleared boot scene");
             EditorSceneManager.playModeStartScene = null;
+        }
     }
 
     private static void OnPlayStateChanged(PlayModeStateChange change)
@@ -74,45 +98,46 @@ public static class PlaymodeTools
             CommandLine.editorCommands = new string[0];
     }
 
+    /// <summary>
+    /// Sets the editor commands before scene load during game run, unless they've already been set by something else
+    /// </summary>
     private static void UpdateEditorCommands()
     {
-        string[] editorCommands = new string[0];
-
-        switch (playModeCommandType)
+        if (CommandLine.editorCommands == null || CommandLine.editorCommands.Length == 0)
         {
-            case PlayModeCommands.Host:
-                int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+            string[] editorCommands = new string[0];
 
-                if (currentSceneIndex == -1)
-                {
-                    Debug.LogError($"Cannot Host in this scene: it is not in the build settings, so we can't load Boot and transfer to this one. Add {SceneManager.GetActiveScene().name} to the build settings to continue.");
-                    EditorApplication.isPlaying = false;
-                }
+            switch (playModeCommandType)
+            {
+                case PlayModeCommands.Host:
+                    if (editorSceneBuildIndex == -1)
+                    {
+                        Debug.LogError($"PlaymodeTools: Cannot Host in this scene: it is not in the build settings, so we can't load Boot and transfer to this one. Add {SceneManager.GetActiveScene().name} to the build settings to continue.");
+                        EditorApplication.isPlaying = false;
+                    }
 
-                editorCommands = new string[] { "-host", "-scene", currentSceneIndex.ToString() };
-                break;
-            case PlayModeCommands.Connect:
-                editorCommands = new string[] { "-connect", "127.0.0.1" };
-                break;
-            case PlayModeCommands.Custom:
-                editorCommands = playModeCommandLine.Split(' ');
-                break;
-            case PlayModeCommands.Disabled:
-                break;
+                    editorCommands = new string[] { "-host", "-scene", editorSceneBuildIndex.ToString() };
+                    break;
+                case PlayModeCommands.Connect:
+                    editorCommands = new string[] { "-connect", "127.0.0.1" };
+                    break;
+                case PlayModeCommands.Custom:
+                    editorCommands = playModeCommandLine.Split(' ');
+                    break;
+                case PlayModeCommands.Disabled:
+                    break;
+            }
+
+            Debug.Log($"Setting PlayMode command line: {string.Join(" ", editorCommands)}");
+            CommandLine.editorCommands = editorCommands;
         }
-
-        if ((EditorSceneManager.playModeStartScene == null) != (playModeCommandType == PlayModeCommands.Disabled))
-            ReloadBootSceneAsStartScene();
-
-        Debug.Log($"Setting PlayMode command line: {string.Join(" ", editorCommands)}");
-        CommandLine.editorCommands = editorCommands;
     }
 
     [MenuItem("Playtest/Autohost in Playmode", false, 100)]
     static void AutoHostOutsideBoot()
     {
         playModeCommandType = PlayModeCommands.Host;
-        UpdateEditorCommands();
+        ReassignBootScene();
     }
 
     [MenuItem("Playtest/Autohost in Playmode", validate = true)]
@@ -127,7 +152,7 @@ public static class PlaymodeTools
     static void AutoConnectOutsideBoot()
     {
         playModeCommandType = PlayModeCommands.Connect;
-        UpdateEditorCommands();
+        ReassignBootScene();
     }
 
     [MenuItem("Playtest/Autoconnect in Playmode", validate = true)]
@@ -159,7 +184,7 @@ public static class PlaymodeTools
     static void DontUseCommands()
     {
         playModeCommandType = PlayModeCommands.Disabled;
-        UpdateEditorCommands();
+        ReassignBootScene();
     }
 
     [MenuItem("Playtest/No commands (Unity default)", validate = true)]

@@ -10,7 +10,7 @@ EditorBuildSettings:
     guid: b190b2c6b197e6e42b0b9c16523af739
   - enabled: 1
     path: Assets/Examples-Mirror/Scenes/A-TickerPlayerMovement.unity
-    guid: 9fc0d4010bbf28b4594072e72b8655ab
+    guid: 3b4fac69b45a8ac4f89ffd3b451acd7e
   - enabled: 1
     path: Assets/Examples-Mirror/Scenes/B-TickerPhysics.unity
     guid: e64670e5bebab0041aa42828d9024b9f
