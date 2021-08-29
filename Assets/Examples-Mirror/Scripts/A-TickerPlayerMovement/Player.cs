@@ -49,6 +49,8 @@ namespace MultiplayerToolset.Examples.Mirror
 
         public TickerSettings tickerSettings = TickerSettings.Default;
 
+        private Movement movement;
+
         private float timeOnServer;
 
         private float timeOfLastReceivedServerUpdate;
@@ -60,6 +62,8 @@ namespace MultiplayerToolset.Examples.Mirror
         {
             ticker = new Ticker<PlayerInput, PlayerState>(this);
             ticker.settings = tickerSettings;
+
+            movement = GetComponent<Movement>();
         }
 
         private void Update()
@@ -113,17 +117,19 @@ namespace MultiplayerToolset.Examples.Mirror
         /// <summary>
         /// Ticks the object. In a networked game, you may put most important gameplay things in this function, as though it were an Update function.
         /// 
-        /// * Do NOT use Time.deltaTime, or anything from Time (except debugging info)!
+        /// * Do NOT use Time.deltaTime, or anything from Time (except debugging info)! Use provided deltaTime instead.
         /// * Do not read live inputs from here (except, again, debugging). Put everything you need into TInput and ensure it is passed into the ticker timeline.
-        /// * Always remember Tick() may be called during states in the past, where Time.deltaTime may completely inaccurate.
         /// * Always remember Tick() may be called multiple times in a single frame. As such, avoid playing sounds or spawning objects unless isRealtime is true.
+        /// * As such, always remember Tick() may be called on past/outdated states.
         /// * You can still use Update for things that don't affect gameplay, such as visual effects.
         /// </summary>
         public void Tick(float deltaTime, PlayerInput input, bool isRealtime)
         {
             Vector3 movementDirection = new Vector3(movementSpeed * input.horizontal, 0f, movementSpeed * input.vertical);
 
-            transform.position += movementDirection * deltaTime; // don't use Time.deltaTime!
+            // "movement" is kind of like a character controller, it lets us move with collision
+            // it's very useful for client prediction because we can do it whenever we want with no physics timing restrictions
+            movement.Move(movementDirection * deltaTime, out _, isRealtime); // don't use Time.deltaTime!
 
             if (movementDirection.sqrMagnitude > 0f)
                 transform.forward = movementDirection;
@@ -138,7 +144,7 @@ namespace MultiplayerToolset.Examples.Mirror
         }
 
         /// <summary>
-        /// Used to restore to a previous state by the ticker. Store all important ticker-affected information here.
+        /// Copy the current state to a PlayerState struct. Called by the ticker. You should store all important Tick-affected values here.
         /// </summary>
         public PlayerState MakeState()
         {
@@ -150,7 +156,7 @@ namespace MultiplayerToolset.Examples.Mirror
         }
 
         /// <summary>
-        /// Used to restore a previous state by the ticker. Apply all important ticker-affected information here.
+        /// Restore a previous state. Called by the ticker. You should store all important Tick-affected values here.
         /// Remember that for physics simulations, you may need to call Physics.SyncTransforms() or just turn Physics.autoSyncTransforms on.
         /// </summary>
         public void ApplyState(PlayerState state)
@@ -160,6 +166,10 @@ namespace MultiplayerToolset.Examples.Mirror
         }
         #endregion
 
+        #region Networking
+        /// <summary>
+        /// Sends player inputs to the server. The input pack may contain old inputs in case packets are missed.
+        /// </summary>
         [Command(channel = Channels.Unreliable)]
         private void CmdPlayerInput(PlayerInput[] inputs, float[] times)
         {
@@ -170,6 +180,9 @@ namespace MultiplayerToolset.Examples.Mirror
                 timeOfLastReceivedClientInput = Time.time;
         }
 
+        /// <summary>
+        /// Receives player state from the server. When received we immediately reconcile to our local time, replaying Ticks between the server's time and our own.
+        /// </summary>
         [ClientRpc(channel = Channels.Unreliable)]
         private void RpcPlayerState(PlayerState state, PlayerInput input, float time, float serverExtrapolation)
         {
@@ -182,6 +195,7 @@ namespace MultiplayerToolset.Examples.Mirror
             }
         }
 
-        private bool IsNetUpdate() => (int)((Time.time - Time.deltaTime) * netUpdateRate) != (int)(Time.time * netUpdateRate);
+        private bool IsNetUpdate() => TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, netUpdateRate);
+        #endregion
     }
 }

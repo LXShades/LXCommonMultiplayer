@@ -9,7 +9,7 @@ public static class CommandLine
 #if UNITY_EDITOR
     public static string[] editorCommands
     {
-        get => EditorPrefs.GetString("_editorCommandLine", "").Split('þ');
+        get => EditorPrefs.GetString("_editorCommandLine", "").Split(new char[] { 'þ' }, System.StringSplitOptions.RemoveEmptyEntries);
         set
         {
             EditorPrefs.SetString("_editorCommandLine", string.Join("þ", value));

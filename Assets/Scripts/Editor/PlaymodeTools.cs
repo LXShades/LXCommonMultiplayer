@@ -28,33 +28,36 @@ public static class PlaymodeTools
 
     private static string playModeCommandLine
     {
-        get => EditorPrefs.GetString("_playModeCommandLineParms", "");
-        set => EditorPrefs.SetString("_playModeCommandLineParms", value);
+        get => SessionState.GetString("_playModeCommandLineParms", "");
+        set => SessionState.SetString("_playModeCommandLineParms", value);
     }
 
     private static int editorSceneBuildIndex
     {
-        get => EditorPrefs.GetInt("_playModeEditorSceneBuildIndex", -1); // we need to remember the value during reloads
-        set => EditorPrefs.SetInt("_playModeEditorSceneBuildIndex", value);
+        get => SessionState.GetInt("_playModeEditorSceneBuildIndex", -1); // we need to remember the value during reloads
+        set => SessionState.SetInt("_playModeEditorSceneBuildIndex", value);
     }
 
     [InitializeOnLoadMethod]
     private static void OnEditorInit()
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode)
-            return;
-
         EditorSceneManager.activeSceneChangedInEditMode += (Scene scn, Scene scn2) =>
         {
-            ReassignBootScene();
+            if (!EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                ReassignBootScene();
 
-            editorSceneBuildIndex = scn2.buildIndex;
+                editorSceneBuildIndex = scn2.buildIndex;
+            }
         };
         EditorSceneManager.sceneLoaded += (Scene scn, LoadSceneMode loadMode) =>
         {
-            ReassignBootScene();
+            if (!EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                ReassignBootScene();
 
-            editorSceneBuildIndex = scn.buildIndex;
+                editorSceneBuildIndex = scn.buildIndex;
+            }
         };
 
         // Be prepared to set editor commands on play mode
@@ -96,6 +99,9 @@ public static class PlaymodeTools
         // when finished playing, do not let previous editor commands persist to the next test
         if (change == PlayModeStateChange.ExitingPlayMode)
             CommandLine.editorCommands = new string[0];
+        if (change == PlayModeStateChange.ExitingEditMode)
+            UpdateEditorCommands();
+
     }
 
     /// <summary>
@@ -103,6 +109,7 @@ public static class PlaymodeTools
     /// </summary>
     private static void UpdateEditorCommands()
     {
+        // Avoid overriding Playtest menu settings
         if (CommandLine.editorCommands == null || CommandLine.editorCommands.Length == 0)
         {
             string[] editorCommands = new string[0];
