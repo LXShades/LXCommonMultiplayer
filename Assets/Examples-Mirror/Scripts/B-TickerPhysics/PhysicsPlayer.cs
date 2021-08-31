@@ -29,7 +29,15 @@ namespace MultiplayerToolset.Examples.Mirror
 
         private PhysicsTickable physicsTickable;
 
+        private TickerController tickerController;
+
         private readonly TimelineList<Input> myInputs = new TimelineList<Input>();
+
+        // tracks how late/early the server received inputs from the client
+        // OnClient is the one received by the client from the server, so it can correct. >0 means the server received the last input on time, <0 means it was late
+        // OnServer is the one set on the server whenever it receives new inputs
+        public TimelineList<float> inputTimeOffsetHistoryOnClient { get; private set; } = new TimelineList<float>();
+        public float inputTimeOffsetOnServer { get; private set; }
 
         public int updatesPerSecond = 30;
 
@@ -52,6 +60,8 @@ namespace MultiplayerToolset.Examples.Mirror
 
             physicsTickable = FindObjectOfType<PhysicsTickable>();
             physicsTickable.TrackPhysicsObject(netIdentity, rb);
+
+            tickerController = FindObjectOfType<TickerController>();
         }
 
         private void Update()
@@ -79,6 +89,7 @@ namespace MultiplayerToolset.Examples.Mirror
                 if (NetworkServer.active)
                 {
                     RpcLatestInput(myInputs.Latest, myInputs.LatestTime);
+                    TargetInputTimeOffset(inputTimeOffsetOnServer);
                 }
             }
         }
@@ -92,6 +103,8 @@ namespace MultiplayerToolset.Examples.Mirror
                     myInputs.Set(times[i], inputs[i]);
             }
 
+            inputTimeOffsetOnServer = times[0] - tickerController.playbackTime;
+
             // avoid overloading inputs
             TrimInputs();
         }
@@ -103,6 +116,13 @@ namespace MultiplayerToolset.Examples.Mirror
 
             // avoid overloading inputs
             TrimInputs();
+        }
+
+        [TargetRpc(channel = Channels.Unreliable)]
+        private void TargetInputTimeOffset(float offset)
+        {
+            inputTimeOffsetHistoryOnClient.Insert(Time.unscaledTime, offset);
+            inputTimeOffsetHistoryOnClient.Trim(Time.unscaledTime - 1f, Time.unscaledTime + 1f);
         }
 
         private void TrimInputs()
