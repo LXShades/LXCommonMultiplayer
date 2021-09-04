@@ -159,7 +159,7 @@ MonoBehaviour:
   predictedId: 0
   serverOnly: 0
   visible: 0
-  m_AssetId: 
+  m_AssetId: 14287757445895a409a4724e6a7a44b3
   hasSpawned: 0
 --- !u!114 &-991465491302836523
 MonoBehaviour:
@@ -210,21 +210,23 @@ MonoBehaviour:
   m_GameObject: {fileID: 3784785161027906916}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8ec020f51922bab4f8a92a38ac34e8c2, type: 3}
+  m_Script: {fileID: 11500000, guid: 2bde2a94275e2fc4a8043cd15a52c4fb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   enableCollision: 1
-  colliders:
-  - {fileID: 4908767280791271164}
+  colliders: []
   blockingCollisionLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  maxNumCollisionSteps: 3
-  maxCollisionStepSize: 0.2
   enableAutomaticPhysics: 0
   gravityMultiplier: 1
   bounceFactor: 0
   bounceFriction: 0
+  defaultMoveType: 0
+  minSweepThresholdUntilPenetration: 0.01
+  maxNumCollisionSteps: 3
+  maxCollisionStepSize: 0.2
+  sweepPullback: 0.005
   debugDrawMovementShapes: 0
   velocity: {x: 0, y: 0, z: 0}
 --- !u!23 &3784785161027906918
