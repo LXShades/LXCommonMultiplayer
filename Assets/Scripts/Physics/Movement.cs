@@ -27,9 +27,9 @@ public class Movement : MonoBehaviour
     public enum MoveType
     {
         /// <summary>
-        /// Sweeps if the distance is far enough. Uses a penetration test if the distance is too small
+        /// Sweeps if the distance is far enough. Then uses a penetration test to remove the object from surfaces.
         /// </summary>
-        AutoSweepOrPenetration,
+        SweepThenPenetration,
 
         /// <summary>
         /// Uses a sweep test for movement
@@ -67,10 +67,10 @@ public class Movement : MonoBehaviour
 
     [Header("Advanced")]
     [Tooltip("Type of collision testing to use while moving, by default. Sweep is fast over long distances but loses accuracy with very small distances, and does not save an object if it has already passed through something. ")]
-    public MoveType defaultMoveType = MoveType.AutoSweepOrPenetration;
+    public MoveType defaultMoveType = MoveType.SweepThenPenetration;
 
-    [Tooltip("Distance we can move before triggering a sweep test")]
-    public float minSweepThresholdUntilPenetration = 0.01f; // Testing shows around 0.0045 to work for a unity default capsule, not sure about other conditions
+    [Tooltip("Distance we can move before triggering a sweep test. Ideal value depends on the phase of the moon and an Ouija board")]
+    public float minSweepThresholdUntilPenetration = 0.05f;
 
     [Tooltip("Max number of collision steps to make. While the number of steps at maxCollisionStepSize varies depending on speed, this is an absolute maximum")]
     public int maxNumCollisionSteps = 3;
@@ -81,6 +81,10 @@ public class Movement : MonoBehaviour
     [Tooltip("How much to pull back the object before doing a sweep test. A sweep test will, annoyingly, frequently rip straight through objects if it is started at the exact edge of the object. This tweak can prevent that. " +
         "The default setting is usually fine. Avoid using values too large as the object may pass through things behind it! Avoid using values too small or movements starting on the edge of objects will go straight through them!")]
     public float sweepPullback = 0.005f;
+
+    [Tooltip("Sort of like pullback but on the opposite end. Tries to keep a slight buffer of space between self and collided objects. " +
+        "This is needed because e.g. a depenetration collision may put you at the edge of an object before a sweep collision subsequently sends you through it.")]
+    public float skinThickness = 0.025f;
 
     [Header("Debugging")]
     public bool debugDrawMovementShapes = false;
@@ -137,18 +141,31 @@ public class Movement : MonoBehaviour
 
     /// <summary>
     /// Moves with collision checking depending on default move type. Calls IMovementCollision callbacks on collided objects. Can be a computationally expensive operation. Returns whether a collision occurred.
+    /// When using a Sweep collision, hitOut is based on the result of the sweep. With Penetration collisions, it is only estimated, based on where the object was pushed out.
+    /// When using SweepThenPenetration, the sweep hit result has priority over the penetration result if there is one, as the former tend to be more accurate.
     /// </summary>
     public bool Move(Vector3 offset, out Hit hitOut, bool isRealtime = true, MoveFlags flags = MoveFlags.None)
     {
-        if ((defaultMoveType == MoveType.AutoSweepOrPenetration && offset.sqrMagnitude > minSweepThresholdUntilPenetration * minSweepThresholdUntilPenetration)
-            || defaultMoveType == MoveType.Sweep
-            || flags != MoveFlags.None) // we don't suppose NoSlide on MovePenetration yet, todo?
+        if (defaultMoveType == MoveType.Sweep || flags != MoveFlags.None) // we don't suppose NoSlide on MovePenetration yet, todo?
         {
             return MoveSweep(offset, out hitOut, isRealtime, flags);
         }
-        else
+        else if (defaultMoveType == MoveType.Penetration)
         {
             return MovePenetration(offset, out hitOut, isRealtime);
+        }
+        else
+        {
+            bool hasHitA = MoveSweep(offset, out Hit hitA, isRealtime, flags);
+            bool hasHitB = MovePenetration(offset, out Hit hitB, isRealtime);
+
+            hitOut = default;
+            if (hasHitB)
+                hitOut = hitB;
+            if (hasHitA)
+                hitOut = hitA;
+
+            return hasHitA || hasHitB;
         }
     }
 
@@ -170,7 +187,6 @@ public class Movement : MonoBehaviour
 
         cachedStopwatch.Restart();
 
-        const float kSkin = 0.005f;
         int numIterations = (flags & MoveFlags.NoSlide) != 0 ? 1 : 3; // final iteration always blocks without slide, so just use one iteration
         Vector3 currentMovement = offset;
         bool hasHitOccurred = false;
@@ -184,8 +200,8 @@ public class Movement : MonoBehaviour
             float pullback = sweepPullback;
             Vector3 normalMovement = currentMovement.normalized;
 
-            int numHits = ColliderCast(moveHitBuffer, transform.position, normalMovement, currentMovementMagnitude + kSkin, blockingCollisionLayers, QueryTriggerInteraction.Collide, pullback, debugDrawMovementShapes, debugColorByStage[iteration]);
-            float closestDist = currentMovementMagnitude + kSkin;
+            int numHits = ColliderCast(moveHitBuffer, transform.position, normalMovement, currentMovementMagnitude + skinThickness, blockingCollisionLayers, QueryTriggerInteraction.Collide, pullback, debugDrawMovementShapes, debugColorByStage[iteration]);
+            float closestDist = currentMovementMagnitude + skinThickness;
             int closestHitId = -1;
 
             // find closest blocking collider
@@ -214,12 +230,12 @@ public class Movement : MonoBehaviour
                 if (iteration < numIterations - 1)
                 {
                     // use slidey slidey collision until the final one is hit
-                    currentMovement += hit.normal * (-Vector3.Dot(hit.normal, currentMovement.normalized * (currentMovement.magnitude - hit.distance)) + kSkin);
+                    currentMovement += hit.normal * (-Vector3.Dot(hit.normal, currentMovement.normalized * (currentMovement.magnitude - hit.distance)) + skinThickness);
                 }
                 else
                 {
                     // final collision: block further movement entirely
-                    currentMovement = currentMovement.normalized * (hit.distance - kSkin);
+                    currentMovement = currentMovement.normalized * Mathf.Max(hit.distance - skinThickness, 0f);
                 }
             }
             else
@@ -260,9 +276,7 @@ public class Movement : MonoBehaviour
 
         float offsetMagnitude = offset.magnitude;
         float colliderExtentFromCentre = CalculateColliderExtentFromOrigin() + offsetMagnitude * 0.5f;
-        int numSteps = Mathf.Clamp(Mathf.CeilToInt(offsetMagnitude / maxCollisionStepSize), 1, maxNumCollisionSteps);
         Vector3 currentPosition = transform.position;
-        Vector3 stepOffset = offset / numSteps;
         Vector3 midPoint = transform.position + offset * 0.5f;
         bool hasHitOccurred = false;
 
@@ -270,23 +284,28 @@ public class Movement : MonoBehaviour
 
         // detect nearby colliders
         // we use a sphere overlap with the sphere being in the centre of our path and extending to encompass the path plus our collider
+        // QueryTriggerInteraction is Collide so that we can still send callbacks to triggers
         int numCollidersToTest = Physics.OverlapSphereNonAlloc(midPoint, colliderExtentFromCentre, nearbyColliderBuffer, blockingCollisionLayers, QueryTriggerInteraction.Collide);
+        const int kNumIterationsPerStep = 3;
+
         MovementDebugStats.total.numOverlapTests++;
 
-        for (int step = 0; step < numSteps; step++)
+        for (float distanceStepped = 0f; distanceStepped < offsetMagnitude; distanceStepped += maxCollisionStepSize)
         {
-            currentPosition += stepOffset;
+            Vector3 stepOffset = offset * (Mathf.Min(maxCollisionStepSize, offsetMagnitude - distanceStepped) / offsetMagnitude);
+            Vector3 nextPosition = currentPosition + stepOffset;
 
-            for (int iteration = 0; iteration < 3; iteration++)
+            for (int iteration = 0; iteration < kNumIterationsPerStep; iteration++)
             {
                 foreach (Collider collider in colliders)
                 {
                     for (int i = 0; i < numCollidersToTest; i++)
                     {
-                        if (collider.gameObject == nearbyColliderBuffer[i].gameObject)
+                        if (nearbyColliderBuffer[i].gameObject == collider.gameObject)
                             continue; // please don't collide with yourself
 
-                        if (Physics.ComputePenetration(collider, currentPosition, transform.rotation, nearbyColliderBuffer[i], nearbyColliderBuffer[i].transform.position, nearbyColliderBuffer[i].transform.rotation, out Vector3 direction, out float distance))
+                        MovementDebugStats.total.numPenetrationTests++;
+                        if (Physics.ComputePenetration(collider, nextPosition, transform.rotation, nearbyColliderBuffer[i], nearbyColliderBuffer[i].transform.position, nearbyColliderBuffer[i].transform.rotation, out Vector3 hitDirection, out float hitDistance))
                         {
                             hasHitOccurred = true;
 
@@ -296,19 +315,32 @@ public class Movement : MonoBehaviour
 
                             if (!nearbyColliderBuffer[i].isTrigger)
                             {
-                                currentPosition += direction * (distance + 0.001f); // tiny buffer to fix capsule cast used for feet detection, annoying but pretty much necessary because casts are dumb
+                                nextPosition += hitDirection * (hitDistance + skinThickness);
 
-                                goto NextIteration;
+                                hitOut.collider = collider;
+                                hitOut.normal = hitDirection;
+
+                                if (iteration == kNumIterationsPerStep - 1)
+                                {
+                                    goto FinishCollisionTest; // collision isn't being resolved; halt
+                                }
+                                else
+                                {
+                                    goto NextIteration;
+                                }
                             }
                         }
-                        MovementDebugStats.total.numPenetrationTests++;
                     }
                 }
+
                 break;
                 NextIteration:;
             }
+
+            currentPosition = nextPosition;
         }
 
+        FinishCollisionTest:;
         transform.position = currentPosition;
 
         MovementDebugStats.total.totalCollisionComputingTimeMicroseconds += cachedStopwatch.ElapsedTicks * 1000000 / System.Diagnostics.Stopwatch.Frequency;
