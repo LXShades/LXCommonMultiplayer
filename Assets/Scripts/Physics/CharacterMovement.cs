@@ -16,16 +16,10 @@ public class CharacterMovement : Movement
         public Vector3 slipVector;
     }
 
-    public Vector2 input = new Vector3(0f, 1f);
-    public bool inputJump = false;
-
     protected Vector3 up;
     protected Vector3 forward;
     protected Vector3 right => Vector3.Cross(up, forward).normalized;
 
-    [Header("Velocities")]
-    public float acceleration = 10f;
-    public float friction = 10f;
     public float gravity = 10f;
 
     [Header("Grounding")]
@@ -44,7 +38,6 @@ public class CharacterMovement : Movement
 
     [Header("Enable")]
     public bool enableSlip = true;
-    public bool enableFriction = true;
     public bool enableCollisionsAffectVelocity = true;
     public bool enableLoopyPushdown = true;
 
