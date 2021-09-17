@@ -42,7 +42,7 @@ public class Movement : MonoBehaviour
         Penetration,
     }
 
-    [Header("Collision")]
+    [Header("[Movement] Collision")]
     public bool enableCollision = true;
 
     [Header("Note: Colliders cannot currently rotate")]
@@ -52,7 +52,7 @@ public class Movement : MonoBehaviour
     [Tooltip("List of collision layers to interact with")]
     public LayerMask blockingCollisionLayers = ~0;
 
-    [Header("Basic physics")]
+    [Header("[Movement] Basic physics")]
     [Tooltip("If enabled, this component will control the object automatically on Update.")]
     public bool enableAutomaticPhysics = false;
 
@@ -65,7 +65,7 @@ public class Movement : MonoBehaviour
     [Tooltip("When bouncing, this is a speed multiplier optionally reducing the speed where 0 does nothing and 1 cuts off all velocity"), Range(0, 1)]
     public float bounceFriction = 0f;
 
-    [Header("Advanced")]
+    [Header("[Movement] Advanced")]
     [Tooltip("Type of collision testing to use while moving, by default. Sweep is fast over long distances but loses accuracy with very small distances, and does not save an object if it has already passed through something. ")]
     public MoveType defaultMoveType = MoveType.SweepThenPenetration;
 
@@ -86,14 +86,10 @@ public class Movement : MonoBehaviour
         "This is needed because e.g. a depenetration collision may put you at the edge of an object before a sweep collision subsequently sends you through it.")]
     public float skinThickness = 0.025f;
 
-    [Header("Debugging")]
-    public bool debugDrawMovementShapes = false;
-
     /// <summary>
     /// The current velocity of the object
     /// </summary>
     [HideInInspector] public Vector3 velocity;
-
 
     private HashSet<IMovementCollisions> movementCollisions = new HashSet<IMovementCollisions>();
 
@@ -101,7 +97,6 @@ public class Movement : MonoBehaviour
     private RaycastHit[] moveHitBuffer = new RaycastHit[128];
     private RaycastHit[] colliderCastHitBuffer = new RaycastHit[128];
 
-    Color[] debugColorByStage = new Color[] { Color.red, Color.green, Color.blue, Color.yellow };
     List<IMovementCollisions> cachedMovementCollisionComponents = new List<IMovementCollisions>(12);
 
     Collider[] nearbyColliderBuffer = new Collider[24];
@@ -200,7 +195,7 @@ public class Movement : MonoBehaviour
             float pullback = sweepPullback;
             Vector3 normalMovement = currentMovement.normalized;
 
-            int numHits = ColliderCast(moveHitBuffer, transform.position, normalMovement, currentMovementMagnitude + skinThickness, blockingCollisionLayers, QueryTriggerInteraction.Collide, pullback, debugDrawMovementShapes, debugColorByStage[iteration]);
+            int numHits = ColliderCast(moveHitBuffer, transform.position, normalMovement, currentMovementMagnitude + skinThickness, blockingCollisionLayers, QueryTriggerInteraction.Collide, pullback);
             float closestDist = currentMovementMagnitude + skinThickness;
             int closestHitId = -1;
 
@@ -354,7 +349,7 @@ public class Movement : MonoBehaviour
     /// <summary>
     /// Performs a sweep test using our current colliders
     /// </summary>
-    public int ColliderCast(RaycastHit[] hitsOut, Vector3 startPosition, Vector3 castDirection, float castMaxDistance, int layers, QueryTriggerInteraction queryTriggerInteraction, float pullback = 0f, bool drawDebug = false, Color drawDebugColor = default)
+    public int ColliderCast(RaycastHit[] hitsOut, Vector3 startPosition, Vector3 castDirection, float castMaxDistance, int layers, QueryTriggerInteraction queryTriggerInteraction, float pullback = 0f)
     {
         int numHits = 0;
 
@@ -472,7 +467,8 @@ public class Movement : MonoBehaviour
 
         foreach (Collider collider in colliders)
         {
-            if ((collider is CapsuleCollider) || (collider is SphereCollider))
+            // == null because user might be adding one
+            if (collider == null || (collider is CapsuleCollider) || (collider is SphereCollider))
                 numValidColliders++;
         }
 

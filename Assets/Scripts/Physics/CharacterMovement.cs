@@ -20,23 +20,24 @@ public class CharacterMovement : Movement
     protected Vector3 forward;
     protected Vector3 right => Vector3.Cross(up, forward).normalized;
 
+    [Header("[CharMovement] Gravity")]
     public float gravity = 10f;
 
-    [Header("Grounding")]
+    [Header("[CharMovement] Grounding")]
     public float groundSphereTestRadius = 0.25f;
     public float groundTestDistanceThreshold = 0.05f;
     public float groundEscapeThreshold = 3f;
     public float slipRadius = 0.25f;
     public float slipVelocity = 5f;
 
-    [Header("Loopy")]
+    [Header("[CharMovement] Loopy")]
     public bool enableLoopy = true;
     public float loopyGroundTestDistance = 0.5f;
     public float loopyPushdownMinRadius = 1f;
     public float loopyPushdownDegreesRequired = 5f;
     public float loopyPushdownNeutralLimit = 0.2f;
 
-    [Header("Enable")]
+    [Header("[CharMovement] Enable")]
     public bool enableSlip = true;
     public bool enableCollisionsAffectVelocity = true;
     public bool enableLoopyPushdown = true;
