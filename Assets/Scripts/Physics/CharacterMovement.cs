@@ -54,6 +54,7 @@ public class CharacterMovement : Movement
 
     [Header("[CharMovement] Collision Velocity Response")]
     public bool enableCollisionsAffectVelocity = true;
+    public bool enableCollisionsDontAffectVerticalVelocity = true;
 
     public void ApplyCharacterGravity(in GroundInfo groundInfo, float deltaTime)
     {
@@ -97,12 +98,21 @@ public class CharacterMovement : Movement
             }
         }
 
-        if (collisionOccurred)
+        if (collisionOccurred && enableCollisionsAffectVelocity)
         {
-            if (enableCollisionsAffectVelocity && deltaTime > 0f 
-                && Vector3.Dot(hitOut.normal, velocity) < 0f) // movement callbacks can affect velocity, double-check that we're still colliding before we cancel out all speed against the object
+            Vector3 velocityImpactNormal = hitOut.normal;
+
+            if (Vector3.Dot(velocityImpactNormal, velocity) < 0f) // movement callbacks can affect velocity, so double-check that we're still colliding _against_ it before we cancel out all speed on that plane
             {
-                velocity.SetAlongAxis(hitOut.normal, 0f);
+                float originalAlongUp = 0f;
+
+                if (enableCollisionsDontAffectVerticalVelocity)
+                    originalAlongUp = Vector3.Dot(velocity, up);
+
+                velocity.SetAlongAxis(velocityImpactNormal, 0f);
+
+                if (enableCollisionsDontAffectVerticalVelocity)
+                    velocity.SetAlongAxis(up, originalAlongUp);
             }
         }
 
@@ -268,4 +278,27 @@ public class CharacterMovement : Movement
 
         return hit.normal;
     }
+
+#if UNITY_EDITOR
+    private void OnDrawGizmos()
+    {
+        DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset), groundSphereTestRadius, Color.blue);
+
+        if (enableStepUp)
+        {
+            // Feet area
+            DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset + new Vector3(0, stepHeight, 0)), groundSphereTestRadius, Color.green);
+        }
+    }
+
+    private void DrawGizmoCircle(Vector3 position, float radius, Color color)
+    {
+        for (int i = 0; i < 12; i++)
+        {
+            float angle = i * Mathf.PI * 2f / 12;
+            float nextAngle = (i + 1) * Mathf.PI * 2f / 12;
+            Debug.DrawLine(position + new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle)) * radius, position + new Vector3(Mathf.Sin(nextAngle), 0f, Mathf.Cos(nextAngle)) * radius, color);
+        }
+    }
+#endif
 }
