@@ -2,9 +2,8 @@
 
 public static class Compressor
 {
-    const int kBitsPerComponent = 8;
-    const int kMaskPerComponent = ~(~0 << kBitsPerComponent);
-    const int kMultiplierPerComponent = ~(~0 << (kBitsPerComponent - 1));
+    const int kMask8 = ~(~0 << 8);
+    const int kMultiplier8 = ~(~0 << (8 - 1));
 
     public static ushort CompressFloat16(float value, float min, float max)
     {
@@ -20,10 +19,10 @@ public static class Compressor
     {
         int result = 0;
 
-        result |= ((int)(quaternion.x * kMultiplierPerComponent) & kMaskPerComponent);
-        result |= ((int)(quaternion.y * kMultiplierPerComponent) & kMaskPerComponent) << kBitsPerComponent;
-        result |= ((int)(quaternion.z * kMultiplierPerComponent) & kMaskPerComponent) << (kBitsPerComponent * 2);
-        result |= ((int)(quaternion.w * kMultiplierPerComponent) & kMaskPerComponent) << (kBitsPerComponent * 3);
+        result |= ((int)(quaternion.x * kMultiplier8) & kMask8);
+        result |= ((int)(quaternion.y * kMultiplier8) & kMask8) << 8;
+        result |= ((int)(quaternion.z * kMultiplier8) & kMask8) << 16;
+        result |= ((int)(quaternion.w * kMultiplier8) & kMask8) << 24;
 
         return (uint)result;
     }
@@ -33,10 +32,10 @@ public static class Compressor
         Quaternion result = default;
 
         // convert to int to sign-extend
-        result.x = ((int)quaternion << (32 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
-        result.y = ((int)quaternion << (24 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
-        result.z = ((int)quaternion << (16 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
-        result.w = ((int)quaternion << (8 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
+        result.x = ((int)quaternion << (32 - 8) >> (32 - 8)) / (float)kMultiplier8;
+        result.y = ((int)quaternion << (24 - 8) >> (32 - 8)) / (float)kMultiplier8;
+        result.z = ((int)quaternion << (16 - 8) >> (32 - 8)) / (float)kMultiplier8;
+        result.w = ((int)quaternion << (8 - 8)  >> (32 - 8)) / (float)kMultiplier8;
 
         return Quaternion.Normalize(result);
     }
@@ -44,10 +43,11 @@ public static class Compressor
     public static uint CompressNormal24(Vector3 normalVector)
     {
         int result = 0;
+        const float kBias = 0.5f / kMultiplier8;
 
-        result |= ((int)(normalVector.x * kMultiplierPerComponent + 0.5f) & kMaskPerComponent);
-        result |= ((int)(normalVector.y * kMultiplierPerComponent + 0.5f) & kMaskPerComponent) << kBitsPerComponent;
-        result |= ((int)(normalVector.z * kMultiplierPerComponent + 0.5f) & kMaskPerComponent) << (kBitsPerComponent * 2);
+        result |= ((int)((normalVector.x > 0f ? normalVector.x + kBias : normalVector.x - kBias) * kMultiplier8) & kMask8);
+        result |= ((int)((normalVector.y > 0f ? normalVector.y + kBias : normalVector.y - kBias) * kMultiplier8) & kMask8) << 8;
+        result |= ((int)((normalVector.z > 0f ? normalVector.z + kBias : normalVector.z - kBias) * kMultiplier8) & kMask8) << 16;
 
         return (uint)result;
     }
@@ -56,9 +56,9 @@ public static class Compressor
     {
         Vector3 result = default;
 
-        result.x = ((int)normalVector << (32 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
-        result.y = ((int)normalVector << (24 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
-        result.z = ((int)normalVector << (16 - kBitsPerComponent) >> (32 - kBitsPerComponent)) / (float)kMultiplierPerComponent;
+        result.x = ((int)normalVector << (32 - 8) >> (32 - 8)) / (float)kMultiplier8;
+        result.y = ((int)normalVector << (24 - 8) >> (32 - 8)) / (float)kMultiplier8;
+        result.z = ((int)normalVector << (16 - 8) >> (32 - 8)) / (float)kMultiplier8;
 
         return result;
     }

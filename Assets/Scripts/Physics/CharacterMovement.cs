@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -41,6 +42,7 @@ public class CharacterMovement : Movement
     public bool enableLoopyPushdown = true;
     [Tooltip("Whether to auto-adjust the forward vector when the up vector changes")]
     public bool enableLoopyForwardAdjustment = true;
+    public bool enableLoopySmoothNormals = true;
     public float loopyGroundTestDistance = 0.5f;
     public float loopyPushdownNeutralLimit = 0.2f;
 
@@ -118,7 +120,7 @@ public class CharacterMovement : Movement
         else
             up = Vector3.up;
 
-        if (enableLoopy && enableLoopyForwardAdjustment && Vector3.Dot(previousUp, up) < 0.999999f)
+        if (enableLoopy && enableLoopyForwardAdjustment && previousUp != up)
         {
             forward = Quaternion.FromToRotation(previousUp, up) * forward;
         }
@@ -162,9 +164,47 @@ public class CharacterMovement : Movement
                 if (Physics.Raycast(new Ray(transform.position + up * 0.01f, -up), out RaycastHit rayHit, loopyGroundTestDistance, ~0, QueryTriggerInteraction.Ignore) && rayHit.distance <= loopyGroundTestDistance)
                 {
                     output.isLoopy = true;
-                    output.loopyNormal = rayHit.normal;
+
+                    output.loopyNormal = enableLoopySmoothNormals ? GetSmoothestNormalFromCollision(rayHit) : rayHit.normal;
                 }
             }
         }
+    }
+
+    private static List<Vector3> normalBuffer = new List<Vector3>();
+    private static List<int> triangleBuffer = new List<int>();
+
+    /// <summary>
+    /// Tries to get a smooth normal from a collider. If successful, returns the smoothed normal; otherwise, returns the hit's normal as supplied.
+    /// </summary>
+    public Vector3 GetSmoothestNormalFromCollision(in RaycastHit hit)
+    {
+        if (hit.collider is MeshCollider meshCollider
+                && meshCollider.sharedMesh.isReadable)
+        {
+            int index = hit.triangleIndex * 3;
+            Mesh mesh = meshCollider.sharedMesh;
+
+            mesh.GetNormals(normalBuffer);
+
+            for (int i = 0; i < mesh.subMeshCount; i++)
+            {
+                int start = mesh.GetSubMesh(i).indexStart;
+                int count = mesh.GetSubMesh(i).indexCount;
+
+                if (index >= start && index < start + count)
+                {
+                    mesh.GetIndices(triangleBuffer, i);
+
+                    Vector3 smoothNormal = normalBuffer[triangleBuffer[index - start]] * hit.barycentricCoordinate.x +
+                        normalBuffer[triangleBuffer[index - start + 1]] * hit.barycentricCoordinate.y +
+                        normalBuffer[triangleBuffer[index - start + 2]] * hit.barycentricCoordinate.z;
+
+                    return meshCollider.transform.TransformDirection(smoothNormal).normalized;
+                }
+            }
+        }
+
+        return hit.normal;
     }
 }
