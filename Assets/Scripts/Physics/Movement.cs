@@ -152,7 +152,7 @@ public class Movement : MonoBehaviour
         else
         {
             bool hasHitA = MoveSweep(offset, out Hit hitA, isRealtime, flags);
-            bool hasHitB = MovePenetration(offset, out Hit hitB, isRealtime);
+            bool hasHitB = MovePenetration(Vector3.zero, out Hit hitB, isRealtime);
 
             hitOut = default;
             if (hasHitB)
@@ -264,12 +264,11 @@ public class Movement : MonoBehaviour
             return false; // done
         }
 
-        if (offset.sqrMagnitude == 0f)
-            return false; // no moving to do
-
+        // note that we move even if there's no offset. Penetration tests should remove us from walls and ceilings.
         cachedStopwatch.Restart();
 
         float offsetMagnitude = offset.magnitude;
+        Vector3 offsetNormalized = offsetMagnitude > 0f ? offset / offset.magnitude : Vector3.zero;
         float colliderExtentFromCentre = CalculateColliderExtentFromOrigin() + offsetMagnitude * 0.5f;
         Vector3 currentPosition = transform.position;
         Vector3 midPoint = transform.position + offset * 0.5f;
@@ -285,9 +284,9 @@ public class Movement : MonoBehaviour
 
         MovementDebugStats.total.numOverlapTests++;
 
-        for (float distanceStepped = 0f; distanceStepped < offsetMagnitude; distanceStepped += maxCollisionStepSize)
+        for (float distanceStepped = 0f; distanceStepped <= offsetMagnitude; distanceStepped += maxCollisionStepSize)
         {
-            Vector3 stepOffset = offset * (Mathf.Min(maxCollisionStepSize, offsetMagnitude - distanceStepped) / offsetMagnitude);
+            Vector3 stepOffset = offsetNormalized * Mathf.Min(maxCollisionStepSize, offsetMagnitude - distanceStepped);
             Vector3 nextPosition = currentPosition + stepOffset;
 
             for (int iteration = 0; iteration < kNumIterationsPerStep; iteration++)

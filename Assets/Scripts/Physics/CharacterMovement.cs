@@ -16,9 +16,12 @@ public class CharacterMovement : Movement
         public Vector3 slipVector;
     }
 
-    protected Vector3 up;
-    protected Vector3 forward;
-    protected Vector3 right => Vector3.Cross(up, forward).normalized;
+    /// <summary>
+    /// Up vector.
+    /// </summary>
+    public Vector3 up { get; set; }
+    public Vector3 forward { get; set; }
+    public Vector3 right => Vector3.Cross(up, forward).normalized;
 
     [Header("[CharMovement] Gravity")]
     public float gravity = 10f;
@@ -27,20 +30,22 @@ public class CharacterMovement : Movement
     public float groundSphereTestRadius = 0.25f;
     public float groundTestDistanceThreshold = 0.05f;
     public float groundEscapeThreshold = 3f;
+
+    [Header("[CharMovement] Slip")]
+    public bool enableSlip = true;
     public float slipRadius = 0.25f;
     public float slipVelocity = 5f;
 
     [Header("[CharMovement] Loopy")]
     public bool enableLoopy = true;
+    public bool enableLoopyPushdown = true;
+    [Tooltip("Whether to auto-adjust the forward vector when the up vector changes")]
+    public bool enableLoopyForwardAdjustment = true;
     public float loopyGroundTestDistance = 0.5f;
-    public float loopyPushdownMinRadius = 1f;
-    public float loopyPushdownDegreesRequired = 5f;
     public float loopyPushdownNeutralLimit = 0.2f;
 
-    [Header("[CharMovement] Enable")]
-    public bool enableSlip = true;
+    [Header("[CharMovement] Misc")]
     public bool enableCollisionsAffectVelocity = true;
-    public bool enableLoopyPushdown = true;
 
     public void ApplyCharacterGravity(in GroundInfo groundInfo, float deltaTime)
     {
@@ -73,6 +78,7 @@ public class CharacterMovement : Movement
             }
         }
 
+        Vector3 previousUp = up;
         if (groundInfo.isLoopy)
         {
             up = groundInfo.loopyNormal;
@@ -97,7 +103,7 @@ public class CharacterMovement : Movement
                     bool situationB = Vector3.Dot(rayHit.normal - groundInfo.loopyNormal, velocity) < 0f;
                     bool situationC = Vector3.Dot(up, velocity) >= groundEscapeThreshold;
 
-                    if (!situationA && !situationB)
+                    if (!situationA && !situationB && !situationC)
                     {
                         // to get as close to the ground as possible in prep for the next frame, we need to move with our rotation simulating our final up vector
                         // todo we could do a collidercast? but the normals won't be as nice so maybe not
@@ -111,6 +117,11 @@ public class CharacterMovement : Movement
         }
         else
             up = Vector3.up;
+
+        if (enableLoopy && enableLoopyForwardAdjustment && Vector3.Dot(previousUp, up) < 0.999999f)
+        {
+            forward = Quaternion.FromToRotation(previousUp, up) * forward;
+        }
     }
 
     public void CalculateGroundInfo(out GroundInfo output)
@@ -142,7 +153,7 @@ public class CharacterMovement : Movement
             }
             else if (secondaryDistance > slipRadius)
             {
-                output.isSlipping = true;
+                output.isSlipping = true && enableSlip;
                 output.slipVector = slipVectorUnnormalized / secondaryDistance; // normalizes it (secondaryDistance = slipVectorUnnormalized.magnitude)
             }
 
