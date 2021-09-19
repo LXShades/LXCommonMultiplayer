@@ -67,15 +67,15 @@ public class CharacterMovement : Movement
         }
     }
 
-    public void ApplyCharacterVelocity(in GroundInfo groundInfo, float deltaTime)
+    public void ApplyCharacterVelocity(in GroundInfo groundInfo, float deltaTime, bool isRealtime)
     {
         // Do final movement
         Vector3 preMovePosition = transform.position;
-        if (Move(velocity * deltaTime, out Movement.Hit hitOut))
+        if (Move(velocity * deltaTime, out Movement.Hit hitOut, isRealtime))
         {
-            if (enableCollisionsAffectVelocity && deltaTime > 0f)
+            if (enableCollisionsAffectVelocity && deltaTime > 0f 
+                && Vector3.Dot(hitOut.normal, velocity) < 0f) // movement callbacks can affect velocity, double-check that we're still colliding before we cancel out all speed against the object
             {
-                //movement.velocity = (transform.position - positionBeforeMovement) / deltaTime;
                 velocity.SetAlongAxis(hitOut.normal, 0f);
             }
         }

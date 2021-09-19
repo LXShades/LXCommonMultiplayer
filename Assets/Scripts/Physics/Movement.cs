@@ -91,13 +91,13 @@ public class Movement : MonoBehaviour
     /// </summary>
     [HideInInspector] public Vector3 velocity;
 
-    private HashSet<IMovementCollisions> movementCollisions = new HashSet<IMovementCollisions>();
+    private HashSet<IMovementCollisionCallbacks> movementCollisions = new HashSet<IMovementCollisionCallbacks>();
 
     // hit buffers for each function, avoiding allocations
     private RaycastHit[] moveHitBuffer = new RaycastHit[128];
     private RaycastHit[] colliderCastHitBuffer = new RaycastHit[128];
 
-    List<IMovementCollisions> cachedMovementCollisionComponents = new List<IMovementCollisions>(12);
+    List<IMovementCollisionCallbacks> cachedMovementCollisionCallbackComponents = new List<IMovementCollisionCallbacks>(12);
 
     Collider[] nearbyColliderBuffer = new Collider[24];
 
@@ -202,16 +202,25 @@ public class Movement : MonoBehaviour
             // find closest blocking collider
             for (int i = 0; i < numHits; i++)
             {
-                if (!moveHitBuffer[i].collider.isTrigger && moveHitBuffer[i].distance < closestDist)
+                // acknowledge all collided movementcollision objects
+                moveHitBuffer[i].collider.GetComponents<IMovementCollisionCallbacks>(cachedMovementCollisionCallbackComponents);
+
+                bool isTrigger = moveHitBuffer[i].collider.isTrigger;
+                bool shouldBlock = !isTrigger && cachedMovementCollisionCallbackComponents.Count == 0; // false if a trigger, and false if there are callbacks to evaluate first
+                foreach (IMovementCollisionCallbacks movementCollision in cachedMovementCollisionCallbackComponents)
+                {
+                    movementCollisions.Add(movementCollision);
+
+                    if (!isTrigger)
+                        shouldBlock |= movementCollision.ShouldBlockMovement(this, moveHitBuffer[i]);
+                }
+
+                // consider it as the main blocker if it's blocking
+                if (shouldBlock && moveHitBuffer[i].distance < closestDist)
                 {
                     closestDist = moveHitBuffer[i].distance;
                     closestHitId = i;
                 }
-
-                // acknowledge all collided movementcollision objects
-                moveHitBuffer[i].collider.GetComponents<IMovementCollisions>(cachedMovementCollisionComponents);
-                foreach (IMovementCollisions movementCollision in cachedMovementCollisionComponents)
-                    movementCollisions.Add(movementCollision);
             }
 
             // Identify the closest blocking collision
@@ -245,14 +254,14 @@ public class Movement : MonoBehaviour
         MovementDebugStats.total.totalCollisionComputingTimeMicroseconds += cachedStopwatch.ElapsedTicks * 1000000 / System.Diagnostics.Stopwatch.Frequency;
 
         // Call collision callbacks
-        foreach (IMovementCollisions collisions in movementCollisions)
+        foreach (IMovementCollisionCallbacks collisions in movementCollisions)
             collisions.OnMovementCollidedBy(this, isRealtime);
 
         return hasHitOccurred;
     }
 
     /// <summary>
-    /// Performs a penetration-based movement. HitOut is currently not valid because we can't actually assign all the info we want to it...
+    /// Performs a penetration-based movement
     /// </summary>
     public bool MovePenetration(Vector3 offset, out Hit hitOut, bool isRealtime)
     {
@@ -303,11 +312,19 @@ public class Movement : MonoBehaviour
                         {
                             hasHitOccurred = true;
 
-                            nearbyColliderBuffer[i].GetComponents<IMovementCollisions>(cachedMovementCollisionComponents);
-                            foreach (IMovementCollisions movementCollision in cachedMovementCollisionComponents)
+                            nearbyColliderBuffer[i].GetComponents<IMovementCollisionCallbacks>(cachedMovementCollisionCallbackComponents);
+
+                            bool isTrigger = nearbyColliderBuffer[i].isTrigger;
+                            bool shouldBlock = !isTrigger && cachedMovementCollisionCallbackComponents.Count == 0; // false if a trigger, and false if there are callbacks to evaluate first
+                            foreach (IMovementCollisionCallbacks movementCollision in cachedMovementCollisionCallbackComponents)
+                            {
                                 movementCollisions.Add(movementCollision);
 
-                            if (!nearbyColliderBuffer[i].isTrigger)
+                                if (!isTrigger)
+                                    shouldBlock |= movementCollision.ShouldBlockMovement(this, moveHitBuffer[i]);
+                            }
+
+                            if (shouldBlock)
                             {
                                 nextPosition += hitDirection * (hitDistance + skinThickness);
 
@@ -339,7 +356,7 @@ public class Movement : MonoBehaviour
 
         MovementDebugStats.total.totalCollisionComputingTimeMicroseconds += cachedStopwatch.ElapsedTicks * 1000000 / System.Diagnostics.Stopwatch.Frequency;
 
-        foreach (IMovementCollisions collisions in movementCollisions)
+        foreach (IMovementCollisionCallbacks collisions in movementCollisions)
             collisions.OnMovementCollidedBy(this, isRealtime);
 
         return hasHitOccurred;
@@ -493,8 +510,16 @@ public class Movement : MonoBehaviour
     }
 }
 
-public interface IMovementCollisions
+public interface IMovementCollisionCallbacks
 {
+    /// <summary>
+    /// Should return whether the object blocks the movement. It may be called multiple times per frame. It should not change the object's state.
+    /// Allows something to pass through conditionally.
+    /// The hit parameter expresses the collision that took place.
+    /// If this object is a trigger, this function won't get called and the object will not block.
+    /// </summary>
+    bool ShouldBlockMovement(Movement source, in RaycastHit hit);
+
     void OnMovementCollidedBy(Movement source, bool isRealtime);
 }
 
