@@ -136,12 +136,14 @@ public class CharacterMovement : Movement
                     //  a) normals are the same but platform distances are different
                     //  b) normals rotate in the opposite direction we'd expect (eg we're moving forward, but rotation is going backward -- we shouldn't be pushing _down_ in that scenario)
                     //  c) we're trying to move upwards, beyond the ground escape velocity
+                    //  d) we're already moving downwards, in which case we can land on the ground naturally
 
                     bool situationA = Vector3.Dot(rayHit.normal, groundInfo.loopyNormal) >= 0.99f && rayHit.distance - raycastPullback > loopyPushdownNeutralLimit;
                     bool situationB = Vector3.Dot(rayHit.normal - groundInfo.loopyNormal, velocity) < 0f;
                     bool situationC = Vector3.Dot(up, velocity) >= groundEscapeThreshold;
+                    bool situationD = Vector3.Dot(up, velocity) < 0f;
 
-                    if (!situationA && !situationB && !situationC)
+                    if (!situationA && !situationB && !situationC && !situationD)
                     {
                         // to get as close to the ground as possible in prep for the next frame, we need to move with our rotation simulating our final up vector
                         // todo we could do a collidercast? but the normals won't be as nice so maybe not
