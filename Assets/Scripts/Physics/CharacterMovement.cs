@@ -28,6 +28,7 @@ public class CharacterMovement : Movement
     public float gravity = 10f;
 
     [Header("[CharMovement] Grounding")]
+    public LayerMask groundLayers = ~0;
     public float groundSphereTestRadius = 0.25f;
     public float groundTestDistanceThreshold = 0.05f;
     public float groundEscapeThreshold = 3f;
@@ -46,7 +47,12 @@ public class CharacterMovement : Movement
     public float loopyGroundTestDistance = 0.5f;
     public float loopyPushdownNeutralLimit = 0.2f;
 
-    [Header("[CharMovement] Misc")]
+    [Header("[CharMovement] Stepping")]
+    public bool enableStepUp = false;
+    public float stepHeight = 0.2f;
+    public Vector3 stepLocalFootOffset = Vector3.zero;
+
+    [Header("[CharMovement] Collision Velocity Response")]
     public bool enableCollisionsAffectVelocity = true;
 
     public void ApplyCharacterGravity(in GroundInfo groundInfo, float deltaTime)
@@ -71,7 +77,27 @@ public class CharacterMovement : Movement
     {
         // Do final movement
         Vector3 preMovePosition = transform.position;
-        if (Move(velocity * deltaTime, out Movement.Hit hitOut, isRealtime))
+        Vector3 preFootPosition = transform.TransformPoint(stepLocalFootOffset);
+        Vector3 moveOffset = velocity * deltaTime;
+
+        bool collisionOccurred = Move(moveOffset, out Movement.Hit hitOut, isRealtime);
+
+        if (collisionOccurred)
+        {
+            if (enableStepUp && hitOut.hasPoint)
+            {
+                if (TryFindStepAlongMovement(preFootPosition, moveOffset, hitOut, out float stepUpHeight))
+                {
+                    // Try the move again, but step up this time
+                    // Todo: Collision checking
+                    transform.position = preMovePosition + up * stepUpHeight;
+
+                    collisionOccurred = Move(moveOffset, out hitOut, isRealtime);
+                }
+            }
+        }
+
+        if (collisionOccurred)
         {
             if (enableCollisionsAffectVelocity && deltaTime > 0f 
                 && Vector3.Dot(hitOut.normal, velocity) < 0f) // movement callbacks can affect velocity, double-check that we're still colliding before we cancel out all speed against the object
@@ -128,7 +154,7 @@ public class CharacterMovement : Movement
 
     public void CalculateGroundInfo(out GroundInfo output)
     {
-        bool hasGroundCastHit = Physics.SphereCast(new Ray(transform.position + up * groundSphereTestRadius, -up), groundSphereTestRadius, out RaycastHit groundHit, Mathf.Max(groundSphereTestRadius, loopyGroundTestDistance), ~0, QueryTriggerInteraction.Ignore);
+        bool hasGroundCastHit = Physics.SphereCast(new Ray(transform.position + up * groundSphereTestRadius, -up), groundSphereTestRadius, out RaycastHit groundHit, Mathf.Max(groundSphereTestRadius, loopyGroundTestDistance), groundLayers, QueryTriggerInteraction.Ignore);
         output = new GroundInfo()
         {
             isOnGround = false,
@@ -151,7 +177,16 @@ public class CharacterMovement : Movement
             if (primaryDistance < groundTestDistanceThreshold)
             {
                 output.isOnGround = true;
-                output.normal = groundHit.normal;
+
+                // We need to provide a normal that isn't affected by the sphere cast. Two reasons:
+                // * When flattening our velocity to the ground, the sphere cast causes corners to boost us when that's not what we really want
+                // * It also causes our acceleration direction (if clamping to groundNormal) to be incorrectly based on the corner instead, making us climb corners when we push towards them.
+                //   We don't really want to do that either (we should either be blocked or step up if that's enabled)
+                // todo centre this cast based on the last cast's hit point so that we can latch onto the most relevant surface
+                if (Physics.Raycast(transform.position + up * 0.01f, -up, out RaycastHit rayHit, groundTestDistanceThreshold + 0.01f, groundLayers, QueryTriggerInteraction.Ignore))
+                    output.normal = rayHit.normal;
+                else
+                    output.normal = Vector3.up;
             }
             else if (secondaryDistance > slipRadius)
             {
@@ -161,7 +196,7 @@ public class CharacterMovement : Movement
 
             if (enableLoopy && primaryDistance <= loopyGroundTestDistance)
             {
-                if (Physics.Raycast(new Ray(transform.position + up * 0.01f, -up), out RaycastHit rayHit, loopyGroundTestDistance, ~0, QueryTriggerInteraction.Ignore) && rayHit.distance <= loopyGroundTestDistance)
+                if (Physics.Raycast(new Ray(transform.position + up * 0.01f, -up), out RaycastHit rayHit, loopyGroundTestDistance, groundLayers, QueryTriggerInteraction.Ignore) && rayHit.distance <= loopyGroundTestDistance)
                 {
                     output.isLoopy = true;
 
@@ -169,6 +204,32 @@ public class CharacterMovement : Movement
                 }
             }
         }
+    }
+
+    private List<RaycastHit> stepHitBuffer = new List<RaycastHit>();
+    public bool TryFindStepAlongMovement(Vector3 originalFootPosition, Vector3 attemptedMovementOffset, in Hit hit, out float outStepHeight)
+    {
+        if (hit.hasPoint)
+        {
+            float height = Vector3.Dot(hit.point - originalFootPosition, up);
+
+            if (height >= -0.01f && height <= stepHeight)
+            {
+                // Check if it's a flat surface that continues flat from the point we hit at
+                if (Physics.Raycast(hit.point + attemptedMovementOffset.AlongPlane(up).normalized * 0.05f + up * 0.05f, -up, out RaycastHit rayHit, 0.1f, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    // Only step up if the steps are upright, avoid stepping on slopes
+                    if (Vector3.Dot(rayHit.normal, up) >= 0.95f)
+                    {
+                        outStepHeight = Vector3.Dot(rayHit.point - originalFootPosition, up);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        outStepHeight = 0f;
+        return false;
     }
 
     private static List<Vector3> normalBuffer = new List<Vector3>();

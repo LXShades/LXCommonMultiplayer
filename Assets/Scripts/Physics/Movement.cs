@@ -15,6 +15,12 @@ public class Movement : MonoBehaviour
 
         /// <summary>Collider hit during the most significant hit</summary>
         public Collider collider;
+
+        /// <summary>Whether the point field is valid. Penetration collisions do not supply this</summary>
+        public bool hasPoint;
+
+        /// <summary>The point that was hit, if available. Check hasPoint first.</summary>
+        public Vector3 point;
     }
 
     [Flags]
@@ -229,6 +235,8 @@ public class Movement : MonoBehaviour
                 hit = moveHitBuffer[closestHitId];
                 hitOut.normal = hit.normal;
                 hitOut.collider = hit.collider;
+                hitOut.hasPoint = true;
+                hitOut.point = hit.point;
                 hasHitOccurred = true;
 
                 if (iteration < numIterations - 1)
