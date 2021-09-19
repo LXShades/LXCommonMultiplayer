@@ -29,9 +29,11 @@ public class CharacterMovement : Movement
 
     [Header("[CharMovement] Grounding")]
     public LayerMask groundLayers = ~0;
-    public float groundSphereTestRadius = 0.25f;
+    [UnityEngine.Serialization.FormerlySerializedAs("groundSphereTestRadius")]
+    public float groundTestRadius = 0.25f;
     public float groundTestDistanceThreshold = 0.05f;
     public float groundEscapeThreshold = 3f;
+    public float groundAngleLimit = 90f;
 
     [Header("[CharMovement] Slip")]
     public bool enableSlip = true;
@@ -130,7 +132,7 @@ public class CharacterMovement : Movement
                 float raycastLength = Vector3.Distance(preMovePosition, transform.position);
                 float raycastPullback = 0.01f;
 
-                if (Physics.Raycast(new Ray(transform.position + up * raycastPullback, -up), out RaycastHit rayHit, raycastLength, ~0, QueryTriggerInteraction.Ignore))
+                if (Physics.Raycast(new Ray(transform.position + up * raycastPullback, -up), out RaycastHit rayHit, raycastLength, groundLayers, QueryTriggerInteraction.Ignore))
                 {
                     // we might not want to push down if...
                     //  a) normals are the same but platform distances are different
@@ -166,7 +168,7 @@ public class CharacterMovement : Movement
 
     public void CalculateGroundInfo(out GroundInfo output)
     {
-        bool hasGroundCastHit = Physics.SphereCast(new Ray(transform.position + up * groundSphereTestRadius, -up), groundSphereTestRadius, out RaycastHit groundHit, Mathf.Max(groundSphereTestRadius, loopyGroundTestDistance), groundLayers, QueryTriggerInteraction.Ignore);
+        bool hasGroundCastHit = Physics.SphereCast(new Ray(transform.position + up * groundTestRadius, -up), groundTestRadius, out RaycastHit groundHit, Mathf.Max(groundTestRadius, loopyGroundTestDistance), groundLayers, QueryTriggerInteraction.Ignore);
         output = new GroundInfo()
         {
             isOnGround = false,
@@ -188,8 +190,6 @@ public class CharacterMovement : Movement
 
             if (primaryDistance < groundTestDistanceThreshold)
             {
-                output.isOnGround = true;
-
                 // We need to provide a normal that isn't affected by the sphere cast. Two reasons:
                 // * When flattening our velocity to the ground, the sphere cast causes corners to boost us when that's not what we really want
                 // * It also causes our acceleration direction (if clamping to groundNormal) to be incorrectly based on the corner instead, making us climb corners when we push towards them.
@@ -199,6 +199,16 @@ public class CharacterMovement : Movement
                     output.normal = rayHit.normal;
                 else
                     output.normal = Vector3.up;
+
+                if (Vector3.Dot(groundHit.normal, up) >= Mathf.Cos(groundAngleLimit * Mathf.Deg2Rad))
+                {
+                    output.isOnGround = true;
+                }
+                else
+                {
+                    output.isOnGround = false;
+                    output.normal = Vector3.up;
+                }
             }
             else if (secondaryDistance > slipRadius)
             {
@@ -282,14 +292,31 @@ public class CharacterMovement : Movement
     }
 
 #if UNITY_EDITOR
+    protected void OnValidate()
+    {
+        slipRadius = Mathf.Min(slipRadius, groundTestRadius);
+
+        if ((groundLayers & ~blockingCollisionLayers) != 0)
+        {
+            Debug.LogWarning($"[CharacterMovement] {gameObject.name}: Filtering groundLayers to only include layers in blockingCollisionLayers (nonblocking collision layers cannot be ground layers).", this);
+            groundLayers &= blockingCollisionLayers;
+        }
+    }
+
     private void OnDrawGizmos()
     {
-        DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset), groundSphereTestRadius, Color.blue);
+        DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset), groundTestRadius, Color.blue);
 
         if (enableStepUp)
         {
             // Feet area
-            DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset + new Vector3(0, stepHeight, 0)), groundSphereTestRadius, Color.green);
+            DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset + new Vector3(0, stepHeight, 0)), groundTestRadius, Color.green);
+        }
+
+        if (enableSlip)
+        {
+            // Slip radius
+            DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset), slipRadius, new Color(1f, 0.6f, 0));
         }
     }
 
