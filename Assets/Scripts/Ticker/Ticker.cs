@@ -271,7 +271,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                     if (inputIndex + 1 < inputTimeline.Count && playbackTime <= inputTime && playbackTime + deltaTime > inputTime && (flags & TickerSeekFlags.IgnoreDeltas) == 0)
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex + 1]);
                     else
-                        input = inputTimeline[inputIndex].WithDeltas(input);
+                        input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex]);
 
                     // on the server, the true non-reconciled state is the one that uses full inputs
                     // on the client, the same is true except when replaying things we've already played - i.e. Reconciles - and we pass forceReconciliation for that.
