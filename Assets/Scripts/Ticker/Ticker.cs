@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using UnityEngine;
 
-public delegate void TickerEvent(bool isRealtime);
+public delegate void TickerEvent(TickInfo tickInfo);
 
 [Flags]
 public enum TickerSeekFlags
@@ -297,15 +297,17 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
 
                 if (deltaTime > 0f)
                 {
+                    TickInfo tickInfo = new TickInfo() { isRealtime = isRealtime, isConfirming = canConfirmState };
+
                     // invoke events
                     for (int i = 0; i < eventTimeline.Count; i++)
                     {
                         if (eventTimeline.TimeAt(i) >= playbackTime && eventTimeline.TimeAt(i) < playbackTime + deltaTime)
-                            eventTimeline[i]?.Invoke(isRealtime);
+                            eventTimeline[i]?.Invoke(tickInfo);
                     }
 
                     // run a tick
-                    target.Tick(deltaTime, input, new TickInfo() { isRealtime = isRealtime, isConfirming = canConfirmState } );
+                    target.Tick(deltaTime, input, tickInfo);
 
                     playbackTime += deltaTime;
 
