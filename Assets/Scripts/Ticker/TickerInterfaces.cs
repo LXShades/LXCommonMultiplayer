@@ -96,7 +96,7 @@ public interface ITickable<TInput, TState> : ITickableBase
     /// * Always remember Tick() may be called multiple times in a single frame. As such, avoid playing sounds or spawning objects unless isRealtime is true.
     /// * You can still use Update for things that don't affect gameplay, such as visual effects.
     /// </summary>
-    void Tick(float deltaTime, TInput input, bool isRealtime);
+    void Tick(float deltaTime, TInput input, TickInfo tickInfo);
 
     /// <summary>
     /// Used to restore to a previous state by the ticker. Store all important ticker-affected information here.

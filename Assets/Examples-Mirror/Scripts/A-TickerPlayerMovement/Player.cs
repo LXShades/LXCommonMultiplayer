@@ -123,13 +123,13 @@ namespace MultiplayerToolset.Examples.Mirror
         /// * As such, always remember Tick() may be called on past/outdated states.
         /// * You can still use Update for things that don't affect gameplay, such as visual effects.
         /// </summary>
-        public void Tick(float deltaTime, PlayerInput input, bool isRealtime)
+        public void Tick(float deltaTime, PlayerInput input, TickInfo tickInfo)
         {
             Vector3 movementDirection = new Vector3(movementSpeed * input.horizontal, 0f, movementSpeed * input.vertical);
 
             // "movement" is kind of like a character controller, it lets us move with collision
             // it's very useful for client prediction because we can do it whenever we want with no physics timing restrictions
-            movement.Move(movementDirection * deltaTime, out _, isRealtime); // don't use Time.deltaTime!
+            movement.Move(movementDirection * deltaTime, out _, tickInfo); // don't use Time.deltaTime!
 
             if (movementDirection.sqrMagnitude > 0f)
                 transform.forward = movementDirection;

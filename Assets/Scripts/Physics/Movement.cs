@@ -141,24 +141,29 @@ public class Movement : MonoBehaviour
     public bool Move(Vector3 offset) => Move(offset, out Hit _);
 
     /// <summary>
+    /// Moves with collision checking depending on default move type. Can be a computationally expensive operation.
+    /// </summary>
+    public bool Move(Vector3 offset, out Hit hitOut) => Move(offset, out hitOut, TickInfo.Default);
+
+    /// <summary>
     /// Moves with collision checking depending on default move type. Calls IMovementCollision callbacks on collided objects. Can be a computationally expensive operation. Returns whether a collision occurred.
     /// When using a Sweep collision, hitOut is based on the result of the sweep. With Penetration collisions, it is only estimated, based on where the object was pushed out.
     /// When using SweepThenPenetration, the sweep hit result has priority over the penetration result if there is one, as the former tend to be more accurate.
     /// </summary>
-    public bool Move(Vector3 offset, out Hit hitOut, bool isRealtime = true, MoveFlags flags = MoveFlags.None)
+    public bool Move(Vector3 offset, out Hit hitOut, TickInfo tickInfo, MoveFlags flags = MoveFlags.None)
     {
         if (defaultMoveType == MoveType.Sweep || flags != MoveFlags.None) // we don't suppose NoSlide on MovePenetration yet, todo?
         {
-            return MoveSweep(offset, out hitOut, isRealtime, flags);
+            return MoveSweep(offset, out hitOut, tickInfo, flags);
         }
         else if (defaultMoveType == MoveType.Penetration)
         {
-            return MovePenetration(offset, out hitOut, isRealtime);
+            return MovePenetration(offset, out hitOut, tickInfo);
         }
         else
         {
-            bool hasHitA = MoveSweep(offset, out Hit hitA, isRealtime, flags);
-            bool hasHitB = MovePenetration(Vector3.zero, out Hit hitB, isRealtime);
+            bool hasHitA = MoveSweep(offset, out Hit hitA, tickInfo, flags);
+            bool hasHitB = MovePenetration(Vector3.zero, out Hit hitB, tickInfo);
 
             hitOut = default;
             if (hasHitB)
@@ -173,7 +178,7 @@ public class Movement : MonoBehaviour
     /// <summary>
     /// Performs a sweep test-based movement
     /// </summary>
-    public bool MoveSweep(Vector3 offset, out Hit hitOut, bool isRealtime = true, MoveFlags flags = MoveFlags.None)
+    public bool MoveSweep(Vector3 offset, out Hit hitOut, TickInfo tickInfo, MoveFlags flags = MoveFlags.None)
     {
         hitOut = default;
 
@@ -263,7 +268,7 @@ public class Movement : MonoBehaviour
 
         // Call collision callbacks
         foreach (IMovementCollisionCallbacks collisions in movementCollisions)
-            collisions.OnMovementCollidedBy(this, isRealtime);
+            collisions.OnMovementCollidedBy(this, tickInfo);
 
         return hasHitOccurred;
     }
@@ -271,7 +276,7 @@ public class Movement : MonoBehaviour
     /// <summary>
     /// Performs a penetration-based movement
     /// </summary>
-    public bool MovePenetration(Vector3 offset, out Hit hitOut, bool isRealtime)
+    public bool MovePenetration(Vector3 offset, out Hit hitOut, TickInfo tickInfo)
     {
         hitOut = default;
 
@@ -365,7 +370,7 @@ public class Movement : MonoBehaviour
         MovementDebugStats.total.totalCollisionComputingTimeMicroseconds += cachedStopwatch.ElapsedTicks * 1000000 / System.Diagnostics.Stopwatch.Frequency;
 
         foreach (IMovementCollisionCallbacks collisions in movementCollisions)
-            collisions.OnMovementCollidedBy(this, isRealtime);
+            collisions.OnMovementCollidedBy(this, tickInfo);
 
         return hasHitOccurred;
     }
@@ -528,7 +533,7 @@ public interface IMovementCollisionCallbacks
     /// </summary>
     bool ShouldBlockMovement(Movement source, in RaycastHit hit);
 
-    void OnMovementCollidedBy(Movement source, bool isRealtime);
+    void OnMovementCollidedBy(Movement source, TickInfo tickInfo);
 }
 
 public static class MovementDebugStats

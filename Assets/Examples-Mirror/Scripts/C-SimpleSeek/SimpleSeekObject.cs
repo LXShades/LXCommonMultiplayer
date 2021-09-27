@@ -56,7 +56,7 @@ namespace MultiplayerToolset.Examples.Mirror
             ticker.Seek(Time.time % inputs.LatestTime, Time.time % inputs.LatestTime, TickerSeekFlags.None);
         }
 
-        public void Tick(float deltaTime, Input input, bool isRealtime)
+        public void Tick(float deltaTime, Input input, TickInfo tickInfo)
         {
             transform.position += new Vector3(input.movementDirection.x, 0f, input.movementDirection.y) * (movementSpeed * deltaTime);
         }

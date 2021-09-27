@@ -153,7 +153,7 @@ namespace MultiplayerToolset.Examples.Mirror
             TrackAllPhysicsObjects();
         }
 
-        public void Tick(float deltaTime, Input input, bool isRealtime)
+        public void Tick(float deltaTime, Input input, TickInfo tickInfo)
         {
             // run physics ticks
             for (int i = 0; i < physObjects.Count; i++)
@@ -164,7 +164,7 @@ namespace MultiplayerToolset.Examples.Mirror
                 {
                     foreach (IPhysicsTick physTick in physObj.GetComponents<IPhysicsTick>())
                     {
-                        physTick.PhysicsTick(deltaTime, physTick.GetInputAtTime(ticker.playbackTime), isRealtime);
+                        physTick.PhysicsTick(deltaTime, physTick.GetInputAtTime(ticker.playbackTime), tickInfo.isRealtime);
                     }
                 }
                 else if (hasAuthority) // server should cleanup invalid objects asap

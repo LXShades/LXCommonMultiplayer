@@ -76,14 +76,14 @@ public class CharacterMovement : Movement
         }
     }
 
-    public void ApplyCharacterVelocity(in GroundInfo groundInfo, float deltaTime, bool isRealtime)
+    public void ApplyCharacterVelocity(in GroundInfo groundInfo, float deltaTime, TickInfo tickInfo)
     {
         // Do final movement
         Vector3 preMovePosition = transform.position;
         Vector3 preFootPosition = transform.TransformPoint(stepLocalFootOffset);
         Vector3 moveOffset = velocity * deltaTime;
 
-        bool collisionOccurred = Move(moveOffset, out Movement.Hit hitOut, isRealtime);
+        bool collisionOccurred = Move(moveOffset, out Movement.Hit hitOut, tickInfo);
 
         if (collisionOccurred)
         {
@@ -95,7 +95,7 @@ public class CharacterMovement : Movement
                     // Todo: Collision checking
                     transform.position = preMovePosition + up * stepUpHeight;
 
-                    collisionOccurred = Move(moveOffset, out hitOut, isRealtime);
+                    collisionOccurred = Move(moveOffset, out hitOut, tickInfo);
                 }
             }
         }
@@ -150,7 +150,7 @@ public class CharacterMovement : Movement
                         // to get as close to the ground as possible in prep for the next frame, we need to move with our rotation simulating our final up vector
                         // todo we could do a collidercast? but the normals won't be as nice so maybe not
                         transform.rotation = Quaternion.LookRotation(forward.AlongPlane(rayHit.normal), rayHit.normal);
-                        Move(-up * (rayHit.distance + raycastPullback), out _, true, Movement.MoveFlags.NoSlide);
+                        Move(-up * (rayHit.distance + raycastPullback), out _, TickInfo.Default, Movement.MoveFlags.NoSlide);
 
                         velocity = velocity.AlongPlane(rayHit.normal);
                     }

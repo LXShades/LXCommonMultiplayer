@@ -49,6 +49,7 @@ public struct TickerSettings
 
     [Header("Debug")]
     public bool debugLogReconciles;
+    public bool debugLogSeekWarnings;
 
 #if UNITY_EDITOR
     public float debugSelfReconcileDelay;
@@ -74,7 +75,22 @@ public struct TickerSettings
         debugLogReconciles = false,
         debugSelfReconcileDelay = 0.3f,
         debugDrawReconciles = false,
-        debugSelfReconcile = false
+        debugSelfReconcile = false,
+        debugLogSeekWarnings = false
+    };
+}
+
+public struct TickInfo
+{
+    public float deltaTime;
+
+    public bool isConfirming;
+
+    public bool isRealtime;
+
+    public static TickInfo Default = new TickInfo()
+    {
+        isRealtime = true
     };
 }
 
@@ -219,7 +235,8 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
             }
             else
             {
-                Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): reverse seek could not find earlier state to seek to. Using current state.");
+                if (settings.debugLogSeekWarnings)
+                    Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): reverse seek could not find earlier state to seek to. Using current state.");
             }
         }
 
@@ -273,9 +290,8 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                     else
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex]);
 
-                    // on the server, the true non-reconciled state is the one that uses full inputs
-                    // on the client, the same is true except when replaying things we've already played - i.e. Reconciles - and we pass forceReconciliation for that.
-                    if (canConfirmState && playbackTime >= realtimePlaybackTime)
+
+                    if (initialPlaybackTime < realtimePlaybackTime && playbackTime >= realtimePlaybackTime)
                         isRealtime = true;
                 }
 
@@ -289,7 +305,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                     }
 
                     // run a tick
-                    target.Tick(deltaTime, input, isRealtime);
+                    target.Tick(deltaTime, input, new TickInfo() { isRealtime = isRealtime, isConfirming = canConfirmState } );
 
                     playbackTime += deltaTime;
 
@@ -308,7 +324,8 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                 numIterations++;
                 if (numIterations == settings.maxSeekIterations)
                 {
-                    Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({confirmedStateTime})");
+                    if (settings.debugLogSeekWarnings)
+                        Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({confirmedStateTime})");
 
                     if (canAttemptConfirmNextState)
                     {
