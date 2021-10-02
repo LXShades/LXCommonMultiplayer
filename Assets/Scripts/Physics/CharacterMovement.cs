@@ -57,6 +57,7 @@ public class CharacterMovement : Movement
     [Header("[CharMovement] Collision Velocity Response")]
     public bool enableCollisionsAffectVelocity = true;
     public bool enableCollisionsDontAffectDownwardVelocity = true;
+    public bool enableCollisionsDontIncreaseUpwardVelocityAboveZero = true;
 
     public void ApplyCharacterGravity(in GroundInfo groundInfo, float deltaTime)
     {
@@ -108,12 +109,14 @@ public class CharacterMovement : Movement
             {
                 float originalAlongUp = 0f;
 
-                if (enableCollisionsDontAffectDownwardVelocity)
+                if (enableCollisionsDontAffectDownwardVelocity || enableCollisionsDontIncreaseUpwardVelocityAboveZero)
                     originalAlongUp = Vector3.Dot(velocity, up);
 
                 velocity.SetAlongAxis(velocityImpactNormal, 0f);
 
                 if (enableCollisionsDontAffectDownwardVelocity && originalAlongUp < 0f)
+                    velocity.SetAlongAxis(up, originalAlongUp);
+                if (enableCollisionsDontIncreaseUpwardVelocityAboveZero && Vector3.Dot(velocity, up) > originalAlongUp && Vector3.Dot(velocity, up) > 0f)
                     velocity.SetAlongAxis(up, originalAlongUp);
             }
         }
