@@ -56,7 +56,7 @@ public class CharacterMovement : Movement
 
     [Header("[CharMovement] Collision Velocity Response")]
     public bool enableCollisionsAffectVelocity = true;
-    public bool enableCollisionsDontAffectVerticalVelocity = true;
+    public bool enableCollisionsDontAffectDownwardVelocity = true;
 
     public void ApplyCharacterGravity(in GroundInfo groundInfo, float deltaTime)
     {
@@ -108,12 +108,12 @@ public class CharacterMovement : Movement
             {
                 float originalAlongUp = 0f;
 
-                if (enableCollisionsDontAffectVerticalVelocity)
+                if (enableCollisionsDontAffectDownwardVelocity)
                     originalAlongUp = Vector3.Dot(velocity, up);
 
                 velocity.SetAlongAxis(velocityImpactNormal, 0f);
 
-                if (enableCollisionsDontAffectVerticalVelocity)
+                if (enableCollisionsDontAffectDownwardVelocity && originalAlongUp < 0f)
                     velocity.SetAlongAxis(up, originalAlongUp);
             }
         }
@@ -142,7 +142,7 @@ public class CharacterMovement : Movement
 
                     bool situationA = Vector3.Dot(rayHit.normal, groundInfo.loopyNormal) >= 0.99f && rayHit.distance - raycastPullback > loopyPushdownNeutralLimit;
                     bool situationB = Vector3.Dot(rayHit.normal - groundInfo.loopyNormal, velocity) < 0f;
-                    bool situationC = Vector3.Dot(up, velocity) >= groundEscapeThreshold;
+                    bool situationC = Vector3.Dot(previousUp, velocity) >= groundEscapeThreshold;
                     bool situationD = Vector3.Dot(up, velocity) < 0f;
 
                     if (!situationA && !situationB && !situationC && !situationD)
