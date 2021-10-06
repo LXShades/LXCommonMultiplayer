@@ -9,7 +9,7 @@ namespace MultiplayerToolset.Examples.Mirror
     {
         Rigidbody GetRigidbody();
 
-        void PhysicsTick(float deltaTime, PhysicsPlayer.Input input, bool isRealtime);
+        void PhysicsTick(float deltaTime, PhysicsPlayer.Input input);
 
         PhysicsPlayer.Input GetInputAtTime(float time);
     }
@@ -164,7 +164,7 @@ namespace MultiplayerToolset.Examples.Mirror
                 {
                     foreach (IPhysicsTick physTick in physObj.GetComponents<IPhysicsTick>())
                     {
-                        physTick.PhysicsTick(deltaTime, physTick.GetInputAtTime(ticker.playbackTime), tickInfo.isRealtime);
+                        physTick.PhysicsTick(deltaTime, physTick.GetInputAtTime(ticker.playbackTime));
                     }
                 }
                 else if (hasAuthority) // server should cleanup invalid objects asap

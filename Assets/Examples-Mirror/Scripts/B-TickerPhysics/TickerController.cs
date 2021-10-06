@@ -35,12 +35,12 @@ namespace MultiplayerToolset.Examples.Mirror
         {
             // seek physics
             if (NetworkServer.active)
-                physTicker.Seek(Time.time, Time.time);
+                physTicker.Seek(Time.time);
             else
             {
                 if (!useAutomaticClientExtrapolation)
                 {
-                    physTicker.Seek(timeOnServer + Time.time - timeOfLastServerUpdate + clientExtrapolation, timeOnServer, TickerSeekFlags.IgnoreDeltas);
+                    physTicker.Seek(timeOnServer + Time.time - timeOfLastServerUpdate + clientExtrapolation, TickerSeekFlags.IgnoreDeltas);
                 }
                 else
                 {
@@ -64,7 +64,7 @@ namespace MultiplayerToolset.Examples.Mirror
                         }
                     }
 
-                    physTicker.Seek(Time.time + autoCalculatedTimeExtrapolation, timeOnServer, TickerSeekFlags.IgnoreDeltas);
+                    physTicker.Seek(Time.time + autoCalculatedTimeExtrapolation, TickerSeekFlags.IgnoreDeltas);
                 }
             }
 

@@ -39,7 +39,7 @@ public class TickerTimelineDebugUI : MonoBehaviour
 
             timeline.DrawTick(targetTicker.playbackTime, 1.5f, 0.5f, playbackTimeColor, "PT", 0);
             timeline.DrawTick(targetTicker.confirmedStateTime, 1.5f, 0.5f, confirmedTimeColor, "CT", 1);
-            timeline.DrawTick(targetTicker.realtimePlaybackTime, 1.5f, 0.5f, realtimeColor, "RT", 2); ;
+            timeline.DrawTick(targetTicker.lastSeekTargetTime, 1.5f, 0.5f, realtimeColor, "RT", 2); ;
 
             for (int i = 0; i < targetTicker.inputTimelineBase.Count; i++)
                 timeline.DrawTick(targetTicker.inputTimelineBase.TimeAt(i), 1f, -1f, inputColor);

@@ -5,8 +5,8 @@ using System;
 /// </summary>
 public interface ITickerBase
 {
-    public void Seek(float targetTime, float realtimePlaybackTime, TickerSeekFlags flags = TickerSeekFlags.None);
-    public void SeekBy(float deltaTime, float realtimePlaybackTime);
+    public void Seek(float targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
+    public void SeekBy(float deltaTime);
 
     public void SetDebugPaused(bool isDebugPaused);
 
@@ -16,14 +16,14 @@ public interface ITickerBase
     public string targetName { get; }
 
     /// <summary>
-    /// The current playback time, based on no specific point of reference, but is expected to use the same time format as input and event history
+    /// The current playback time. This can be in any unit that matches the unit you use in the inputTimeline and stateTimelines, for example Time.time or Time.realtimeSinceStartup
     /// </summary>
     public float playbackTime { get; }
 
     /// <summary>
-    /// The realtime playback during the last Seek. This is mainly for debugging and doesn't affect current state
+    /// The last time that was Seeked to. Similar to playbackTime, BUT it does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
     /// </summary>
-    public float realtimePlaybackTime { get; }
+    public float lastSeekTargetTime { get; }
 
     /// <summary>
     /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state

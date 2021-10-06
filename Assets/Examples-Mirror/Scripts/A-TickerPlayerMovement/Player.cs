@@ -76,7 +76,7 @@ namespace MultiplayerToolset.Examples.Mirror
                 ticker.InsertInput(nextInput, Time.time);
 
                 // seek to the current Time.time. this may amount to a mixture of reverting/confirming states and ticking forward with delta time
-                ticker.Seek(Time.time, Time.time);
+                ticker.Seek(Time.time);
 
                 // send our inputs and times to the server
                 if (IsNetUpdate())
@@ -92,7 +92,7 @@ namespace MultiplayerToolset.Examples.Mirror
                 if (NetworkServer.active)
                 {
                     // server receiving client's state - just process the inputs, moving to the latest client time (no speedhack tests)
-                    ticker.Seek(ticker.inputTimelineBase.LatestTime, ticker.inputTimelineBase.LatestTime);
+                    ticker.Seek(ticker.inputTimelineBase.LatestTime);
                 }
                 else
                 {
@@ -105,7 +105,7 @@ namespace MultiplayerToolset.Examples.Mirror
                     // both are needed to extrapolate it as expected
                     float extrapolatedTimeOnServer = timeOnServer + Time.time - timeOfLastReceivedServerUpdate;
 
-                    ticker.Seek(extrapolatedTimeOnServer, extrapolatedTimeOnServer, TickerSeekFlags.IgnoreDeltas);
+                    ticker.Seek(extrapolatedTimeOnServer, TickerSeekFlags.IgnoreDeltas);
                 }
             }
 

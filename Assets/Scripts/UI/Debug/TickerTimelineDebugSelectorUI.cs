@@ -135,7 +135,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
                 if (timeDifference != 0f)
                 {
                     tickerTimeline.targetTicker.SetDebugPaused(false); // briefly allow seek
-                    tickerTimeline.targetTicker.Seek(targetTime, targetTime);
+                    tickerTimeline.targetTicker.Seek(targetTime);
                     tickerTimeline.targetTicker.SetDebugPaused(true); // briefly allow seek
                 }
             }
@@ -150,9 +150,9 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
                 float targetTime = tickerTimeline.targetTicker.playbackTime;
 
                 tickerTimeline.targetTicker.SetDebugPaused(false);
-                tickerTimeline.targetTicker.Seek(sourceTime, targetTime);
+                tickerTimeline.targetTicker.Seek(sourceTime);
                 tickerTimeline.targetTicker.stateTimelineBase.TrimAfter(sourceTime); // force reconfirmation
-                tickerTimeline.targetTicker.Seek(targetTime, targetTime);
+                tickerTimeline.targetTicker.Seek(targetTime);
                 tickerTimeline.targetTicker.SetDebugPaused(true);
             }
         }

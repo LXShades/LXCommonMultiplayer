@@ -53,7 +53,7 @@ namespace MultiplayerToolset.Examples.Mirror
 
         private void Update()
         {
-            ticker.Seek(Time.time % inputs.LatestTime, Time.time % inputs.LatestTime, TickerSeekFlags.None);
+            ticker.Seek(Time.time % inputs.LatestTime, TickerSeekFlags.None);
         }
 
         public void Tick(float deltaTime, Input input, TickInfo tickInfo)

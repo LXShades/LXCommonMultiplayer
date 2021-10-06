@@ -132,7 +132,7 @@ namespace MultiplayerToolset.Examples.Mirror
             myInputs.Trim(time - 3f, time + 3f);
         }
 
-        public void PhysicsTick(float deltaTime, Input input, bool isRealtime)
+        public void PhysicsTick(float deltaTime, Input input)
         {
             Vector3 moveDirection = Camera.main.transform.right * input.horizontal + Camera.main.transform.forward * input.vertical;
             moveDirection.y = 0f;

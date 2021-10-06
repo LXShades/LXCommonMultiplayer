@@ -23,7 +23,14 @@ public enum TickerSeekFlags
     /// 
     /// This is slightly more efficient as the character doesn't need to be rewound or fast-forwarded or to have its states confirmed and stored
     /// </summary>
-    DontConfirm = 2
+    DontConfirm = 2,
+
+    /// <summary>
+    /// Treat this as a replay regardless of whether it is replaying old ticks.
+    /// 
+    /// This is useful for predicting future ticks without real-time consequences and effects.
+    /// </summary>
+    TreatAsReplay = 4,
 };
 
 [System.Serializable]
@@ -67,7 +74,7 @@ public struct TickerSettings
 
     public static TickerSettings Default = new TickerSettings()
     {
-        maxDeltaTime = 0.03f,
+        maxDeltaTime = 0.03334f,
         maxSeekIterations = 15,
         maxInputRate = 60,
         alwaysReconcile = false,
@@ -82,15 +89,45 @@ public struct TickerSettings
 
 public struct TickInfo
 {
-    public float deltaTime;
+    //public float deltaTime;
 
+    /// <summary>
+    /// Whether this tick is part of a confirmation. A "confirmation" happens when:
+    /// * There is a known input both before and after the tick period (inclusive)
+    /// * OR the target time from the known input exceeds maxDeltaTime (a confirmation happens in this case)
+    /// * AND seekFlags does not contain TickerSeekFlags.DontConfirm.
+    /// 
+    /// Confirmations exist so that inputs can have variable delta times, and they make sure both client/server get the same deltas and results.
+    /// 
+    /// Confirmations may occur multiple times between a single pair of inputs if the gap between them exceeds maxDeltaTime.
+    /// This is usually nothing to be worried about, it just means the deltas are split into smaller pieces.
+    /// </summary>
     public bool isConfirming;
 
-    public bool isRealtime;
+    /// <summary>
+    /// Whether this tick is approaching a target time greater than the last Seek.
+    /// This is confusing so here's an example of why it's needed:
+    /// * A player is ticking at time=5
+    /// * Player receives a state confirmation in the past at time 4.5. playbackTime has been set to 4.5.
+    /// * Next frame, the player is ticking at time=5.5. However, playbackTime is still 4.5, and we don't want to replay sound and visual effects between 4.5 and 5.0.
+    /// 
+    /// In the above scenario, isReplaying will be true between 4.5 and 5.0, and false from 5.0 beyond
+    /// tl;dr isReplaying = currentTime > destinationTimeAtPreviousSeek
+    /// </summary>
+    public bool isReplaying;
+
+    /// <summary>
+    /// A confirmation may hop back slightly in time if extrapolation is used, but the destination is still forward in time.
+    /// This creates an awkward scenario where it's not technically a replay, but it is partially replaying, but treating it as a full replay might miss crucial effects.
+    /// In those cases, try isConfirmingNew
+    /// </summary>
+    public bool isConfirmingForward => !isReplaying && isConfirming;
+
+    public TickerSeekFlags seekFlags;
 
     public static TickInfo Default = new TickInfo()
     {
-        isRealtime = true
+        isReplaying = false
     };
 }
 
@@ -125,9 +162,9 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     public float playbackTime { get; private set; }
 
     /// <summary>
-    /// The realtime playback during the last Seek. This is mainly for debugging and doesn't affect current state
+    /// The last time that was Seeked to. Similar to playbackTime, but does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
     /// </summary>
-    public float realtimePlaybackTime { get; private set; }
+    public float lastSeekTargetTime { get; private set; }
 
     /// <summary>
     /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
@@ -195,9 +232,9 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// Seeks forward by the given deltaTime, if possible
     /// </summary>
-    public void SeekBy(float deltaTime, float realtimePlaybackTime)
+    public void SeekBy(float deltaTime)
     {
-        Seek(playbackTime + deltaTime, realtimePlaybackTime);
+        Seek(playbackTime + deltaTime);
     }
 
     /// <summary>
@@ -210,7 +247,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     ///  
     /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
     /// </summary>
-    public void Seek(float targetTime, float realtimePlaybackTime, TickerSeekFlags flags = TickerSeekFlags.None)
+    public void Seek(float targetTime, TickerSeekFlags flags = TickerSeekFlags.None)
     {
         float initialPlaybackTime = playbackTime;
         Debug.Assert(settings.maxDeltaTime > 0f);
@@ -252,7 +289,6 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                 int inputIndex = inputTimeline.ClosestIndexBeforeOrEarliest(playbackTime, 0.001f);
                 bool canConfirmState = false;
                 float confirmStateTime = 0f;
-                bool isRealtime = false;
 
                 // Decide the delta time to use
                 float deltaTime = targetTime - playbackTime;
@@ -289,15 +325,11 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex + 1]);
                     else
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex]);
-
-
-                    if (initialPlaybackTime < realtimePlaybackTime && playbackTime >= realtimePlaybackTime)
-                        isRealtime = true;
                 }
 
                 if (deltaTime > 0f)
                 {
-                    TickInfo tickInfo = new TickInfo() { isRealtime = isRealtime, isConfirming = canConfirmState };
+                    TickInfo tickInfo = new TickInfo() { isReplaying = playbackTime + deltaTime <= lastSeekTargetTime || (flags & TickerSeekFlags.TreatAsReplay) != 0, isConfirming = canConfirmState, seekFlags = flags };
 
                     // invoke events
                     for (int i = 0; i < eventTimeline.Count; i++)
@@ -347,7 +379,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
 
         // even if something went wrong, we prefer to say we're at the target time
         playbackTime = targetTime;
-        this.realtimePlaybackTime = realtimePlaybackTime;
+        lastSeekTargetTime = targetTime;
 
         // Perform history cleanup
         CleanupHistory();
@@ -361,11 +393,11 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
         float originalPlaybackTime = playbackTime;
 
         ConfirmStateAt(pastState, pastStateTime);
-        Seek(originalPlaybackTime, originalPlaybackTime);
+        Seek(originalPlaybackTime);
     }
 
     /// <summary>
-    /// Applies a state into the history. If the state differs from earlier state, or the state is old, a rewind will occur.
+    /// Applies a state into the history. If the state differs from the earlier state, playbackTime will be reverted and the next Seek will technically be a reconcile.
     /// 
     /// CAUTION: If the state differs from the original state at that time:
     /// * The new state is confirmed
