@@ -90,6 +90,10 @@ public struct TickerSettings
 public struct TickInfo
 {
     //public float deltaTime;
+    /// <summary>
+    /// The time of this tick. This is after deltaTime (so eg first frame with deltaTime=0.5, time is 0.5, much like Unity)
+    /// </summary>
+    public float time;
 
     /// <summary>
     /// Whether this tick is part of a confirmation. A "confirmation" happens when:
@@ -329,7 +333,13 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
 
                 if (deltaTime > 0f)
                 {
-                    TickInfo tickInfo = new TickInfo() { isReplaying = playbackTime + deltaTime <= lastSeekTargetTime || (flags & TickerSeekFlags.TreatAsReplay) != 0, isConfirming = canConfirmState, seekFlags = flags };
+                    TickInfo tickInfo = new TickInfo()
+                    {
+                        time = playbackTime + deltaTime,
+                        isReplaying = playbackTime + deltaTime <= lastSeekTargetTime || (flags & TickerSeekFlags.TreatAsReplay) != 0,
+                        isConfirming = canConfirmState,
+                        seekFlags = flags
+                    };
 
                     // invoke events
                     for (int i = 0; i < eventTimeline.Count; i++)
