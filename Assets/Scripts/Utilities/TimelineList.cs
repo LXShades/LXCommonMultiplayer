@@ -15,6 +15,11 @@ public class TimelineListBase
     public virtual float LatestTime { get; }
 
     /// <summary>
+    /// The time of the earliest item in the timeline
+    /// </summary>
+    public virtual float EarliestTime { get; }
+
+    /// <summary>
     /// Clears all items
     /// </summary>
     public virtual void Clear() { }
@@ -105,7 +110,9 @@ public class TimelineList<T> : TimelineListBase
 
     public T Latest => items.Count > 0 ? items[0].item : default;
 
-    public override float LatestTime => items.Count > 0 ? items[0].time : 0.0f;
+    public override float LatestTime => items.Count > 0 ? items[0].time : 0f;
+
+    public override float EarliestTime => items.Count > 0 ? items[items.Count - 1].time : 0f;
 
     public T ItemAt(float time, float tolerance = 0f)
     {
