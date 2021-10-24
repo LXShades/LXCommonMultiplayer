@@ -7,8 +7,6 @@ public class NetMan : NetworkManager
 {
     public static new NetMan singleton { get; private set; }
 
-    private int defaultPort;
-
     public delegate void ConnectionEvent(NetworkConnection connection);
     public delegate void BasicEvent();
 
@@ -42,7 +40,7 @@ public class NetMan : NetworkManager
     /// </summary>
     public ConnectionEvent onServerAddPlayer;
 
-    private int transportPort
+    public int transportPort
     {
         get
         {
@@ -90,18 +88,12 @@ public class NetMan : NetworkManager
         base.Awake();
 
         singleton = this;
-        defaultPort = transportPort;
         transform.SetParent(null, false);
         DontDestroyOnLoad(gameObject);
     }
 
-    public void Host(bool withLocalPlayer, int port = -1)
+    public void Host(bool withLocalPlayer)
     {
-        if (port != -1)
-            transportPort = port;
-        else
-            transportPort = defaultPort;
-
         bool useNullOnlineScene = false;
         if (string.IsNullOrEmpty(onlineScene))
         {
@@ -136,14 +128,12 @@ public class NetMan : NetworkManager
             }
             else
             {
-                Debug.LogWarning($"Could not read port {ip.Substring(ip.IndexOf(":") + 1)}, using default of {defaultPort}.");
-                transportPort = defaultPort;
+                Debug.LogWarning($"Could not read port {ip.Substring(ip.IndexOf(":") + 1)}, using default of {transportPort}.");
             }
         }
         else
         {
             networkAddress = ip;
-            transportPort = defaultPort;
         }
         
         StartClient();

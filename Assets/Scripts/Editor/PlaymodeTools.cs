@@ -32,12 +32,6 @@ public static class PlaymodeTools
         set => SessionState.SetString("_playModeCommandLineParms", value);
     }
 
-    private static int editorSceneBuildIndex
-    {
-        get => SessionState.GetInt("_playModeEditorSceneBuildIndex", -1); // we need to remember the value during reloads
-        set => SessionState.SetInt("_playModeEditorSceneBuildIndex", value);
-    }
-
     [InitializeOnLoadMethod]
     private static void OnEditorInit()
     {
@@ -46,8 +40,6 @@ public static class PlaymodeTools
             if (!EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 ReassignBootScene();
-
-                editorSceneBuildIndex = scn2.buildIndex;
             }
         };
         EditorSceneManager.sceneLoaded += (Scene scn, LoadSceneMode loadMode) =>
@@ -55,8 +47,6 @@ public static class PlaymodeTools
             if (!EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 ReassignBootScene();
-
-                editorSceneBuildIndex = scn.buildIndex;
             }
         };
 
@@ -98,7 +88,7 @@ public static class PlaymodeTools
     {
         // when finished playing, do not let previous editor commands persist to the next test
         if (change == PlayModeStateChange.ExitingPlayMode)
-            CommandLine.editorCommands = new string[0];
+            CommandLine.editorCommands = "";
         if (change == PlayModeStateChange.ExitingEditMode)
             UpdateEditorCommands();
 
@@ -112,31 +102,23 @@ public static class PlaymodeTools
         // Avoid overriding Playtest menu settings
         if (CommandLine.editorCommands == null || CommandLine.editorCommands.Length == 0)
         {
-            string[] editorCommands = new string[0];
-
             switch (playModeCommandType)
             {
                 case PlayModeCommands.Host:
-                    if (editorSceneBuildIndex == -1)
-                    {
-                        Debug.LogError($"PlaymodeTools: Cannot Host in this scene: it is not in the build settings, so we can't load Boot and transfer to this one. Add {SceneManager.GetActiveScene().name} to the build settings to continue.");
-                        EditorApplication.isPlaying = false;
-                    }
-
-                    editorCommands = new string[] { "-host", "-scene", editorSceneBuildIndex.ToString() };
+                    CommandLine.editorCommands = $"-host -scene \"{EditorSceneManager.GetActiveScene().path}\"";
                     break;
                 case PlayModeCommands.Connect:
-                    editorCommands = new string[] { "-connect", "127.0.0.1" };
+                    CommandLine.editorCommands = $"-connect 127.0.0.1";
                     break;
                 case PlayModeCommands.Custom:
-                    editorCommands = playModeCommandLine.Split(' ');
+                    CommandLine.editorCommands = playModeCommandLine;
                     break;
                 case PlayModeCommands.Disabled:
+                    CommandLine.editorCommands = "";
                     break;
             }
 
-            Debug.Log($"Setting PlayMode command line: {string.Join(" ", editorCommands)}");
-            CommandLine.editorCommands = editorCommands;
+            Debug.Log($"Running PlayMode command line: {CommandLine.editorCommands}");
         }
     }
 

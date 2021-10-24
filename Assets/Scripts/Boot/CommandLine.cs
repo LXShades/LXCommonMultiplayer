@@ -7,12 +7,12 @@ public static class CommandLine
     private static string[] commands;
 
 #if UNITY_EDITOR
-    public static string[] editorCommands
+    public static string editorCommands
     {
-        get => EditorPrefs.GetString("_editorCommandLine", "").Split(new char[] { 'þ' }, System.StringSplitOptions.RemoveEmptyEntries);
+        get => EditorPrefs.GetString("_editorCommandLine", "");
         set
         {
-            EditorPrefs.SetString("_editorCommandLine", string.Join("þ", value));
+            EditorPrefs.SetString("_editorCommandLine", value);
             UpdateCommands();
         }
     }
@@ -26,7 +26,19 @@ public static class CommandLine
     private static void UpdateCommands()
     {
 #if UNITY_EDITOR
-        commands = editorCommands;
+        // Double-quotes should allow spaces
+        string[] splitByQuotes = editorCommands.Split(new char[] { '"' }, System.StringSplitOptions.RemoveEmptyEntries);
+        System.Collections.Generic.List<string> joinedAsList = new System.Collections.Generic.List<string>();
+
+        for (int i = 0; i < splitByQuotes.Length; i++)
+        {
+            if ((i & 1) == 1)
+                joinedAsList.Add(splitByQuotes[i]);
+            else
+                joinedAsList.AddRange(splitByQuotes[i].Split(new char[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        commands = joinedAsList.ToArray();
 #else
         commands = System.Environment.GetCommandLineArgs();
 #endif

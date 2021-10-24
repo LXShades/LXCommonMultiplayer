@@ -335,15 +335,15 @@ public class PlaytestTools : MonoBehaviour
         switch (editorRole)
         {
             case EditorRole.Client:
-                CommandLine.editorCommands = new string[] { "-connect", "127.0.0.1" };
-                RunBuild($"-host -scene {EditorSceneManager.GetActiveScene().path} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                CommandLine.editorCommands = "-connect 127.0.0.1";
+                RunBuild($"-host -scene \"{EditorSceneManager.GetActiveScene().path}\" {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
                 break;
             case EditorRole.Server:
-                CommandLine.editorCommands = new string[] { "-host", "127.0.0.1", "-scene", EditorSceneManager.GetActiveScene().path };
+                CommandLine.editorCommands = $"-server -scene \"{EditorSceneManager.GetActiveScene().path}\"";
                 RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
                 break;
             case EditorRole.Host:
-                CommandLine.editorCommands = new string[] { "-host", "127.0.0.1", "-scene", EditorSceneManager.GetActiveScene().path };
+                CommandLine.editorCommands = $"-host 127.0.0.1 -scene \"{EditorSceneManager.GetActiveScene().path}\"";
                 numWindowsTotal = numTestPlayers - 1;
                 break;
             case EditorRole.None:
