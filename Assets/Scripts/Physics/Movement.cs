@@ -58,6 +58,9 @@ public class Movement : MonoBehaviour
     [Tooltip("List of collision layers to interact with")]
     public LayerMask blockingCollisionLayers = ~0;
 
+    [Tooltip("A list of objects (NOT object types) to ignore in collisions")]
+    public HashSet<GameObject> gameObjectInstancesToIgnore = new HashSet<GameObject>();
+
     [Header("[Movement] Basic physics")]
     [Tooltip("If enabled, this component will control the object automatically on Update.")]
     public bool enableAutomaticPhysics = false;
@@ -213,6 +216,9 @@ public class Movement : MonoBehaviour
             // find closest blocking collider
             for (int i = 0; i < numHits; i++)
             {
+                if (gameObjectInstancesToIgnore.Contains(moveHitBuffer[i].collider.gameObject))
+                    continue;
+
                 // acknowledge all collided movementcollision objects
                 moveHitBuffer[i].collider.GetComponents<IMovementCollisionCallbacks>(cachedMovementCollisionCallbackComponents);
 
@@ -319,6 +325,8 @@ public class Movement : MonoBehaviour
                     {
                         if (nearbyColliderBuffer[i].gameObject == collider.gameObject)
                             continue; // please don't collide with yourself
+                        if (gameObjectInstancesToIgnore.Contains(nearbyColliderBuffer[i].gameObject))
+                            continue; // or ignored objects
 
                         MovementDebugStats.total.numPenetrationTests++;
                         if (Physics.ComputePenetration(collider, nextPosition, transform.rotation, nearbyColliderBuffer[i], nearbyColliderBuffer[i].transform.position, nearbyColliderBuffer[i].transform.rotation, out Vector3 hitDirection, out float hitDistance))

@@ -204,6 +204,7 @@ public static class PlaymodeTools
             if (GUILayout.Button("Done"))
             {
                 PlaymodeTools.playModeCommandLine = tempCommands;
+                PlaymodeTools.UpdateEditorCommands();
                 Close();
             }
             if (GUILayout.Button("Cancel"))
