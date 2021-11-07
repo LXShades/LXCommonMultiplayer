@@ -80,4 +80,12 @@ public static class VectorExtensions
 
         return vec - planeNormal * Vector3.Dot(vec, planeNormal);
     }
+
+    /// <summary>
+    /// Returns the vector normalized if outside the given squared length tolerance
+    /// </summary>
+    public static Vector3 NormalizedWithSqrTolerance(in this Vector3 vec, float sqrTolerance = 0.0001f)
+    {
+        return Mathf.Abs(vec.sqrMagnitude - 1f) <= sqrTolerance ? vec : vec.normalized;
+    }
 }

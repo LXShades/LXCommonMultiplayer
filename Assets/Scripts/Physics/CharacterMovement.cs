@@ -51,7 +51,10 @@ public class CharacterMovement : Movement
 
     [Header("[CharMovement] Stepping")]
     public bool enableStepUp = false;
-    public float stepHeight = 0.2f;
+    public bool enableStepDown = false;
+    [UnityEngine.Serialization.FormerlySerializedAs("stepHeight")]
+    public float maxStepHeight = 0.2f;
+    public float minStepWidth = 0.1f;
     public Vector3 stepLocalFootOffset = Vector3.zero;
 
     [Header("[CharMovement] Collision Velocity Response")]
@@ -84,22 +87,26 @@ public class CharacterMovement : Movement
         Vector3 preFootPosition = transform.TransformPoint(stepLocalFootOffset);
         Vector3 moveOffset = velocity * deltaTime;
 
+        // Check step-up strip
+        float stepUpHeight = 0f;
+        if (enableStepUp || enableStepDown)
+        {
+            TryScanStepStrip(preFootPosition, moveOffset, up, out stepUpHeight);
+
+            if (enableStepUp && stepUpHeight > 0f)
+            {
+                // Try the move again, but step up this time
+                // we do stepUpHeight >= -stepHeight becuase this check doesn't use a capsule collider
+                transform.position = preMovePosition + up * (stepUpHeight + 0.01f);
+            }
+
+        }
+
         bool collisionOccurred = Move(moveOffset, out Movement.Hit hitOut, tickInfo);
 
-        if (collisionOccurred)
-        {
-            if (enableStepUp && hitOut.hasPoint)
-            {
-                if (TryFindStepAlongMovement(preFootPosition, moveOffset, hitOut, out float stepUpHeight))
-                {
-                    // Try the move again, but step up this time
-                    // Todo: Collision checking
-                    transform.position = preMovePosition + up * stepUpHeight;
-
-                    collisionOccurred = Move(moveOffset, out hitOut, tickInfo);
-                }
-            }
-        }
+        // Step down
+        if (enableStepDown && stepUpHeight <= -0.01f && groundInfo.isOnGround && Vector3.Dot(up, velocity) < groundEscapeThreshold)
+            Move(up * stepUpHeight, out Hit _, tickInfo, MoveFlags.NoSlide);
 
         if (collisionOccurred && enableCollisionsAffectVelocity)
         {
@@ -203,7 +210,7 @@ public class CharacterMovement : Movement
                 else
                     output.normal = Vector3.up;
 
-                if (Vector3.Dot(groundHit.normal, up) >= Mathf.Cos(groundAngleLimit * Mathf.Deg2Rad))
+                if (Vector3.Dot(output.normal, up) >= Mathf.Cos(groundAngleLimit * Mathf.Deg2Rad))
                 {
                     output.isOnGround = true;
                 }
@@ -221,7 +228,8 @@ public class CharacterMovement : Movement
 
             if (enableLoopy && primaryDistance <= loopyGroundTestDistance)
             {
-                if (Physics.Raycast(new Ray(transform.position + up * 0.01f, -up), out RaycastHit rayHit, loopyGroundTestDistance, groundLayers, QueryTriggerInteraction.Ignore) && rayHit.distance <= loopyGroundTestDistance)
+                if (Physics.Raycast(new Ray(transform.position + up * 0.01f, -up), out RaycastHit rayHit, loopyGroundTestDistance, groundLayers, QueryTriggerInteraction.Ignore) && rayHit.distance <= loopyGroundTestDistance
+                    && Vector3.Dot(rayHit.normal, up) >= Mathf.Cos(groundAngleLimit * Mathf.Deg2Rad))
                 {
                     output.isLoopy = true;
 
@@ -238,7 +246,7 @@ public class CharacterMovement : Movement
         {
             float height = Vector3.Dot(hit.point - originalFootPosition, up);
 
-            if (height >= -0.01f && height <= stepHeight)
+            if (height >= -0.01f && height <= maxStepHeight)
             {
                 // Check if it's a flat surface that continues flat from the point we hit at
                 if (Physics.Raycast(hit.point + attemptedMovementOffset.AlongPlane(up).normalized * 0.05f + up * 0.05f, -up, out RaycastHit rayHit, 0.1f, ~0, QueryTriggerInteraction.Ignore))
@@ -255,6 +263,85 @@ public class CharacterMovement : Movement
 
         outStepHeight = 0f;
         return false;
+    }
+
+    public void TryScanStepStrip(Vector3 originalFootPosition, Vector3 movementOffset, Vector3 up, out float outStepHeight)
+    {
+        float movementLength = movementOffset.magnitude;
+
+        if (movementLength <= 0.0001f || minStepWidth < 0.01f)
+        {
+            outStepHeight = 0f;
+            return;
+        }
+
+        Vector3 position = originalFootPosition;
+        Vector3 movementNormal = movementOffset / movementLength;
+        int numStepsToPossiblyTake = (int)(movementLength / minStepWidth) + 1;
+        float totalPossibleHeight = maxStepHeight * numStepsToPossiblyTake;
+        PhysicsExtensions.Parameters parameters = new PhysicsExtensions.Parameters() { ignoreObject = colliders[0].gameObject }; // hack?
+        float testRadius = groundTestRadius + skinThickness * 1.5f;
+
+        up = up.NormalizedWithSqrTolerance();
+
+        // Start at the end with the total possible height, see where it reaches
+        position = position + movementOffset;
+        if (PhysicsExtensions.SphereCast(position + up * (totalPossibleHeight + testRadius), -up, testRadius, out RaycastHit hit, totalPossibleHeight * 2, groundLayers, QueryTriggerInteraction.Ignore, in parameters))
+        {
+            const float kRequiredDot = 0.97f;
+            Vector3 normal = hit.normal;
+            PhysicsExtensions.GetFlatNormal(ref normal, hit.collider, hit.point, movementNormal, -up);
+
+            if (Vector3.Dot(normal, up) >= kRequiredDot) // it's not a step if we're just waltzing up a slope
+            {
+                float stepHeightAtEnd = Vector3.Dot(hit.point - position, up);
+
+                if (Mathf.Abs(stepHeightAtEnd) > maxStepHeight)
+                {
+                    // this is too high for one step, we need to know if there were steps in-between
+                    // backtrack by minStepSize until we're satisfied that a staircase brought us to this point
+                    position.SetAlongAxis(up, hit.point.AlongAxis(up)); // starting from the end step
+
+                    for (float progress = minStepWidth; progress + minStepWidth < movementLength; progress += minStepWidth)
+                    {
+                        position = position - movementNormal * progress;
+
+                        // the cast needs to hit a step
+                        if (Physics.Raycast(new Ray(position + up * maxStepHeight, -up), out RaycastHit subHit, maxStepHeight * 2, groundLayers, QueryTriggerInteraction.Ignore))
+                        {
+                            // the step needs to be flat
+                            if (Vector3.Dot(subHit.normal, up) >= kRequiredDot)
+                            {
+                                position = subHit.point;
+                                continue; // it's valid
+                            }
+                        }
+
+                        // it's invalid
+                        outStepHeight = 0f;
+                        return;
+                    }
+                }
+
+                // it's valid
+                // if we're perching on the edge, the actual height of the bottom of the capsule will be lower, so include that as we calculate our height as this position
+                float distFromSphereCentre = Vector3.Distance(hit.point.AlongPlane(up), position.AlongPlane(up));
+
+                if (distFromSphereCentre > groundTestRadius)
+                {
+                    // sigh never mind
+                    // for some reason we need to test with a slightly bigger sphere than the capsule itself, possibly becuase of skin width, but if the touched point exceeds that it's not really valid
+                    outStepHeight = 0f;
+                    return;
+                }
+
+                float characterHeightAtEnd = distFromSphereCentre > 0.0001f ? stepHeightAtEnd - (testRadius - Mathf.Sqrt(testRadius * testRadius - distFromSphereCentre * distFromSphereCentre)) : stepHeightAtEnd;
+                outStepHeight = characterHeightAtEnd;
+                return;
+            }
+        }
+
+        outStepHeight = 0f;
     }
 
     private static List<Vector3> normalBuffer = new List<Vector3>();
@@ -313,7 +400,7 @@ public class CharacterMovement : Movement
         if (enableStepUp)
         {
             // Feet area
-            DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset + new Vector3(0, stepHeight, 0)), groundTestRadius, Color.green);
+            DrawGizmoCircle(transform.TransformPoint(stepLocalFootOffset + new Vector3(0, maxStepHeight, 0)), groundTestRadius, Color.green);
         }
 
         if (enableSlip)
