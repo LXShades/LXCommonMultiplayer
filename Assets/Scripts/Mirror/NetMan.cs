@@ -10,6 +10,12 @@ public class NetMan : NetworkManager
     public delegate void ConnectionEvent(NetworkConnection connection);
     public delegate void BasicEvent();
 
+    [Header("UnityMultiplayerEssentials")]
+    /// <summary>
+    /// Auto-created object that can hold server state and settings
+    /// </summary>
+    public ServerStateBase serverStatePrefab;
+
     /// <summary>
     /// Connected to the server as a client
     /// </summary>
@@ -173,7 +179,36 @@ public class NetMan : NetworkManager
     public override void OnStartServer()
     {
         base.OnStartServer();
+
+        if (serverStatePrefab != null)
+        {
+            GameObject serverState = Instantiate(serverStatePrefab).gameObject;
+            NetworkServer.Spawn(serverState);
+        }
+
         onServerStarted?.Invoke();
+    }
+
+    public override void OnStopServer()
+    {
+        if (ServerStateBase.instance != null)
+        {
+            NetworkServer.UnSpawn(ServerStateBase.instance.gameObject);
+            Destroy(ServerStateBase.instance.gameObject);
+        }
+
+        base.OnStopServer();
+    }
+
+    public override void OnStopHost()
+    {
+        if (ServerStateBase.instance != null)
+        {
+            NetworkServer.UnSpawn(ServerStateBase.instance.gameObject);
+            Destroy(ServerStateBase.instance.gameObject);
+        }
+
+        base.OnStopHost();
     }
 
     public override void OnServerAddPlayer(NetworkConnection conn)

@@ -1,5 +1,5 @@
 {
-    "name": "MultiplayerToolset.Editor",
+    "name": "UnityMultiplayerEssentials.Editor",
     "rootNamespace": "",
     "references": [
         "GUID:e63798dd1b8c01447931ccce2ef09bdc"
