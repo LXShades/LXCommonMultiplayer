@@ -17,7 +17,7 @@ public static class PhysicsExtensions
     /// <summary>
     /// Raycast with extension parameters
     /// </summary>
-    public static bool Raycast(Vector3 start, Vector3 direction, float radius, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction triggerInteraction, in Parameters parameters)
+    public static bool Raycast(Vector3 start, Vector3 direction, out RaycastHit hitInfo, float maxDistance, int layerMask, QueryTriggerInteraction triggerInteraction, in Parameters parameters)
     {
         int numHits = Physics.RaycastNonAlloc(new Ray(start, direction), hitBuffer, maxDistance, layerMask, triggerInteraction);
         return GetFilteredResult(hitBuffer, numHits, out hitInfo, in parameters);

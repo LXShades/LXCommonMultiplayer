@@ -26,6 +26,7 @@ public class CharacterMovement : Movement
 
     [Header("[CharMovement] Gravity")]
     public float gravity = 10f;
+    public Vector3 gravityDirection = Vector3.down;
 
     [Header("[CharMovement] Grounding")]
     public LayerMask groundLayers = ~0;
@@ -76,7 +77,7 @@ public class CharacterMovement : Movement
             }
 
             // Gravity - only apply when not on ground, otherwise slipping occurs
-            velocity += new Vector3(0f, -gravity * deltaTime, 0f);
+            velocity += gravityDirection * (gravity * deltaTime / gravityDirection.magnitude);
         }
     }
 
@@ -168,7 +169,7 @@ public class CharacterMovement : Movement
             }
         }
         else
-            up = Vector3.up;
+            up = -gravityDirection.normalized;
 
         if (enableLoopy && enableLoopyForwardAdjustment && previousUp != up)
         {
@@ -179,13 +180,15 @@ public class CharacterMovement : Movement
     public void CalculateGroundInfo(out GroundInfo output)
     {
         bool hasGroundCastHit = Physics.SphereCast(new Ray(transform.position + up * groundTestRadius, -up), groundTestRadius, out RaycastHit groundHit, Mathf.Max(groundTestRadius, loopyGroundTestDistance), groundLayers, QueryTriggerInteraction.Ignore);
+        Vector3 defaultNormal = -gravityDirection.normalized;
+
         output = new GroundInfo()
         {
             isOnGround = false,
             isSlipping = false,
             isLoopy = false,
-            normal = Vector3.up,
-            loopyNormal = Vector3.up,
+            normal = defaultNormal,
+            loopyNormal = defaultNormal,
             slipVector = Vector3.zero
         };
 
@@ -208,7 +211,7 @@ public class CharacterMovement : Movement
                 if (Physics.Raycast(transform.position + up * 0.01f, -up, out RaycastHit rayHit, groundTestDistanceThreshold + 0.01f, groundLayers, QueryTriggerInteraction.Ignore))
                     output.normal = rayHit.normal;
                 else
-                    output.normal = Vector3.up;
+                    output.normal = defaultNormal;
 
                 if (Vector3.Dot(output.normal, up) >= Mathf.Cos(groundAngleLimit * Mathf.Deg2Rad))
                 {
@@ -217,7 +220,7 @@ public class CharacterMovement : Movement
                 else
                 {
                     output.isOnGround = false;
-                    output.normal = Vector3.up;
+                    output.normal = defaultNormal;
                 }
             }
             else if (secondaryDistance > slipRadius)
@@ -239,7 +242,6 @@ public class CharacterMovement : Movement
         }
     }
 
-    private List<RaycastHit> stepHitBuffer = new List<RaycastHit>();
     public bool TryFindStepAlongMovement(Vector3 originalFootPosition, Vector3 attemptedMovementOffset, in Hit hit, out float outStepHeight)
     {
         if (hit.hasPoint)
