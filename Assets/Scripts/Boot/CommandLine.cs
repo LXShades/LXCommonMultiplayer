@@ -42,6 +42,8 @@ public static class CommandLine
 #else
         commands = System.Environment.GetCommandLineArgs();
 #endif
+
+        UnityEngine.Debug.Log($"[CommandLine] Starting with command line: {string.Join(" ", commands)}");
     }
 
     public static bool HasCommand(string commandName)

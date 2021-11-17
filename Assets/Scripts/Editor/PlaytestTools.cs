@@ -348,7 +348,7 @@ public class PlaytestTools : MonoBehaviour
                 break;
             case EditorRole.None:
                 numWindowsTotal = numTestPlayers + 1;
-                RunBuild($"-host -scene {EditorSceneManager.GetActiveScene().path} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                RunBuild($"-host -scene \"{EditorSceneManager.GetActiveScene().path}\" {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
                 RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
                 break;
         }
