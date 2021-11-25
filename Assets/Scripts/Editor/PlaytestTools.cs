@@ -52,6 +52,12 @@ public class PlaytestTools : MonoBehaviour
         set => EditorPrefs.SetInt("playtestBuildType", (int)value);
     }
 
+    private static bool isWin64
+    {
+        get => EditorPrefs.GetBool("playtestIsWin64", true);
+        set => EditorPrefs.SetBool("playtestIsWin64", value);
+    }
+
     public static string playtestBuildPath => $"{Application.dataPath.Substring(0, Application.dataPath.LastIndexOf('/'))}/Builds/Playtest/{Application.productName}";
     public static string playtestBuildDataPath => $"{Application.dataPath.Substring(0, Application.dataPath.LastIndexOf('/'))}/Builds/Playtest/{Application.productName}/{Application.productName}_Data";
 
@@ -64,9 +70,9 @@ public class PlaytestTools : MonoBehaviour
         set { EditorPrefs.SetInt("editorRole", (int)value); }
     }
 
-    private const BuildTarget playtestBuildTarget = BuildTarget.StandaloneWindows64;
+    private static BuildTarget playtestBuildTarget => isWin64 ? BuildTarget.StandaloneWindows64 : BuildTarget.StandaloneWindows;
 
-    private const string playtestBuildTargetAsString = "WindowsStandalone64"; // must be compatible with AssemblyDefinition info. yes this is just StandaloneWindows64 with the words swapped lol
+    private static string playtestBuildTargetAsString => isWin64 ? "WindowsStandalone64" : "WindowsStandalone32"; // must be compatible with AssemblyDefinition info
 
     private static string[] pendingAssembliesForCompile
     {
@@ -480,7 +486,20 @@ public class PlaytestTools : MonoBehaviour
     [MenuItem("Playtest/BuildType: Assembly copy", true)]
     private static bool BuildTypeAssemblyValidate() { Menu.SetChecked("Playtest/BuildType: Assembly copy", buildType == BuildType.CopyAssemblies); return true; }
 
-    [MenuItem("Playtest/Autocompile Playtest Assemblies", priority = 160)]
+
+    [MenuItem("Playtest/BuildPlatform: Win64", priority = 160)]
+    private static void BuildPlatform64() { isWin64 = true; }
+
+    [MenuItem("Playtest/BuildPlatform: Win64", true)]
+    private static bool BuildPlatform64Validate() { Menu.SetChecked("Playtest/BuildPlatform: Win64", isWin64); return true; }
+
+    [MenuItem("Playtest/BuildPlatform: Win32", priority = 160)]
+    private static void BuildPlatform32() { isWin64 = false; }
+
+    [MenuItem("Playtest/BuildPlatform: Win32", true)]
+    private static bool BuildPlatform32Validate() { Menu.SetChecked("Playtest/BuildPlatform: Win32", !isWin64); return true; }
+
+    [MenuItem("Playtest/Autocompile Playtest Assemblies", priority = 180)]
     private static void AutoCompilePlaytestAssemblies() { autoCompilePlaytestAssemblies = !autoCompilePlaytestAssemblies; }
 
     [MenuItem("Playtest/Autocompile Playtest Assemblies", true)]
