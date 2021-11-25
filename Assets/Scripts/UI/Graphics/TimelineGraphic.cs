@@ -10,7 +10,7 @@ public class TimelineGraphic : MaskableGraphic
 {
     private struct Tick
     {
-        public float time;
+        public double time;
         public float heightScale;
         public float offset;
         public Color32 color;
@@ -24,8 +24,8 @@ public class TimelineGraphic : MaskableGraphic
     public Color32 timelineColour = new Color32(255, 255, 255, 255);
     public float timelineThickness = 5;
 
-    public float timeStart = 10;
-    public float timeEnd = 20;
+    public double timeStart = 10;
+    public double timeEnd = 20;
 
     [Header("Ticks")]
     public float tickHeight = 20;
@@ -39,9 +39,9 @@ public class TimelineGraphic : MaskableGraphic
     private GUIStyle labelStyleRight;
     private GUIStyle labelStyleCentre;
 
-    public float timePerScreenX => (timeEnd - timeStart) / rectTransform.rect.width / rectTransform.lossyScale.x;
+    public double timePerScreenX => (timeEnd - timeStart) / rectTransform.rect.width / rectTransform.lossyScale.x;
 
-    public float TimeAtScreenX(float screenX)
+    public double TimeAtScreenX(float screenX)
     {
         Vector3 relativePosition = rectTransform.InverseTransformPoint(new Vector3(screenX, 0, 0)) - new Vector3(rectTransform.rect.min.x, 0, 0);
         return timeStart + relativePosition.x * (timeEnd - timeStart) / rectTransform.rect.width;
@@ -63,7 +63,7 @@ public class TimelineGraphic : MaskableGraphic
     /// * An optional label can appear on the tick
     /// * labelLine defines the "line number" that the label can appear at, allowing multiple labels to share a spot without overlapping
     /// </summary>
-    public void DrawTick(float time, float heightScale, float offset, Color32 color, string label = "", int labelLine = 0)
+    public void DrawTick(double time, float heightScale, float offset, Color32 color, string label = "", int labelLine = 0)
     {
         if (time < timeStart || time > timeEnd)
         {
@@ -81,9 +81,9 @@ public class TimelineGraphic : MaskableGraphic
         });
     }
 
-    private void DrawTickInternal(float time, float heightScale, float offset, Color32 color)
+    private void DrawTickInternal(double time, float heightScale, float offset, Color32 color)
     {
-        Vector2 centre = new Vector2(rectTransform.rect.xMin + (time - timeStart) / (timeEnd - timeStart) * rectTransform.rect.width, rectTransform.rect.center.y);
+        Vector2 centre = new Vector2((float)(rectTransform.rect.xMin + (time - timeStart) / (timeEnd - timeStart) * rectTransform.rect.width), rectTransform.rect.center.y);
 
         centre.x = Mathf.Round(centre.x);
         centre.y = Mathf.Round(centre.y);
@@ -170,7 +170,7 @@ public class TimelineGraphic : MaskableGraphic
             if (!string.IsNullOrEmpty(tick.label))
             {
                 GUI.contentColor = tick.color;
-                GUI.Label(new Rect(pixelRect.xMin + pixelRect.width * (tick.time - timeStart) / (timeEnd - timeStart), pixelRect.center.y + tickHeight / 2f * tick.heightScale + labelSize * 3 / 4 + tick.labelLine * (labelSize + 2), 0, 0), tick.label, labelStyleCentre);
+                GUI.Label(new Rect((float)(pixelRect.xMin + pixelRect.width * (tick.time - timeStart) / (timeEnd - timeStart)), pixelRect.center.y + tickHeight / 2f * tick.heightScale + labelSize * 3 / 4 + tick.labelLine * (labelSize + 2), 0, 0), tick.label, labelStyleCentre);
             }
         }
     }

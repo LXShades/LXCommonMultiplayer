@@ -12,12 +12,12 @@ public class TimelineListBase
     /// <summary>
     /// The time of the latest item in the timeline
     /// </summary>
-    public virtual float LatestTime { get; }
+    public virtual double LatestTime { get; }
 
     /// <summary>
     /// The time of the earliest item in the timeline
     /// </summary>
-    public virtual float EarliestTime { get; }
+    public virtual double EarliestTime { get; }
 
     /// <summary>
     /// Clears all items
@@ -27,31 +27,31 @@ public class TimelineListBase
     /// <summary>
     /// Returns the index of the item at the given time, within the tolerance, or -1 if not available
     /// </summary>
-    public virtual int IndexAt(float time, float tolerance = 0f) => -1;
+    public virtual int IndexAt(double time, double tolerance = 0f) => -1;
 
     /// <summary>
     /// Returns the time of the item at the given index
     /// </summary>
-    public virtual float TimeAt(int index) => -1f;
+    public virtual double TimeAt(int index) => -1f;
 
     /// <summary>
     /// Returns the nearest item after the given time, or within the tolerance range
     /// If there are multiple items within the tolerance, the closest one after the time is returned
     /// </summary>
-    public virtual int ClosestIndexAfter(float time, float tolerance = 0f) => -1;
+    public virtual int ClosestIndexAfter(double time, double tolerance = 0f) => -1;
 
     /// <summary>
     /// Returns the nearest item before the given time, or within the tolerance range
     /// If there are multiple items within the tolerance, the closest one before the time is returned
     /// </summary>
-    public virtual int ClosestIndexBefore(float time, float tolerance = 0f) => -1;
+    public virtual int ClosestIndexBefore(double time, double tolerance = 0f) => -1;
 
     /// <summary>
     /// Returns the nearest item before the given time, or within the tolerance range
     /// If there are multiple items within the tolerance, the closest one before the time is returned.
     /// If there are no items within or before the tolerance, the earliest index in the timeline is returned
     /// </summary>
-    public virtual int ClosestIndexBeforeOrEarliest(float time, float tolerance = 0f) => -1;
+    public virtual int ClosestIndexBeforeOrEarliest(double time, double tolerance = 0f) => -1;
 
     /// <summary>
     /// Removes the item at the given index
@@ -61,28 +61,29 @@ public class TimelineListBase
     /// <summary>
     /// Clears all items before the given time
     /// </summary>
-    public virtual void TrimBefore(float minTime) { }
+    public virtual void TrimBefore(double minTime) { }
 
     /// <summary>
     /// Clears all items before the given time, except for the latest item in the list - useful for times when you need at least one item in your list
     /// </summary>
-    public virtual void TrimBeforeExceptLatest(float minTime) { }
+    public virtual void TrimBeforeExceptLatest(double minTime) { }
 
     /// <summary>
     /// Clears all items after the given time
     /// </summary>
-    public virtual void TrimAfter(float maxTime) { }
+    public virtual void TrimAfter(double maxTime) { }
 
     /// <summary>
     /// Trims all items outside the given time range, inclusive
     /// </summary>
-    public virtual void Trim(float minTime, float maxTime) { }
+    public virtual void Trim(double minTime, double maxTime) { }
 }
 
 /// <summary>
-/// A list of items arranged along a floating-point timeline. Items can be searched, inserted, replaced, etc and quickly retrieved from certain times.
+/// A list of items arranged along a double floating-point timeline. Items can be searched, inserted, replaced, etc and quickly retrieved from certain times.
 /// 
-/// Items are arranged from latest item (0) to earliest item (Count - 1) order.
+/// * Items are arranged from latest item (0) to earliest item (Count - 1) order.
+/// * Doubles are used because floats are actually quite limiting as the hours add up. After a few hours the discrepency between Time.deltaTime and (Time.time - lastFrameTime) becomes quite noticeable. Doubles are virtually infinite on a per-second basis.
 /// </summary>
 [Serializable]
 public class TimelineList<T> : TimelineListBase
@@ -90,7 +91,7 @@ public class TimelineList<T> : TimelineListBase
     [Serializable]
     public struct TimelineItem
     {
-        public float time;
+        public double time;
         public T item;
     }
 
@@ -110,28 +111,28 @@ public class TimelineList<T> : TimelineListBase
 
     public T Latest => items.Count > 0 ? items[0].item : default;
 
-    public override float LatestTime => items.Count > 0 ? items[0].time : 0f;
+    public override double LatestTime => items.Count > 0 ? items[0].time : 0f;
 
-    public override float EarliestTime => items.Count > 0 ? items[items.Count - 1].time : 0f;
+    public override double EarliestTime => items.Count > 0 ? items[items.Count - 1].time : 0f;
 
-    public T ItemAt(float time, float tolerance = 0f)
+    public T ItemAt(double time, double tolerance = 0f)
     {
         return items.Find(a => a.time >= time - tolerance && a.time <= time + tolerance).item;
     }
 
-    public override int IndexAt(float time, float tolerance = 0f)
+    public override int IndexAt(double time, double tolerance = 0f)
     {
         return items.FindIndex(a => a.time >= time - tolerance && a.time <= time + tolerance);
     }
 
-    public override float TimeAt(int index)
+    public override double TimeAt(int index)
     {
         if (index == -1) return -1;
 
         return items[index].time;
     }
 
-    public override int ClosestIndexAfter(float time, float tolerance = 0f)
+    public override int ClosestIndexAfter(double time, double tolerance = 0f)
     {
         if (items.Count > 0)
         {
@@ -145,7 +146,7 @@ public class TimelineList<T> : TimelineListBase
         return -1;
     }
 
-    public override int ClosestIndexBefore(float time, float tolerance = 0f)
+    public override int ClosestIndexBefore(double time, double tolerance = 0f)
     {
         for (int index = 0; index < items.Count; index++)
         {
@@ -156,7 +157,7 @@ public class TimelineList<T> : TimelineListBase
         return -1;
     }
 
-    public override int ClosestIndexBeforeOrEarliest(float time, float tolerance = 0f)
+    public override int ClosestIndexBeforeOrEarliest(double time, double tolerance = 0f)
     {
         int index = ClosestIndexBefore(time, tolerance);
         
@@ -170,7 +171,7 @@ public class TimelineList<T> : TimelineListBase
         }
     }
 
-    public void Set(float time, T item, float tolerance = 0f)
+    public void Set(double time, T item, double tolerance = 0f)
     {
         for (int index = 0; index < items.Count; index++)
         {
@@ -185,7 +186,7 @@ public class TimelineList<T> : TimelineListBase
         Insert(time, item);
     }
 
-    public void Insert(float time, T item)
+    public void Insert(double time, T item)
     {
         int index;
         for (index = 0; index < items.Count; index++)
@@ -207,7 +208,7 @@ public class TimelineList<T> : TimelineListBase
         items.RemoveAt(index);
     }
 
-    public override void TrimBefore(float minTime)
+    public override void TrimBefore(double minTime)
     {
         // start newest, end oldest
         for (int i = 0; i < items.Count; i++)
@@ -220,7 +221,7 @@ public class TimelineList<T> : TimelineListBase
         }
     }
 
-    public override void TrimBeforeExceptLatest(float minTime)
+    public override void TrimBeforeExceptLatest(double minTime)
     {
         // start newest, end oldest
         for (int i = 1; i < items.Count; i++)
@@ -233,7 +234,7 @@ public class TimelineList<T> : TimelineListBase
         }
     }
 
-    public override void TrimAfter(float maxTime)
+    public override void TrimAfter(double maxTime)
     {
         // start oldest, end newest
         for (int i = items.Count - 1; i >= 0; i--)
@@ -246,7 +247,7 @@ public class TimelineList<T> : TimelineListBase
         }
     }
 
-    public override void Trim(float minTime, float maxTime)
+    public override void Trim(double minTime, double maxTime)
     {
         TrimBefore(minTime);
         TrimAfter(maxTime);
@@ -257,6 +258,6 @@ public class TimelineList<T> : TimelineListBase
     /// </summary>
     public void Validate()
     {
-        items.Sort((TimelineItem a, TimelineItem b) => (int)Mathf.Sign(b.time - a.time));
+        items.Sort((TimelineItem a, TimelineItem b) => (int)b.time > a.time ? 1 : -1);
     }
 }

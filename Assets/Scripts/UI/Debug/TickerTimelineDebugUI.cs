@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 /// <summary>
 /// Displays a debug timeline for the targetTicker
@@ -32,7 +33,7 @@ public class TickerTimelineDebugUI : MonoBehaviour
     {
         if (targetTicker != null)
         {
-            timeline.timeStart = (int)(Mathf.Max(targetTicker.playbackTime, targetTicker.confirmedStateTime) / timelineLength) * timelineLength;
+            timeline.timeStart = (int)(Math.Max(targetTicker.playbackTime, targetTicker.confirmedStateTime) / timelineLength) * timelineLength;
             timeline.timeEnd = timeline.timeStart + timelineLength;
 
             timeline.ClearDraw();

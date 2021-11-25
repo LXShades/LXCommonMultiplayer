@@ -33,6 +33,20 @@ public enum TickerSeekFlags
     TreatAsReplay = 4,
 };
 
+public enum TickerMaxInputRateConstraint
+{
+    /// <summary>
+    /// A new inputs is ignored if it shares the same quantised chunk of time (for example a fixed 0.05 interval from 0) as the last
+    /// </summary>
+    QuantisedTime,
+
+    /// <summary>
+    /// A new input is ignored if it is inserted in under 1/maxInputRate seconds since the last input was inserted.
+    /// Works for many cases but may not work well with TimeTool.Quantize setups after long periods of time, as the floating points become fuzzy
+    /// </summary>
+    Flexible
+}
+
 [System.Serializable]
 public struct TickerSettings
 {
@@ -45,6 +59,8 @@ public struct TickerSettings
     [Header("Input")]
     [Tooltip("The maximum input rate in hz. If <=0, the input rate is unlimited. This should be restricted sensibly so that clients do not send too many inputs and save CPU.")]
     public int maxInputRate;
+    [Tooltip("Defines how the input rate will be constrained")]
+    public TickerMaxInputRateConstraint maxInputRateConstraint;
 
     [Header("Reconciling")]
     [Tooltip("Whether to reconcile even if the server's confirmed state matched the local state at the time")]
@@ -77,6 +93,7 @@ public struct TickerSettings
         maxDeltaTime = 0.03334f,
         maxSeekIterations = 15,
         maxInputRate = 60,
+        maxInputRateConstraint = TickerMaxInputRateConstraint.QuantisedTime,
         alwaysReconcile = false,
         historyLength = 1f,
         debugLogReconciles = false,
@@ -93,7 +110,7 @@ public struct TickInfo
     /// <summary>
     /// The time of this tick. This is after deltaTime (so eg first frame with deltaTime=0.5, time is 0.5, much like Unity)
     /// </summary>
-    public float time;
+    public double time;
 
     /// <summary>
     /// Whether this tick is part of a confirmation. A "confirmation" happens when:
@@ -135,6 +152,15 @@ public struct TickInfo
     };
 }
 
+/// <summary>
+/// A Ticker allows you to run "ticks" based on inputs, storing the resulting "states" along the way.
+/// 
+/// * You can scrub through an object's history using the Seek function. 
+/// * You can overwrite a state in the object's history using ConfirmStateAt, and those changes will be propagated to later states using the recorded inputs.
+/// * Recorded inputs and states are in the Timeline members (inputTimeline, stateTimeline) with time-data pairs.
+/// * Time can be in any format you like, recommended to be based on seconds. Times are internally stored as a double to suit a practically infinite spectrum. Deltas, however, use floats for efficiency as they will typically be much smaller.
+/// * See "settings" for a bunch of overrideables, such as limits on delta time and more.
+/// </summary>
 public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>, ITickerInputFunctions<TInput>
     where TInput : ITickerInput<TInput> where TState : ITickerState<TState>
 {
@@ -163,17 +189,17 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// The current playback time, based on no specific point of reference, but is expected to use the same time format as input and event history
     /// </summary>
-    public float playbackTime { get; private set; }
+    public double playbackTime { get; private set; }
 
     /// <summary>
     /// The last time that was Seeked to. Similar to playbackTime, but does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
     /// </summary>
-    public float lastSeekTargetTime { get; private set; }
+    public double lastSeekTargetTime { get; private set; }
 
     /// <summary>
     /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
     /// </summary>
-    public float confirmedStateTime => stateTimeline.Count > 0 ? stateTimeline.LatestTime : -1f;
+    public double confirmedStateTime => stateTimeline.Count > 0 ? stateTimeline.LatestTime : -1f;
 
     /// <summary>
     /// The most recent confirmed state
@@ -205,11 +231,13 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// Inserts a single input into the input history. Old inputs at the same time will be replaced.
     /// </summary>
-    public void InsertInput(TInput input, float time)
+    public void InsertInput(TInput input, double time)
     {
         int closestPriorInputIndex = inputTimeline.ClosestIndexBefore(time);
 
-        if (settings.maxInputRate <= 0 || closestPriorInputIndex == -1 || time - inputTimeline.TimeAt(closestPriorInputIndex) >= 1f / settings.maxInputRate - 0.0001f)
+        if (settings.maxInputRate <= 0 || closestPriorInputIndex == -1
+            || (settings.maxInputRateConstraint == TickerMaxInputRateConstraint.Flexible && time * settings.maxInputRate - inputTimeline.TimeAt(closestPriorInputIndex) * settings.maxInputRate >= 0.999f)
+            || (settings.maxInputRateConstraint == TickerMaxInputRateConstraint.QuantisedTime && TimeTool.Quantize(time, settings.maxInputRate) != TimeTool.Quantize(inputTimeline.TimeAt(closestPriorInputIndex), settings.maxInputRate)))
         {
             // Add current player input to input history
             inputTimeline.Set(time, input);
@@ -251,9 +279,9 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     ///  
     /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
     /// </summary>
-    public void Seek(float targetTime, TickerSeekFlags flags = TickerSeekFlags.None)
+    public void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None)
     {
-        float initialPlaybackTime = playbackTime;
+        double initialPlaybackTime = playbackTime;
         Debug.Assert(settings.maxDeltaTime > 0f);
 
         // in debug pause mode we never seek to other times
@@ -292,10 +320,10 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                 TInput input = default;
                 int inputIndex = inputTimeline.ClosestIndexBeforeOrEarliest(playbackTime, 0.001f);
                 bool canConfirmState = false;
-                float confirmStateTime = 0f;
+                double confirmStateTime = 0f;
 
                 // Decide the delta time to use
-                float deltaTime = targetTime - playbackTime;
+                double deltaTime = targetTime - playbackTime;
                 if (deltaTime >= settings.maxDeltaTime)
                 {
                     deltaTime = settings.maxDeltaTime;
@@ -306,13 +334,13 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
 
                 if (inputIndex != -1)
                 {
-                    float inputTime = inputTimeline.TimeAt(inputIndex);
+                    double inputTime = inputTimeline.TimeAt(inputIndex);
 
                     if (inputIndex > 0)
                     {
                         // if we can do a full previous->next input tick, we can "confirm" this state
                         // note that we may subdivide the confirmed ticks by settings.maxDeltaTime, so we check based on the current playbackTime rather than the previous input's time
-                        float timeToNextInput = inputTimeline.TimeAt(inputIndex - 1) - playbackTime;
+                        double timeToNextInput = inputTimeline.TimeAt(inputIndex - 1) - playbackTime;
 
                         if (deltaTime >= timeToNextInput && canAttemptConfirmNextState)
                         {
@@ -349,7 +377,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                     }
 
                     // run a tick
-                    target.Tick(deltaTime, input, tickInfo);
+                    target.Tick((float)deltaTime, input, tickInfo);
 
                     playbackTime += deltaTime;
 
@@ -398,12 +426,12 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// Rewinds to pastState and fast forwards to the present time, using recorded inputs if available
     /// </summary>
-    public void Reconcile(TState pastState, float pastStateTime, TickerSeekFlags seekFlags)
+    public void Reconcile(TState pastState, double pastStateTime, TickerSeekFlags seekFlags)
     {
-        float originalPlaybackTime = playbackTime;
+        double originalPlaybackTime = playbackTime;
 
         ConfirmStateAt(pastState, pastStateTime);
-        Seek(originalPlaybackTime);
+        Seek(originalPlaybackTime, seekFlags);
     }
 
     /// <summary>
@@ -414,7 +442,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// * All future confirmed states are removed (as they will likely be different when seeked again)
     /// * The current playback time is set to the time provided.
     /// </summary>
-    public void ConfirmStateAt(TState state, float time)
+    public void ConfirmStateAt(TState state, double time)
     {
         int index = stateTimeline.IndexAt(time, 0.0001f);
 
@@ -505,7 +533,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// </summary>
     private void CleanupHistory()
     {
-        float trimTo = playbackTime - settings.historyLength;
+        double trimTo = playbackTime - settings.historyLength;
 
         // we always want to have a confirmed state ready for us among other things, so we tend to preserve at least one item in each list as the "last known"
         inputTimeline.TrimBeforeExceptLatest(trimTo);

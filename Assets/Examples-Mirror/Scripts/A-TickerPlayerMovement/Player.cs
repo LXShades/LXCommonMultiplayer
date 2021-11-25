@@ -1,4 +1,5 @@
 using Mirror;
+using System;
 using UnityEngine;
 
 
@@ -51,10 +52,10 @@ namespace MultiplayerToolset.Examples.Mirror
 
         private Movement movement;
 
-        private float timeOnServer;
+        private double timeOnServer;
 
-        private float timeOfLastReceivedServerUpdate;
-        private float timeOfLastReceivedClientInput;
+        private double timeOfLastReceivedServerUpdate;
+        private double timeOfLastReceivedClientInput;
 
         Ticker<PlayerInput, PlayerState> ticker;
 
@@ -103,14 +104,14 @@ namespace MultiplayerToolset.Examples.Mirror
 
                     // another note: the server also added its Time.time - timeOfLastReceivedClientInput
                     // both are needed to extrapolate it as expected
-                    float extrapolatedTimeOnServer = timeOnServer + Time.time - timeOfLastReceivedServerUpdate;
+                    double extrapolatedTimeOnServer = timeOnServer + Time.timeAsDouble - timeOfLastReceivedServerUpdate;
 
                     ticker.Seek(extrapolatedTimeOnServer, TickerSeekFlags.IgnoreDeltas);
                 }
             }
 
             if (NetworkServer.active && IsNetUpdate())
-                RpcPlayerState(ticker.lastConfirmedState, ticker.latestInput, ticker.confirmedStateTime, Mathf.Min(isLocalPlayer ? Time.time - ticker.confirmedStateTime : Time.time - timeOfLastReceivedClientInput, 0.5f));
+                RpcPlayerState(ticker.lastConfirmedState, ticker.latestInput, ticker.confirmedStateTime, (float)Math.Min(isLocalPlayer ? Time.timeAsDouble - ticker.confirmedStateTime : Time.timeAsDouble - timeOfLastReceivedClientInput, 0.5f));
         }
 
         #region ITickable
@@ -171,27 +172,27 @@ namespace MultiplayerToolset.Examples.Mirror
         /// Sends player inputs to the server. The input pack may contain old inputs in case packets are missed.
         /// </summary>
         [Command(channel = Channels.Unreliable)]
-        private void CmdPlayerInput(PlayerInput[] inputs, float[] times)
+        private void CmdPlayerInput(PlayerInput[] inputs, double[] times)
         {
-            float lastLatest = ticker.inputTimeline.LatestTime;
+            double lastLatest = ticker.inputTimeline.LatestTime;
             ticker.InsertInputPack(new TickerInputPack<PlayerInput>(inputs, times));
 
             if (ticker.inputTimeline.LatestTime > lastLatest)
-                timeOfLastReceivedClientInput = Time.time;
+                timeOfLastReceivedClientInput = Time.timeAsDouble;
         }
 
         /// <summary>
         /// Receives player state from the server. When received we immediately reconcile to our local time, replaying Ticks between the server's time and our own.
         /// </summary>
         [ClientRpc(channel = Channels.Unreliable)]
-        private void RpcPlayerState(PlayerState state, PlayerInput input, float time, float serverExtrapolation)
+        private void RpcPlayerState(PlayerState state, PlayerInput input, double time, float serverExtrapolation)
         {
             if (!NetworkServer.active) // don't affect host player
             {
                 ticker.InsertInput(input, time);
                 ticker.Reconcile(state, time, TickerSeekFlags.DontConfirm);
                 timeOnServer = time + serverExtrapolation;
-                timeOfLastReceivedServerUpdate = Time.time;
+                timeOfLastReceivedServerUpdate = Time.timeAsDouble;
             }
         }
 

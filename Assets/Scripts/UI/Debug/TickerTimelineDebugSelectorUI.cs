@@ -129,8 +129,8 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
             // scroll target time
             if (pointerEvent.button == PointerEventData.InputButton.Left)
             {
-                float timeDifference = tickerTimeline.timeline.timePerScreenX * pointerEvent.delta.x;
-                float targetTime = tickerTimeline.targetTicker.playbackTime + timeDifference;
+                double timeDifference = tickerTimeline.timeline.timePerScreenX * pointerEvent.delta.x;
+                double targetTime = tickerTimeline.targetTicker.playbackTime + timeDifference;
 
                 if (timeDifference != 0f)
                 {
@@ -146,8 +146,8 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
             // scroll source time
             if (pointerEvent2.button == PointerEventData.InputButton.Right)
             {
-                float sourceTime = tickerTimeline.timeline.TimeAtScreenX(pointerEvent2.position.x);
-                float targetTime = tickerTimeline.targetTicker.playbackTime;
+                double sourceTime = tickerTimeline.timeline.TimeAtScreenX(pointerEvent2.position.x);
+                double targetTime = tickerTimeline.targetTicker.playbackTime;
 
                 tickerTimeline.targetTicker.SetDebugPaused(false);
                 tickerTimeline.targetTicker.Seek(sourceTime);

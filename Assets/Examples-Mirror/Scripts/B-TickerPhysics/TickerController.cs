@@ -10,19 +10,19 @@ namespace MultiplayerToolset.Examples.Mirror
 
         Ticker<PhysicsTickable.Input, PhysicsTickable.State> physTicker;
 
-        private float timeOnServer;
-        private float timeOfLastServerUpdate;
+        private double timeOnServer;
+        private double timeOfLastServerUpdate;
 
         public bool useAutomaticClientExtrapolation = false;
         public float clientExtrapolation = 0.5f;
-        public float autoCalculatedClientExtrapolation => Time.time + autoCalculatedTimeExtrapolation - timeOnServer - (Time.time - timeOfLastServerUpdate);
+        public float autoCalculatedClientExtrapolation => (float)(Time.timeAsDouble + autoCalculatedTimeExtrapolation - timeOnServer - (Time.timeAsDouble - timeOfLastServerUpdate));
         public float autoCalculatedTimeExtrapolation { get; private set; }
 
         public int updatesPerSecond = 30;
 
-        public float playbackTime => physTicker != null ? physTicker.playbackTime : 0f;
+        public double playbackTime => physTicker != null ? physTicker.playbackTime : 0f;
 
-        private TimelineList<float> serverTimeHistory = new TimelineList<float>();
+        private TimelineList<double> serverTimeHistory = new TimelineList<double>();
 
         private void Start()
         {
@@ -35,12 +35,12 @@ namespace MultiplayerToolset.Examples.Mirror
         {
             // seek physics
             if (NetworkServer.active)
-                physTicker.Seek(Time.time);
+                physTicker.Seek(Time.timeAsDouble);
             else
             {
                 if (!useAutomaticClientExtrapolation)
                 {
-                    physTicker.Seek(timeOnServer + Time.time - timeOfLastServerUpdate + clientExtrapolation, TickerSeekFlags.IgnoreDeltas);
+                    physTicker.Seek(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + clientExtrapolation, TickerSeekFlags.IgnoreDeltas);
                 }
                 else
                 {
@@ -53,7 +53,7 @@ namespace MultiplayerToolset.Examples.Mirror
                     // we continually adjust our game time based on this feedback
                     if (NetworkClient.localPlayer && NetworkClient.localPlayer.TryGetComponent(out PhysicsPlayer localPhysPlayer))
                     {
-                        if (TimeTool.IsTick(Time.time, Time.deltaTime, 2))
+                        if (TimeTool.IsTick(Time.timeAsDouble, Time.deltaTime, 2))
                         {
                             float bestTimeOffset = float.MaxValue;
 
@@ -70,17 +70,17 @@ namespace MultiplayerToolset.Examples.Mirror
 
             // send target ticker's state to clients
             if (NetworkServer.active && TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
-                RpcState(physTicker.lastConfirmedState, physTicker.confirmedStateTime, Time.time - physTicker.confirmedStateTime);
+                RpcState(physTicker.lastConfirmedState, physTicker.confirmedStateTime, (float)(Time.timeAsDouble - physTicker.confirmedStateTime));
         }
 
         [ClientRpc(channel = Channels.Unreliable)]
-        private void RpcState(PhysicsTickable.State state, float time, float serverExtrapolation)
+        private void RpcState(PhysicsTickable.State state, double time, float serverExtrapolation)
         {
             // client-only
             if (!NetworkServer.active)
             {
-                serverTimeHistory.Insert(Time.time, time + serverExtrapolation);
-                serverTimeHistory.Trim(Time.time - 3f, Time.time + 3f);
+                serverTimeHistory.Insert(Time.timeAsDouble, time + serverExtrapolation);
+                serverTimeHistory.Trim(Time.timeAsDouble - 3d, Time.timeAsDouble + 3d);
 
                 physTicker.Reconcile(state, time, 0/*TickerSeekFlags.DontConfirm*/);
                 timeOnServer = time + serverExtrapolation;

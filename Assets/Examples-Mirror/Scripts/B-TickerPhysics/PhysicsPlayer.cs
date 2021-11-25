@@ -37,6 +37,8 @@ namespace MultiplayerToolset.Examples.Mirror
         // OnClient is the one received by the client from the server, so it can correct. >0 means the server received the last input on time, <0 means it was late
         // OnServer is the one set on the server whenever it receives new inputs
         public TimelineList<float> inputTimeOffsetHistoryOnClient { get; private set; } = new TimelineList<float>();
+
+        // float because it's generally going to be small
         public float inputTimeOffsetOnServer { get; private set; }
 
         public int updatesPerSecond = 30;
@@ -75,7 +77,7 @@ namespace MultiplayerToolset.Examples.Mirror
 
                     int numInputsToSend = Mathf.Min(5, myInputs.Count);
                     Input[] inputs = new Input[numInputsToSend];
-                    float[] times = new float[numInputsToSend];
+                    double[] times = new double[numInputsToSend];
                     for (int i = 0; i < numInputsToSend; i++)
                     {
                         inputs[i] = myInputs[i];
@@ -95,7 +97,7 @@ namespace MultiplayerToolset.Examples.Mirror
         }
 
         [Command(channel = Channels.Unreliable)]
-        private void CmdInput(Input[] inputs, float[] times)
+        private void CmdInput(Input[] inputs, double[] times)
         {
             if (inputs != null && times != null && inputs.Length == times.Length)
             {
@@ -103,14 +105,14 @@ namespace MultiplayerToolset.Examples.Mirror
                     myInputs.Set(times[i], inputs[i]);
             }
 
-            inputTimeOffsetOnServer = times[0] - tickerController.playbackTime;
+            inputTimeOffsetOnServer = (float)(times[0] - tickerController.playbackTime);
 
             // avoid overloading inputs
             TrimInputs();
         }
 
         [ClientRpc(channel = Channels.Unreliable)]
-        private void RpcLatestInput(Input input, float time)
+        private void RpcLatestInput(Input input, double time)
         {
             myInputs.Set(time, input);
 
@@ -121,13 +123,13 @@ namespace MultiplayerToolset.Examples.Mirror
         [TargetRpc(channel = Channels.Unreliable)]
         private void TargetInputTimeOffset(float offset)
         {
-            inputTimeOffsetHistoryOnClient.Insert(Time.unscaledTime, offset);
-            inputTimeOffsetHistoryOnClient.Trim(Time.unscaledTime - 1f, Time.unscaledTime + 1f);
+            inputTimeOffsetHistoryOnClient.Insert(Time.unscaledTimeAsDouble, offset);
+            inputTimeOffsetHistoryOnClient.Trim(Time.unscaledTimeAsDouble - 1f, Time.unscaledTimeAsDouble + 1f);
         }
 
         private void TrimInputs()
         {
-            float time = physicsTickable.GetTicker().playbackTime;
+            double time = physicsTickable.GetTicker().playbackTime;
 
             myInputs.Trim(time - 3f, time + 3f);
         }
@@ -145,7 +147,7 @@ namespace MultiplayerToolset.Examples.Mirror
             }
         }
 
-        public Input GetInputAtTime(float time)
+        public Input GetInputAtTime(double time)
         {
             int index = myInputs.ClosestIndexBeforeOrEarliest(TimeTool.Quantize(time, physicsTickable.inputsPerSecond));
 

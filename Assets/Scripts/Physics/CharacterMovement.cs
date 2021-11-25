@@ -384,7 +384,7 @@ public class CharacterMovement : Movement
     }
 
 #if UNITY_EDITOR
-    protected void OnValidate()
+    protected virtual void OnValidate()
     {
         slipRadius = Mathf.Min(slipRadius, groundTestRadius);
 

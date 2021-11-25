@@ -5,7 +5,7 @@ using System;
 /// </summary>
 public interface ITickerBase
 {
-    public void Seek(float targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
+    public void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
     public void SeekBy(float deltaTime);
 
     public void SetDebugPaused(bool isDebugPaused);
@@ -18,17 +18,17 @@ public interface ITickerBase
     /// <summary>
     /// The current playback time. This can be in any unit that matches the unit you use in the inputTimeline and stateTimelines, for example Time.time or Time.realtimeSinceStartup
     /// </summary>
-    public float playbackTime { get; }
+    public double playbackTime { get; }
 
     /// <summary>
     /// The last time that was Seeked to. Similar to playbackTime, BUT it does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
     /// </summary>
-    public float lastSeekTargetTime { get; }
+    public double lastSeekTargetTime { get; }
 
     /// <summary>
     /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
     /// </summary>
-    public float confirmedStateTime { get; }
+    public double confirmedStateTime { get; }
 
     /// <summary>
     /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
@@ -51,8 +51,8 @@ public interface ITickerBase
 /// </summary>
 public interface ITickerStateFunctions<TState> where TState : ITickerState<TState>
 {
-    public void ConfirmStateAt(TState state, float time);
-    public void Reconcile(TState pastState, float pastStateTime, TickerSeekFlags seekFlags);
+    public void ConfirmStateAt(TState state, double time);
+    public void Reconcile(TState pastState, double pastStateTime, TickerSeekFlags seekFlags);
 }
 
 /// <summary>
@@ -60,7 +60,7 @@ public interface ITickerStateFunctions<TState> where TState : ITickerState<TStat
 /// </summary>
 public interface ITickerInputFunctions<TInput> where TInput : ITickerInput<TInput>
 {
-    public void InsertInput(TInput input, float time);
+    public void InsertInput(TInput input, double time);
     public void InsertInputPack(TickerInputPack<TInput> inputPack);
     public TickerInputPack<TInput> MakeInputPack(float maxLength);
 }
@@ -146,14 +146,14 @@ public interface ITickerState<TState> : IEquatable<TState>
 
 public struct TickerInputPack<TInput>
 {
-    public TickerInputPack(TInput[] input, float[] times)
+    public TickerInputPack(TInput[] input, double[] times)
     {
         this.inputs = input;
         this.times = times;
     }
 
     public TInput[] inputs;
-    public float[] times;
+    public double[] times;
 
     /// <summary>
     /// Makes an InputPack from a given input history
@@ -166,7 +166,7 @@ public struct TickerInputPack<TInput>
         if (startIndex != -1)
         {
             TInput[] inputs = new TInput[startIndex + 1];
-            float[] times = new float[startIndex + 1];
+            double[] times = new double[startIndex + 1];
 
             for (int i = startIndex; i >= 0; i--)
             {
@@ -184,7 +184,7 @@ public struct TickerInputPack<TInput>
         return new TickerInputPack<TInput>()
         {
             inputs = new TInput[0],
-            times = new float[0]
+            times = new double[0]
         };
     }
 }

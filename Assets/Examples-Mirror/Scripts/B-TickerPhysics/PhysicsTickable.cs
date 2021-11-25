@@ -11,7 +11,7 @@ namespace MultiplayerToolset.Examples.Mirror
 
         void PhysicsTick(float deltaTime, PhysicsPlayer.Input input);
 
-        PhysicsPlayer.Input GetInputAtTime(float time);
+        PhysicsPlayer.Input GetInputAtTime(double time);
     }
 
     public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsTickable.Input, PhysicsTickable.State>
