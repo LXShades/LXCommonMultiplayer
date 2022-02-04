@@ -376,7 +376,27 @@ public class PlaytestTools : MonoBehaviour
 
         EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
 
-        UnityEditor.Build.Reporting.BuildReport buildReport = BuildPipeline.BuildPlayer(EditorBuildSettings.scenes, $"{linuxBuildPath}/build.x86_64", BuildTarget.StandaloneLinux64, BuildOptions.EnableHeadlessMode);
+        List<string> scenes = new List<string>();
+
+        foreach (EditorBuildSettingsScene scene in EditorBuildSettings.scenes)
+        {
+            if (scene.enabled)
+                scenes.Add(scene.path);
+        }
+
+        BuildPlayerOptions buildOptions = new BuildPlayerOptions()
+        {
+            target = BuildTarget.StandaloneLinux64,
+            scenes = scenes.ToArray(),
+            locationPathName = $"{linuxBuildPath}/build.x86_64",
+#if UNITY_2021_2_OR_NEWER
+            subtarget = (int)StandaloneBuildSubtarget.Server, // int???
+#else
+            options = BuildOptions.EnableHeadlessMode
+#endif
+        };
+
+        UnityEditor.Build.Reporting.BuildReport buildReport = BuildPipeline.BuildPlayer(buildOptions);
 
         EditorSceneManager.OpenScene(originalScene);
 
