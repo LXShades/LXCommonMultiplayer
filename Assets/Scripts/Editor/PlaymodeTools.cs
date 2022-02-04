@@ -57,6 +57,9 @@ public static class PlaymodeTools
         EditorBuildSettings.sceneListChanged += ReassignBootScene;
     }
 
+    private const string kPlaymodeMenu = "Multiplayer/Playmode Override/";
+    private const int kPlaymodePrio = 190;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void OnGameInit()
     {
@@ -73,13 +76,13 @@ public static class PlaymodeTools
 
             if (EditorSceneManager.playModeStartScene == null || EditorSceneManager.playModeStartScene.name != bootScene.name)
             {
-                Debug.Log($"PlaymodeTools: Reassigned boot scene to {bootScene.name}");
+                Debug.Log($"[PlaymodeTools]: Boot scene set to {bootScene.name}");
                 EditorSceneManager.playModeStartScene = bootScene;
             }
         }
         else if (EditorSceneManager.playModeStartScene != null)
         {
-            Debug.Log($"PlaymodeTools: Cleared boot scene");
+            Debug.Log($"[PlaymodeTools]: Cleared boot scene");
             EditorSceneManager.playModeStartScene = null;
         }
     }
@@ -122,36 +125,50 @@ public static class PlaymodeTools
         }
     }
 
-    [MenuItem("Playtest/Autohost in Playmode", false, 100)]
+    [MenuItem(kPlaymodeMenu + "None", false, kPlaymodePrio)]
+    static void DontUseCommands()
+    {
+        playModeCommandType = PlayModeCommands.Disabled;
+        ReassignBootScene();
+    }
+
+    [MenuItem(kPlaymodeMenu + "None", validate = true)]
+    static bool DontUseCommandsValidate()
+    {
+        Menu.SetChecked(kPlaymodeMenu + "None", playModeCommandType == PlayModeCommands.Disabled);
+        return true;
+    }
+
+    [MenuItem(kPlaymodeMenu + "Host", false, kPlaymodePrio+1)]
     static void AutoHostOutsideBoot()
     {
         playModeCommandType = PlayModeCommands.Host;
         ReassignBootScene();
     }
 
-    [MenuItem("Playtest/Autohost in Playmode", validate = true)]
+    [MenuItem(kPlaymodeMenu + "Host", validate = true)]
     static bool AutoHostOutsideBootValidate()
     {
-        Menu.SetChecked("Playtest/Autohost in Playmode", playModeCommandType == PlayModeCommands.Host);
+        Menu.SetChecked(kPlaymodeMenu + "Host", playModeCommandType == PlayModeCommands.Host);
         return true;
     }
 
 
-    [MenuItem("Playtest/Autoconnect in Playmode", false, 101)]
+    [MenuItem(kPlaymodeMenu + "Connect", false, kPlaymodePrio+2)]
     static void AutoConnectOutsideBoot()
     {
         playModeCommandType = PlayModeCommands.Connect;
         ReassignBootScene();
     }
 
-    [MenuItem("Playtest/Autoconnect in Playmode", validate = true)]
+    [MenuItem(kPlaymodeMenu + "Connect", validate = true)]
     static bool AutoConnectOutsideBootValidate()
     {
-        Menu.SetChecked("Playtest/Autoconnect in Playmode", playModeCommandType == PlayModeCommands.Connect);
+        Menu.SetChecked(kPlaymodeMenu + "Connect", playModeCommandType == PlayModeCommands.Connect);
         return true;
     }
 
-    [MenuItem("Playtest/Custom Playmode Commands...", false, 102)]
+    [MenuItem(kPlaymodeMenu + "Custom command line...", false, kPlaymodePrio+3)]
     static void SetCustomCommands()
     {
         DefaultCommandLineBox window = DefaultCommandLineBox.CreateInstance<DefaultCommandLineBox>();
@@ -162,24 +179,10 @@ public static class PlaymodeTools
         UpdateEditorCommands();
     }
 
-    [MenuItem("Playtest/Custom Playmode Commands...", validate = true)]
+    [MenuItem(kPlaymodeMenu + "Custom command line...", validate = true)]
     static bool SetCustomCommandsValidate()
     {
-        Menu.SetChecked("Playtest/Custom Playmode Commands...", playModeCommandType == PlayModeCommands.Custom);
-        return true;
-    }
-
-    [MenuItem("Playtest/No commands (Unity default)", false, 103)]
-    static void DontUseCommands()
-    {
-        playModeCommandType = PlayModeCommands.Disabled;
-        ReassignBootScene();
-    }
-
-    [MenuItem("Playtest/No commands (Unity default)", validate = true)]
-    static bool DontUseCommandsValidate()
-    {
-        Menu.SetChecked("Playtest/No commands (Unity default)", playModeCommandType == PlayModeCommands.Disabled);
+        Menu.SetChecked(kPlaymodeMenu + "Custom command line...", playModeCommandType == PlayModeCommands.Custom);
         return true;
     }
 

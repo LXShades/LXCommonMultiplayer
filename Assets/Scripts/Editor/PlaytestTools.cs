@@ -2,7 +2,6 @@
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
-using UnityEditorInternal;
 using UnityEngine;
 using UnityAssembly = UnityEditor.Compilation.Assembly;
 
@@ -31,19 +30,13 @@ public class PlaytestTools : MonoBehaviour
         Full = 0,
         CurrentScene = 1,
         ScriptsOnly = 2,
-        CopyAssemblies = 3
+        AutoCompile = 3
     }
 
     public static int numTestPlayers
     {
         get => Mathf.Clamp(EditorPrefs.GetInt("playtestNumTestPlayers"), 1, 4);
         set => EditorPrefs.SetInt("playtestNumTestPlayers", value);
-    }
-
-    public static bool autoCompilePlaytestAssemblies
-    {
-        get => EditorPrefs.GetBool("playtestAutoCompilePlaytestAssemblies", true);
-        set => EditorPrefs.SetBool("playtestAutoCompilePlaytestAssemblies", value);
     }
 
     private static BuildType buildType
@@ -80,6 +73,21 @@ public class PlaytestTools : MonoBehaviour
         set => SessionState.SetString("playtestTools_pendingAssembliesForCompile", string.Join("¬", value));
     }
 
+    private const string kMultiplayerMenu = "Multiplayer/Playtest/";
+    private const string kEditorRoleMenu = "Multiplayer/Playtest/";
+    private const string kPlayerCountMenu = "Multiplayer/Playtest/";
+    private const string kBuildTypeMenu = "Multiplayer/Playtest/";
+    private const string kBuildPlatformMenu = "Multiplayer/Build Platform/";
+    private const string kFinalBuildMenu = "Multiplayer/Final Builds/";
+
+    private const int kMultiplayerPrio = 10;
+    private const int kPlayerCountPrio = 30;
+    private const int kEditorRolePrio = 50;
+    private const int kBuildTypePrio = 70;
+    private const int kBuildPlatformPrio = 110;
+    private const int kFinalBuildPrio = 130;
+
+
     [InitializeOnLoadMethod]
     public static void InitializePlaytestTools()
     {
@@ -90,7 +98,8 @@ public class PlaytestTools : MonoBehaviour
 
     private static void OnEditorUpdate()
     {
-        if (!autoCompilePlaytestAssemblies || EditorApplication.isCompiling || !Directory.Exists(playtestBuildPath))
+        // Handle auto-compile functionality
+        if (buildType != BuildType.AutoCompile || EditorApplication.isCompiling || !Directory.Exists(playtestBuildPath))
             return;
 
         if (pendingAssembliesForCompile.Length > 0)
@@ -190,7 +199,7 @@ public class PlaytestTools : MonoBehaviour
 
     private static void OnAssemblyCompiled(string asmPath, UnityEditor.Compilation.CompilerMessage[] messages)
     {
-        if (!autoCompilePlaytestAssemblies)
+        if (buildType != BuildType.AutoCompile)
             return;
         if (System.Array.FindIndex(messages, a => a.type == UnityEditor.Compilation.CompilerMessageType.Error) != -1)
             return; // compilation failed, don't do anything with it
@@ -203,10 +212,11 @@ public class PlaytestTools : MonoBehaviour
         }
     }
 
-    [MenuItem("Playtest/Build", priority = 1)]
+    [MenuItem(kMultiplayerMenu+"Build", priority = kMultiplayerPrio)]
     public static bool Build()
     {
-        if (buildType == BuildType.CopyAssemblies)
+        // Big TODO here
+        /*if (buildType == BuildType.CopyAssemblies)
         {
             List<string> skippedAsms = new List<string>();
             List<string> copiedAsms = new List<string>();
@@ -262,7 +272,7 @@ public class PlaytestTools : MonoBehaviour
 
             return true;
         }
-        else
+        else*/
         {
             // Add the open scene to the list if it's not already in there
             List<string> levels = new List<string>();
@@ -324,7 +334,7 @@ public class PlaytestTools : MonoBehaviour
         }
     }
 
-    [MenuItem("Playtest/Build && Run", priority = 20)]
+    [MenuItem(kMultiplayerMenu+"Build && Run", priority = kMultiplayerPrio+1)]
     public static void BuildAndRun()
     {
         if (Build())
@@ -332,7 +342,7 @@ public class PlaytestTools : MonoBehaviour
     }
 
 
-    [MenuItem("Playtest/Run", priority = 21)]
+    [MenuItem(kMultiplayerMenu+"Run", priority = kMultiplayerPrio+2)]
     public static void Run()
     {
         int playerIndex = 0;
@@ -368,8 +378,113 @@ public class PlaytestTools : MonoBehaviour
             EditorApplication.isPlaying = true;
     }
 
+    [MenuItem(kEditorRoleMenu + "Standalone", priority = kEditorRolePrio)]
+    private static void StandaloneOnly() { editorRole = EditorRole.None; }
 
-    [MenuItem("Playtest/Final/Server Build")]
+    [MenuItem(kEditorRoleMenu + "Standalone", true)]
+    private static bool StandaloneOnlyValidate() { Menu.SetChecked(kEditorRoleMenu + "Standalone", editorRole == EditorRole.None); return true; }
+
+    [MenuItem(kEditorRoleMenu + "Editor is Host", priority = kEditorRolePrio+1)]
+    private static void EditorIsHost() { editorRole = EditorRole.Host; }
+
+    [MenuItem(kEditorRoleMenu + "Editor is Host", true)]
+    private static bool EditorIsHostValidate() { Menu.SetChecked(kEditorRoleMenu + "Editor is Host", editorRole == EditorRole.Host); return true; }
+
+    [MenuItem(kEditorRoleMenu + "Editor is Server", priority = kEditorRolePrio+2)]
+    private static void EditorIsServer() { editorRole = EditorRole.Server; }
+
+    [MenuItem(kEditorRoleMenu + "Editor is Server", true)]
+    private static bool EditorIsServerValidate() { Menu.SetChecked(kEditorRoleMenu + "Editor is Server", editorRole == EditorRole.Server); return true; }
+
+    [MenuItem(kEditorRoleMenu + "Editor is Client", priority = kEditorRolePrio+3)]
+    private static void EditorIsClient() { editorRole = EditorRole.Client; }
+
+    [MenuItem(kEditorRoleMenu + "Editor is Client", true)]
+    private static bool EditorIsClientValidate() { Menu.SetChecked(kEditorRoleMenu + "Editor is Client", editorRole == EditorRole.Client); return true; }
+
+    [MenuItem(kPlayerCountMenu + "1 player", priority = kPlayerCountPrio)]
+    private static void OneTestPlayer() { numTestPlayers = 1; }
+
+    [MenuItem(kPlayerCountMenu + "1 player", true)]
+    private static bool OneTestPlayerValidate() { Menu.SetChecked(kPlayerCountMenu + "1 player", numTestPlayers == 1); return true; }
+
+
+    [MenuItem(kPlayerCountMenu + "2 players", priority = kPlayerCountPrio+1)]
+    private static void TwoTestPlayers() { numTestPlayers = 2; }
+
+    [MenuItem(kPlayerCountMenu + "2 players", true)]
+    private static bool TwoTestPlayersValidate() { Menu.SetChecked(kPlayerCountMenu + "2 players", numTestPlayers == 2); return true; }
+
+
+    [MenuItem(kPlayerCountMenu + "3 players", priority = kPlayerCountPrio+2)]
+    private static void ThreeTestPlayers() { numTestPlayers = 3; }
+
+    [MenuItem(kPlayerCountMenu + "3 players", true)]
+    private static bool ThreeTestPlayersValidate() { Menu.SetChecked(kPlayerCountMenu + "3 players", numTestPlayers == 3); return true; }
+
+
+    [MenuItem(kPlayerCountMenu + "4 players", priority = kPlayerCountPrio+3)]
+    private static void FourTestPlayers() { numTestPlayers = 4; }
+
+    [MenuItem(kPlayerCountMenu + "4 players", true)]
+    private static bool FourTestPlayersValidate() { Menu.SetChecked(kPlayerCountMenu + "4 players", numTestPlayers == 4); return true; }
+
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Full", priority = kBuildTypePrio)]
+    private static void BuildTypeFull() { buildType = BuildType.Full; }
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Full", true)]
+    private static bool BuildTypeFullValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: Full", buildType == BuildType.Full); return true; }
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Current scene", priority = kBuildTypePrio+1)]
+    private static void BuildTypeScripts() { buildType = BuildType.CurrentScene; }
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Current scene", true)]
+    private static bool BuildTypeScriptsValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: Current scene", buildType == BuildType.CurrentScene); return true; }
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Scripts only", priority = kBuildTypePrio+2)]
+    private static void BuildTypeCurrentScene() { buildType = BuildType.ScriptsOnly; }
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Scripts only", true)]
+    private static bool BuildTypeCurrentSceneValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: Scripts only", buildType == BuildType.ScriptsOnly); return true; }
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Autocompile", priority = kBuildTypePrio+3)]
+    private static void BuildTypeAutoCompile()
+    {
+        EditorUtility.DisplayDialog("AutoCompile mode note", "AutoCompile attempts to compile and transfer new binaries on the fly and send them to a pre-built playtest build folder. This must exist first!\n\n" +
+            "This is EXPERIMENTAL and may not always produce the correct results or function at all.\n\nAuto-compiling may also hang your editor for slightly longer so is not recommended during rapid single-player iteration.", "I understand");
+        buildType = BuildType.AutoCompile;
+    }
+
+    [MenuItem(kBuildTypeMenu + "BuildType: Autocompile", true)]
+    private static bool BuildTypeAutoCompileValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: Autocompile", buildType == BuildType.AutoCompile); return true; }
+
+
+    [MenuItem(kBuildPlatformMenu + "BuildPlatform: Win64", priority = kBuildPlatformPrio)]
+    private static void BuildPlatform64() { isWin64 = true; }
+
+    [MenuItem(kBuildPlatformMenu + "BuildPlatform: Win64", true)]
+    private static bool BuildPlatform64Validate() { Menu.SetChecked(kBuildPlatformMenu + "BuildPlatform: Win64", isWin64); return true; }
+
+    [MenuItem(kBuildPlatformMenu + "BuildPlatform: Win32", priority = kBuildPlatformPrio+1)]
+    private static void BuildPlatform32() { isWin64 = false; }
+
+    [MenuItem(kBuildPlatformMenu + "BuildPlatform: Win32", true)]
+    private static bool BuildPlatform32Validate() { Menu.SetChecked(kBuildPlatformMenu + "BuildPlatform: Win32", !isWin64); return true; }
+
+    private static void RunBuild(string arguments = "")
+    {
+        // Run another instance of the game
+        System.Diagnostics.Process process = new System.Diagnostics.Process();
+
+        process.StartInfo.FileName = $"{playtestBuildPath}/{Application.productName}.exe";
+        process.StartInfo.WorkingDirectory = playtestBuildPath;
+        process.StartInfo.Arguments = arguments;
+
+        process.Start();
+    }
+
+    [MenuItem(kFinalBuildMenu + "Server Build", priority = kFinalBuildPrio)]
     public static void BuildFinalServer()
     {
         string originalScene = EditorSceneManager.GetActiveScene().path;
@@ -406,7 +521,7 @@ public class PlaytestTools : MonoBehaviour
         }
     }
 
-    [MenuItem("Playtest/Final/WebGL Build")]
+    [MenuItem(kFinalBuildMenu + "WebGL Build", priority = kFinalBuildPrio + 1)]
     public static void BuildFinalWebGL()
     {
         string originalScene = EditorSceneManager.GetActiveScene().path;
@@ -421,120 +536,6 @@ public class PlaytestTools : MonoBehaviour
         {
             EditorUtility.DisplayDialog("Someone goofed", $"Build failed ({buildReport.summary.totalErrors} errors)", "OK");
         }
-    }
-
-    [MenuItem("Playtest/Standalone Only", priority = 40)]
-    private static void StandaloneOnly() { editorRole = EditorRole.None; }
-
-    [MenuItem("Playtest/Standalone Only", true)]
-    private static bool StandaloneOnlyValidate() { Menu.SetChecked("Playtest/Standalone Only", editorRole == EditorRole.None); return true; }
-
-    [MenuItem("Playtest/Editor is Host", priority = 41)]
-    private static void EditorIsHost() { editorRole = EditorRole.Host; }
-
-    [MenuItem("Playtest/Editor is Host", true)]
-    private static bool EditorIsHostValidate() { Menu.SetChecked("Playtest/Editor is Host", editorRole == EditorRole.Host); return true; }
-
-    [MenuItem("Playtest/Editor is Server", priority = 42)]
-    private static void EditorIsServer() { editorRole = EditorRole.Server; }
-
-    [MenuItem("Playtest/Editor is Server", true)]
-    private static bool EditorIsServerValidate() { Menu.SetChecked("Playtest/Editor is Server", editorRole == EditorRole.Server); return true; }
-
-    [MenuItem("Playtest/Editor is Client", priority = 43)]
-    private static void EditorIsClient() { editorRole = EditorRole.Client; }
-
-    [MenuItem("Playtest/Editor is Client", true)]
-    private static bool EditorIsClientValidate() { Menu.SetChecked("Playtest/Editor is Client", editorRole == EditorRole.Client); return true; }
-
-    [MenuItem("Playtest/1 player", priority = 80)]
-    private static void OneTestPlayer() { numTestPlayers = 1; }
-
-    [MenuItem("Playtest/1 player", true)]
-    private static bool OneTestPlayerValidate() { Menu.SetChecked("Playtest/1 player", numTestPlayers == 1); return true; }
-
-
-    [MenuItem("Playtest/2 players", priority = 81)]
-    private static void TwoTestPlayers() { numTestPlayers = 2; }
-
-    [MenuItem("Playtest/2 players", true)]
-    private static bool TwoTestPlayersValidate() { Menu.SetChecked("Playtest/2 players", numTestPlayers == 2); return true; }
-
-
-    [MenuItem("Playtest/3 players", priority = 82)]
-    private static void ThreeTestPlayers() { numTestPlayers = 3; }
-
-    [MenuItem("Playtest/3 players", true)]
-    private static bool ThreeTestPlayersValidate() { Menu.SetChecked("Playtest/3 players", numTestPlayers == 3); return true; }
-
-
-    [MenuItem("Playtest/4 players", priority = 83)]
-    private static void FourTestPlayers() { numTestPlayers = 4; }
-
-    [MenuItem("Playtest/4 players", true)]
-    private static bool FourTestPlayersValidate() { Menu.SetChecked("Playtest/4 players", numTestPlayers == 4); return true; }
-
-
-    [MenuItem("Playtest/BuildType: Full", priority = 140)]
-    private static void BuildTypeFull() { buildType = BuildType.Full; }
-
-    [MenuItem("Playtest/BuildType: Full", true)]
-    private static bool BuildTypeFullValidate() { Menu.SetChecked("Playtest/BuildType: Full", buildType == BuildType.Full); return true; }
-
-    [MenuItem("Playtest/BuildType: Current scene", priority = 141)]
-    private static void BuildTypeScripts() { buildType = BuildType.CurrentScene; }
-
-    [MenuItem("Playtest/BuildType: Current scene", true)]
-    private static bool BuildTypeScriptsValidate() { Menu.SetChecked("Playtest/BuildType: Current scene", buildType == BuildType.CurrentScene); return true; }
-
-    [MenuItem("Playtest/BuildType: Scripts only", priority = 142)]
-    private static void BuildTypeCurrentScene() { buildType = BuildType.ScriptsOnly; }
-
-    [MenuItem("Playtest/BuildType: Scripts only", true)]
-    private static bool BuildTypeCurrentSceneValidate() { Menu.SetChecked("Playtest/BuildType: Scripts only", buildType == BuildType.ScriptsOnly); return true; }
-
-    [MenuItem("Playtest/BuildType: Assembly copy", priority = 143)]
-    private static void BuildTypeAssembly()
-    {
-        buildType = BuildType.CopyAssemblies;
-
-        EditorUtility.DisplayDialog("Assembly Copy info", "AssemblyCopy is a code-only build that directly copies the code compiled by the editor. You'll need a full build first if you don't have one.\n\n" +
-            "There are two restrictions:\n * Only .asmdef code is included\n * Each .asmdef can only be included if it is free of UnityEditor references.\n\n" +
-            "Note that UnityEditor references will be included even if you use UNITY_EDITOR guards around them, so take care to avoid them if you want your .asmdef included.", "Understood");
-    }
-
-    [MenuItem("Playtest/BuildType: Assembly copy", true)]
-    private static bool BuildTypeAssemblyValidate() { Menu.SetChecked("Playtest/BuildType: Assembly copy", buildType == BuildType.CopyAssemblies); return true; }
-
-
-    [MenuItem("Playtest/BuildPlatform: Win64", priority = 160)]
-    private static void BuildPlatform64() { isWin64 = true; }
-
-    [MenuItem("Playtest/BuildPlatform: Win64", true)]
-    private static bool BuildPlatform64Validate() { Menu.SetChecked("Playtest/BuildPlatform: Win64", isWin64); return true; }
-
-    [MenuItem("Playtest/BuildPlatform: Win32", priority = 160)]
-    private static void BuildPlatform32() { isWin64 = false; }
-
-    [MenuItem("Playtest/BuildPlatform: Win32", true)]
-    private static bool BuildPlatform32Validate() { Menu.SetChecked("Playtest/BuildPlatform: Win32", !isWin64); return true; }
-
-    [MenuItem("Playtest/Autocompile Playtest Assemblies", priority = 180)]
-    private static void AutoCompilePlaytestAssemblies() { autoCompilePlaytestAssemblies = !autoCompilePlaytestAssemblies; }
-
-    [MenuItem("Playtest/Autocompile Playtest Assemblies", true)]
-    private static bool AutoCompilePlaytestAssembliesValidate() { Menu.SetChecked("Playtest/Autocompile Playtest Assemblies", autoCompilePlaytestAssemblies); return true; }
-
-    private static void RunBuild(string arguments = "")
-    {
-        // Run another instance of the game
-        System.Diagnostics.Process process = new System.Diagnostics.Process();
-
-        process.StartInfo.FileName = $"{playtestBuildPath}/{Application.productName}.exe";
-        process.StartInfo.WorkingDirectory = playtestBuildPath;
-        process.StartInfo.Arguments = arguments;
-
-        process.Start();
     }
 
     private static string MakeDimensionParam(RectInt dimensions) => $"" +
