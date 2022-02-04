@@ -1,7 +1,7 @@
 using Mirror;
 
 
-namespace MultiplayerToolset.Examples.Mirror
+namespace UnityMultiplayerEssentials.Examples.Mirror
 {
     /// <summary>
     /// Holds the player's name and assigns it to the GameObject

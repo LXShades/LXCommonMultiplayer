@@ -1,7 +1,7 @@
 using UnityEngine;
 
 
-namespace MultiplayerToolset.Examples.Mirror
+namespace UnityMultiplayerEssentials.Examples.Mirror
 {
     /// <summary>
     /// Simple tickable object with a pre-determined set of inputs to cycle through

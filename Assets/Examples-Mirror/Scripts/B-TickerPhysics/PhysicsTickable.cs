@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-namespace MultiplayerToolset.Examples.Mirror
+namespace UnityMultiplayerEssentials.Examples.Mirror
 {
     public interface IPhysicsTick
     {

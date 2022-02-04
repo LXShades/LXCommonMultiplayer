@@ -3,7 +3,7 @@ using System;
 using UnityEngine;
 
 
-namespace MultiplayerToolset.Examples.Mirror
+namespace UnityMultiplayerEssentials.Examples.Mirror
 {
     /// <summary>
     /// Basic player that moves towards the given direction in a predicted-reconciled way.

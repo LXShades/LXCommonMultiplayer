@@ -1,6 +1,6 @@
-using MultiplayerToolset.Examples.Mirror;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityMultiplayerEssentials.Examples.Mirror;
 
 public class SceneBUI : MonoBehaviour
 {

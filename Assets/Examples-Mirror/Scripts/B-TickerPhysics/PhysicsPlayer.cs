@@ -2,7 +2,7 @@ using Mirror;
 using UnityEngine;
 
 
-namespace MultiplayerToolset.Examples.Mirror
+namespace UnityMultiplayerEssentials.Examples.Mirror
 {
     public class PhysicsPlayer : NetworkBehaviour, IPhysicsTick
     {
