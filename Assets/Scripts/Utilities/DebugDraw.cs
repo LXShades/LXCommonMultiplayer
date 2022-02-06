@@ -37,7 +37,10 @@ public static class DebugDraw
     const float kRadsInCircle = Mathf.PI * 2f;
 
     private static List<DebugShape> currentDebugShapes = new List<DebugShape>();
+    private static List<DebugShape> previousDebugShapes = new List<DebugShape>();
     private static List<DebugShape> debugShapePool = new List<DebugShape>();
+
+    private static bool hasBufferedPausedShapes = false;
 
     /// <summary>
     /// Draws a line between start and end in world coordinates
@@ -166,10 +169,27 @@ public static class DebugDraw
     {
         Camera.onPostRender -= OnFinalRenderDebugShapes;
         Camera.onPostRender += OnFinalRenderDebugShapes;
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.pauseStateChanged -= OnPauseStateChanged;
+        UnityEditor.EditorApplication.pauseStateChanged += OnPauseStateChanged;
+#endif
     }
 
     private static DebugShape GetNewShape(Color color)
     {
+        if (hasBufferedPausedShapes)
+        {
+            // Cleanup the buffered paused shapes. This can happen in paused mode during a step
+            debugShapePool.AddRange(previousDebugShapes);
+            previousDebugShapes.Clear();
+
+            previousDebugShapes.AddRange(currentDebugShapes);
+            currentDebugShapes.Clear();
+
+            hasBufferedPausedShapes = false;
+        }
+
         if (debugShapePool.Count > 0)
         {
             DebugShape output = debugShapePool[debugShapePool.Count - 1];
@@ -211,9 +231,42 @@ public static class DebugDraw
         GL.End();
         GL.PopMatrix();
 
-        debugShapePool.AddRange(currentDebugShapes);
-        currentDebugShapes.Clear();
+#if UNITY_EDITOR
+        if (!UnityEditor.EditorApplication.isPaused)
+        {
+#endif
+            debugShapePool.AddRange(previousDebugShapes);
+            previousDebugShapes.Clear();
 
-        Camera.onPostRender -= OnFinalRenderDebugShapes;
+            previousDebugShapes.AddRange(currentDebugShapes);
+            currentDebugShapes.Clear();
+
+            Camera.onPostRender -= OnFinalRenderDebugShapes;
+#if UNITY_EDITOR
+        }
+        else
+        {
+            // this can happen in the event of a step
+            hasBufferedPausedShapes = true;
+        }
+#endif
     }
+
+#if UNITY_EDITOR
+    private static void OnPauseStateChanged(UnityEditor.PauseState pauseState)
+    {
+        // Preserve the last frame's shapes
+        if (pauseState == UnityEditor.PauseState.Paused)
+        {
+            if (currentDebugShapes.Count == 0 && previousDebugShapes.Count > 0)
+            {
+                currentDebugShapes.AddRange(previousDebugShapes);
+                previousDebugShapes.Clear();
+            }
+
+            if (currentDebugShapes.Count > 0)
+                RequestDrawThisFrame();
+        }
+    }
+#endif
 }

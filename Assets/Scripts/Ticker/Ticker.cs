@@ -222,9 +222,12 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     public TimelineListBase inputTimelineBase => inputTimeline;
     public TimelineListBase stateTimelineBase => stateTimeline;
 
+    private bool doesStateImplementDebug;
+
     public Ticker(ITickable<TInput, TState> target)
     {
         this.target = target;
+        doesStateImplementDebug = typeof(ITickerStateDebug).IsAssignableFrom(typeof(TState));
         ConfirmCurrentState();
     }
 
@@ -490,7 +493,8 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// </summary>
     public void DebugDrawCurrentState(Color colour)
     {
-        target.MakeState().DebugDraw(colour);
+        if (doesStateImplementDebug)
+            (target.MakeState() as ITickerStateDebug).DebugDraw(colour);
     }
 
     private string PrintStructDifferences<T>(string aName, string bName, T structureA, T structureB)

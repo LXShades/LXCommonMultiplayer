@@ -27,7 +27,7 @@ public class PlaytestTools : MonoBehaviour
 
     private enum BuildType
     {
-        Full = 0,
+        AllScenes = 0,
         CurrentScene = 1,
         ScriptsOnly = 2,
         AutoCompile = 3
@@ -41,7 +41,7 @@ public class PlaytestTools : MonoBehaviour
 
     private static BuildType buildType
     {
-        get => (BuildType)EditorPrefs.GetInt("playtestBuildType", (int)BuildType.Full);
+        get => (BuildType)EditorPrefs.GetInt("playtestBuildType", (int)BuildType.AllScenes);
         set => EditorPrefs.SetInt("playtestBuildType", (int)value);
     }
 
@@ -78,7 +78,7 @@ public class PlaytestTools : MonoBehaviour
     private const string kPlayerCountMenu = "Multiplayer/Playtest/";
     private const string kBuildTypeMenu = "Multiplayer/Playtest/";
     private const string kBuildPlatformMenu = "Multiplayer/Build Platform/";
-    private const string kFinalBuildMenu = "Multiplayer/Final Builds/";
+    private const string kFinalBuildMenu = "Multiplayer/Final Build/";
 
     private const int kMultiplayerPrio = 10;
     private const int kPlayerCountPrio = 30;
@@ -430,11 +430,11 @@ public class PlaytestTools : MonoBehaviour
     private static bool FourTestPlayersValidate() { Menu.SetChecked(kPlayerCountMenu + "4 players", numTestPlayers == 4); return true; }
 
 
-    [MenuItem(kBuildTypeMenu + "BuildType: Full", priority = kBuildTypePrio)]
-    private static void BuildTypeFull() { buildType = BuildType.Full; }
+    [MenuItem(kBuildTypeMenu + "BuildType: All scenes", priority = kBuildTypePrio)]
+    private static void BuildTypeFull() { buildType = BuildType.AllScenes; }
 
-    [MenuItem(kBuildTypeMenu + "BuildType: Full", true)]
-    private static bool BuildTypeFullValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: Full", buildType == BuildType.Full); return true; }
+    [MenuItem(kBuildTypeMenu + "BuildType: All scenes", true)]
+    private static bool BuildTypeFullValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: All Scenes", buildType == BuildType.AllScenes); return true; }
 
     [MenuItem(kBuildTypeMenu + "BuildType: Current scene", priority = kBuildTypePrio+1)]
     private static void BuildTypeScripts() { buildType = BuildType.CurrentScene; }

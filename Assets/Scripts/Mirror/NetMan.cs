@@ -145,16 +145,16 @@ public class NetMan : NetworkManager
         StartClient();
     }
 
-    public override void OnClientConnect(NetworkConnection conn)
+    public override void OnClientConnect()
     {
-        base.OnClientConnect(conn);
-        onClientConnect?.Invoke(conn);
+        base.OnClientConnect();
+        onClientConnect?.Invoke(NetworkClient.connection);
     }
 
-    public override void OnClientDisconnect(NetworkConnection conn)
+    public override void OnClientDisconnect()
     {
-        base.OnClientDisconnect(conn);
-        onClientDisconnect?.Invoke(conn);
+        base.OnClientDisconnect();
+        onClientDisconnect?.Invoke(NetworkClient.connection);
 
         StopClient();
     }

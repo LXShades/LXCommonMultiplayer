@@ -133,13 +133,20 @@ public interface ITickerInput<TOwner>
 }
 
 /// <summary>
-/// Qualifies a stuct or class as a ticker snapshot.
+/// Makes a class or struct usable as a ticker state snapshot.
 /// 
-/// This is used to revert a tickable component to an earlier state for potential resimulation.
+/// These states can be inserted into a Ticker's timeline, which can then rewind or fast-forward an object's state if desired.
 /// 
-/// To work reliably, this snapshot should be able to store and load all simulatable state from a tickable component.
+/// This should contain everything you want to synchronise, replay, or reconcile.
 /// </summary>
 public interface ITickerState<TState> : IEquatable<TState>
+{
+}
+
+/// <summary>
+/// Adds debugging functionality to an ITickerState, if desired
+/// </summary>
+public interface ITickerStateDebug
 {
     void DebugDraw(UnityEngine.Color colour);
 }

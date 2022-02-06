@@ -132,12 +132,12 @@ namespace UnityMultiplayerEssentials.Examples
 
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR // why does !UNITY_EDITOR need to be here, shouldn't standalone be standalone? Oh well, doesn't seem to work that way
         // Window management functions
-        [DllImport("user32.dll")]
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern System.IntPtr GetActiveWindow();
 
-        [DllImport("user32.dll")]
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(System.IntPtr hwnd);
-        [DllImport("user32.dll")]
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool SetWindowPos(System.IntPtr hwnd, System.IntPtr hwndInsertAfter, int x, int y, int cx, int cy, uint flags);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
