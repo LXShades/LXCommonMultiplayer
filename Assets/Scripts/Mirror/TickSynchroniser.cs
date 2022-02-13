@@ -34,7 +34,7 @@ public class TickSynchroniser : NetworkBehaviour
 
     protected double timeOnServer;
     protected double timeOfLastServerUpdate;
-    protected double lastTickTime; // last local tick time
+    public double lastTickTime { get; protected set; } // last local tick time
 
     protected TimelineList<float> clientTimeOffsetHistory = new TimelineList<float>();
 

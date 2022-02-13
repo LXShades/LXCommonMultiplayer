@@ -111,7 +111,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             }
 
             if (NetworkServer.active && IsNetUpdate())
-                RpcPlayerState(ticker.lastConfirmedState, ticker.latestInput, ticker.confirmedStateTime, (float)Math.Min(isLocalPlayer ? Time.timeAsDouble - ticker.confirmedStateTime : Time.timeAsDouble - timeOfLastReceivedClientInput, 0.5f));
+                RpcPlayerState(ticker.lastConfirmedState, ticker.latestInput, ticker.lastConfirmedStateTime, (float)Math.Min(isLocalPlayer ? Time.timeAsDouble - ticker.lastConfirmedStateTime : Time.timeAsDouble - timeOfLastReceivedClientInput, 0.5f));
         }
 
         #region ITickable

@@ -32,6 +32,16 @@ public class NetPlayer : NetworkBehaviour
     public static Dictionary<int, NetPlayer> players = new Dictionary<int, NetPlayer>();
 
     /// <summary>
+    /// Returns the local NetPlayer if applicable
+    /// </summary>
+    public static NetPlayer localPlayer;
+
+    /// <summary>
+    /// Returns the local NetPlayer's character if available
+    /// </summary>
+    public static GameObject localCharacter => localPlayer ? localPlayer.character : null;
+
+    /// <summary>
     /// Default set of player names
     /// I'm in a pizza mood
     /// </summary>
@@ -82,6 +92,16 @@ public class NetPlayer : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Assigns the local player
+    /// </summary>
+    public override void OnStartLocalPlayer()
+    {
+        base.OnStartLocalPlayer();
+
+        localPlayer = this;
+    }
+
     private void OnDestroy()
     {
         if (players.ContainsKey(playerId) && players[playerId] == this)
@@ -93,6 +113,18 @@ public class NetPlayer : NetworkBehaviour
         foreach (var kvp in players)
         {
             if (kvp.Value && kvp.Value.character == characterObject)
+            {
+                return kvp.Value;
+            }
+        }
+        return null;
+    }
+
+    public static NetPlayer FindPlayerForConnection(NetworkConnectionToClient connection)
+    {
+        foreach (var kvp in players)
+        {
+            if (kvp.Value && kvp.Value.connectionToClient == connection)
             {
                 return kvp.Value;
             }

@@ -26,9 +26,9 @@ public enum TickerSeekFlags
     DontConfirm = 2,
 
     /// <summary>
-    /// Treat this as a replay regardless of whether it is replaying old ticks.
+    /// Treat this as an internal replay.
     /// 
-    /// This is useful for predicting future ticks without real-time consequences and effects.
+    /// Use when you e.g. want to modify and replay a piece of the timeline, but don't want sounds, visual effects etc to play. Because it's not playing in realtime, it's just internally replaying a new version of things that already happened.
     /// </summary>
     TreatAsReplay = 4,
 };
@@ -197,14 +197,14 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     public double lastSeekTargetTime { get; private set; }
 
     /// <summary>
-    /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
-    /// </summary>
-    public double confirmedStateTime => stateTimeline.Count > 0 ? stateTimeline.LatestTime : -1f;
-
-    /// <summary>
     /// The most recent confirmed state
     /// </summary>
     public TState lastConfirmedState => stateTimeline.Count > 0 ? stateTimeline.Latest : default;
+
+    /// <summary>
+    /// The most recent confirmed state time - the non-extrapolated playback time of the last confirmed state
+    /// </summary>
+    public double lastConfirmedStateTime => stateTimeline.Count > 0 ? stateTimeline.LatestTime : -1f;
 
     /// <summary>
     /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
@@ -257,7 +257,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     }
 
     /// <summary>
-    /// Makes an input pack from input history
+    /// Makes an input pack from the input history (useful for sending multiple inputs to server)
     /// </summary>
     public TickerInputPack<TInput> MakeInputPack(float maxLength)
     {
@@ -275,10 +275,6 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// Seeks to the given time. Ticks going forward beyond the latest confirmed state will call Tick on the target, with the closest available inputs.
     /// New states up to that point may be confirmed into the timeline, unless DontConfirm is used.
-    /// 
-    /// RealtimePlaybackTime describes the time after which e.g. sound effects and particles could be performed. This exists because if you have rewinded the state and are reconciling, you don't always want to replay those.
-    ///  -> When realtime is reached, Tick() is called with isRealtime = true
-    ///  -> When realtime is reached, TickerEvents are also called with isRealtime = true
     ///  
     /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
     /// </summary>
@@ -400,7 +396,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                 if (numIterations == settings.maxSeekIterations)
                 {
                     if (settings.debugLogSeekWarnings)
-                        Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({confirmedStateTime})");
+                        Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({lastConfirmedStateTime})");
 
                     if (canAttemptConfirmNextState)
                     {
@@ -461,12 +457,11 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                     $"Diffs: {(index != -1 ? PrintStructDifferences("recv", "old", state, stateTimeline[index]) : "N/A")}");
             }
 
+            playbackTime = time;
             target.ApplyState(state);
 
             stateTimeline.Set(time, state);
             stateTimeline.TrimAfter(time);
-
-            playbackTime = time;
         }
     }
 

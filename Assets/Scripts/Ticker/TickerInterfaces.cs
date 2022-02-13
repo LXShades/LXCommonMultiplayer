@@ -28,7 +28,7 @@ public interface ITickerBase
     /// <summary>
     /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
     /// </summary>
-    public double confirmedStateTime { get; }
+    public double lastConfirmedStateTime { get; }
 
     /// <summary>
     /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
@@ -120,11 +120,6 @@ public interface ITickable<TInput, TState> : ITickableBase
 /// </summary>
 public interface ITickerInput<TOwner>
 {
-    /// <summary>
-    /// Returns an input representing current live input state
-    /// </summary>
-    public TOwner GenerateLocal();
-
     /// <summary>
     /// Returns an input with optional deltas compared to the previous input. e.g. btnJumpPressed, btnJumpReleased
     /// When WithDeltas is called on the owner with the owner as the parameter, that can be considered WithoutDeltas.

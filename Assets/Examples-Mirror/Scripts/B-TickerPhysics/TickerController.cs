@@ -70,7 +70,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
             // send target ticker's state to clients
             if (NetworkServer.active && TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
-                RpcState(physTicker.lastConfirmedState, physTicker.confirmedStateTime, (float)(Time.timeAsDouble - physTicker.confirmedStateTime));
+                RpcState(physTicker.lastConfirmedState, physTicker.lastConfirmedStateTime, (float)(Time.timeAsDouble - physTicker.lastConfirmedStateTime));
         }
 
         [ClientRpc(channel = Channels.Unreliable)]

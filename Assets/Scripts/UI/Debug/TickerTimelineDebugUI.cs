@@ -33,13 +33,13 @@ public class TickerTimelineDebugUI : MonoBehaviour
     {
         if (targetTicker != null)
         {
-            timeline.timeStart = (int)(Math.Max(targetTicker.playbackTime, targetTicker.confirmedStateTime) / timelineLength) * timelineLength;
+            timeline.timeStart = (int)(Math.Max(targetTicker.playbackTime, targetTicker.lastConfirmedStateTime) / timelineLength) * timelineLength;
             timeline.timeEnd = timeline.timeStart + timelineLength;
 
             timeline.ClearDraw();
 
             timeline.DrawTick(targetTicker.playbackTime, 1.5f, 0.5f, playbackTimeColor, "PT", 0);
-            timeline.DrawTick(targetTicker.confirmedStateTime, 1.5f, 0.5f, confirmedTimeColor, "CT", 1);
+            timeline.DrawTick(targetTicker.lastConfirmedStateTime, 1.5f, 0.5f, confirmedTimeColor, "CT", 1);
             timeline.DrawTick(targetTicker.lastSeekTargetTime, 1.5f, 0.5f, realtimeColor, "RT", 2); ;
 
             for (int i = 0; i < targetTicker.inputTimelineBase.Count; i++)
