@@ -1,52 +1,6 @@
 using System;
 
 /// <summary>
-/// ITickerBase allows you to use a Ticker even if you don't know TState or TInput.
-/// </summary>
-public interface ITickerBase
-{
-    public void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
-    public void SeekBy(float deltaTime);
-
-    public void SetDebugPaused(bool isDebugPaused);
-
-    /// <summary>
-    /// The name of the target component or struct
-    /// </summary>
-    public string targetName { get; }
-
-    /// <summary>
-    /// The current playback time. This can be in any unit that matches the unit you use in the inputTimeline and stateTimelines, for example Time.time or Time.realtimeSinceStartup
-    /// </summary>
-    public double playbackTime { get; }
-
-    /// <summary>
-    /// The last time that was Seeked to. Similar to playbackTime, BUT it does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
-    /// </summary>
-    public double lastSeekTargetTime { get; }
-
-    /// <summary>
-    /// The current confirmed state time - the non-extrapolated playback time of the last input-confirmed state
-    /// </summary>
-    public double lastConfirmedStateTime { get; }
-
-    /// <summary>
-    /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
-    /// </summary>
-    public bool isDebugPaused { get; }
-
-    /// <summary>
-    /// Input history in this Ticker
-    /// </summary>
-    public TimelineListBase inputTimelineBase { get; }
-
-    /// <summary>
-    /// State history in this Ticker
-    /// </summary>
-    public TimelineListBase stateTimelineBase { get; }
-}
-
-/// <summary>
 /// You can cast and use ITickerStateFunctions when you know what TState is but don't know what TInput is
 /// </summary>
 public interface ITickerStateFunctions<TState> where TState : ITickerState<TState>
@@ -66,17 +20,6 @@ public interface ITickerInputFunctions<TInput> where TInput : ITickerInput<TInpu
 }
 
 /// <summary>
-/// Enables you to get the ticker out of a tickable regardless of generic types
-/// </summary>
-public interface ITickableBase
-{
-    /// <summary>
-    /// Should return this object's Ticker instance with its chosen TInput and TState.
-    /// </summary>
-    ITickerBase GetTicker();
-} 
-
-/// <summary>
 /// Qualifies something as tickable.
 /// 
 /// This class can be ticked, reverted to a previous state, and "Seek" to an earlier _or_ future time in its history
@@ -85,7 +28,7 @@ public interface ITickableBase
 /// 
 /// This interface should implement MakeState(), ApplyState() and Tick().
 /// </summary>
-public interface ITickable<TInput, TState> : ITickableBase
+public interface ITickable<TInput, TState>
 {
     /// <summary>
     /// Ticks the object. In a networked game, you may put most important gameplay things in this function, as though it were an Update function.
@@ -112,7 +55,7 @@ public interface ITickable<TInput, TState> : ITickableBase
 
 
 /// <summary>
-/// Qualifies a struct or class as a ticker input.
+/// Qualifies a struct or class as a ticker input. TOwner is the struct or class type itself.
 /// 
 /// The ticker input can be e.g a set of player controls specified by booleans (isJumpButtonDown) and floats (horizontalMovement).
 /// 

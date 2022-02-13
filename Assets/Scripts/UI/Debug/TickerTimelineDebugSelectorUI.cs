@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,7 +22,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     public Button playPauseButton;
     public Text playPauseButtonText;
 
-    private readonly List<ITickableBase> selectableTickers = new List<ITickableBase>(32);
+    private readonly List<TickerBase> selectableTickers = new List<TickerBase>(32);
 
     private void Start()
     {
@@ -98,15 +99,18 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         dropdown.ClearOptions();
         selectableTickers.Clear();
 
-        // add new items
-        foreach (MonoBehaviour tickableComponent in FindObjectsOfType<MonoBehaviour>())
-        {
-            if (tickableComponent is ITickableBase tickable)
-            {
-                selectableTickers.Add(tickable);
-                options.Add(new Dropdown.OptionData(tickableComponent.gameObject.name));
+        selectableTickers.Add(null);
+        options.Add(new Dropdown.OptionData("<select ticker>"));
 
-                if (tickableComponent.gameObject.name == currentlySelectedItemName)
+        // add new items
+        foreach (WeakReference<TickerBase> tickerWeak in TickerBase.allTickers)
+        {
+            if (tickerWeak.TryGetTarget(out TickerBase ticker))
+            {
+                options.Add(new Dropdown.OptionData(ticker.targetName));
+                selectableTickers.Add(ticker);
+
+                if (tickerTimeline.targetTicker == ticker)
                     newSelectedItemIndex = options.Count - 1;
             }
         }
@@ -119,7 +123,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     private void OnDropdownSelectionChanged(int value)
     {
         if (value > -1 && value < selectableTickers.Count)
-            tickerTimeline.targetTicker = selectableTickers[value].GetTicker();
+            tickerTimeline.targetTicker = selectableTickers[value];
     }
 
     private void OnTimelineDrag(BaseEventData eventData)

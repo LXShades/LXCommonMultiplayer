@@ -111,7 +111,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             }
 
             if (NetworkServer.active && IsNetUpdate())
-                RpcPlayerState(ticker.lastConfirmedState, ticker.latestInput, ticker.lastConfirmedStateTime, (float)Math.Min(isLocalPlayer ? Time.timeAsDouble - ticker.lastConfirmedStateTime : Time.timeAsDouble - timeOfLastReceivedClientInput, 0.5f));
+                RpcPlayerState(ticker.latestConfirmedState, ticker.latestInput, ticker.latestConfirmedStateTime, (float)Math.Min(isLocalPlayer ? Time.timeAsDouble - ticker.latestConfirmedStateTime : Time.timeAsDouble - timeOfLastReceivedClientInput, 0.5f));
         }
 
         #region ITickable
@@ -139,7 +139,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         /// <summary>
         /// Returns the ticker owned by this player
         /// </summary>
-        public ITickerBase GetTicker()
+        public TickerBase GetTicker()
         {
             return ticker;
         }

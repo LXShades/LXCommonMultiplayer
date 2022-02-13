@@ -103,7 +103,9 @@ public class TickSynchroniser : NetworkBehaviour
                 {
                     if (conn.Value != null && conn.Value.isReady && conn.Value != NetworkServer.localConnection)
                     {
-                        double clientTime = lastClientGameTime.GetValueOrDefault(conn.Value, 0d);
+                        double clientTime = 0f;
+                        lastClientGameTime.TryGetValue(conn.Value, out clientTime);
+
                         TargetTimeAndOffset(conn.Value, lastTickTime, (float)(clientTime - lastTickTime));
                     }
                 }

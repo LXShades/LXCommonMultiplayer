@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
@@ -106,9 +107,8 @@ public struct TickerSettings
 
 public struct TickInfo
 {
-    //public float deltaTime;
     /// <summary>
-    /// The time of this tick. This is after deltaTime (so eg first frame with deltaTime=0.5, time is 0.5, much like Unity)
+    /// The time of this tick. This is evaluated after deltaTime (so eg first frame with deltaTime=0.5, time is 0.5). Therefore this is not guaranteed to start at 0.
     /// </summary>
     public double time;
 
@@ -152,6 +152,63 @@ public struct TickInfo
     };
 }
 
+
+/// <summary>
+/// The TickerBase allows you to use a Ticker even if you don't know TState or TInput.
+/// </summary>
+public abstract class TickerBase
+{
+    /// <summary>
+    /// All tickers that currently exist. This list may contain null gaps. The list is cleaned when new tickers are created.
+    /// </summary>
+    public static List<WeakReference<TickerBase>> allTickers = new List<WeakReference<TickerBase>>();
+
+    public abstract void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
+    public abstract void SeekBy(float deltaTime);
+
+    public abstract void SetDebugPaused(bool isDebugPaused);
+
+    /// <summary>
+    /// The name of the target component or struct
+    /// </summary>
+    public abstract string targetName { get; }
+
+    /// <summary>
+    /// The current playback time. This can be in any unit that matches the unit you use in the inputTimeline and stateTimelines, for example Time.time or Time.realtimeSinceStartup
+    /// </summary>
+    public double playbackTime { get; protected set; }
+
+    /// <summary>
+    /// The last time that was Seeked to. Similar to playbackTime, BUT it does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
+    /// </summary>
+    public double lastSeekTargetTime { get; protected set; }
+
+    /// <summary>
+    /// The playback time of the latest input
+    /// </summary>
+    public double latestInputTime => inputTimelineBase.Count > 0 ? inputTimelineBase.LatestTime : -1f;
+
+    /// <summary>
+    /// The playback time of the latest confirmed state
+    /// </summary>
+    public double latestConfirmedStateTime => stateTimelineBase.Count > 0 ? stateTimelineBase.LatestTime : -1f;
+
+    /// <summary>
+    /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
+    /// </summary>
+    public bool isDebugPaused { get; protected set; }
+
+    /// <summary>
+    /// Input history in this Ticker
+    /// </summary>
+    public abstract TimelineListBase inputTimelineBase { get; }
+
+    /// <summary>
+    /// State history in this Ticker
+    /// </summary>
+    public abstract TimelineListBase stateTimelineBase { get; }
+}
+
 /// <summary>
 /// A Ticker allows you to run "ticks" based on inputs, storing the resulting "states" along the way.
 /// 
@@ -161,19 +218,22 @@ public struct TickInfo
 /// * Time can be in any format you like, recommended to be based on seconds. Times are internally stored as a double to suit a practically infinite spectrum. Deltas, however, use floats for efficiency as they will typically be much smaller.
 /// * See "settings" for a bunch of overrideables, such as limits on delta time and more.
 /// </summary>
-public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>, ITickerInputFunctions<TInput>
+public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>, ITickerInputFunctions<TInput>
     where TInput : ITickerInput<TInput> where TState : ITickerState<TState>
 {
-    /// <summary>
-    /// The name of the target
-    /// </summary>
-    public string targetName => (target is Component targetAsComponent) ? targetAsComponent.gameObject.name : "N/A";
-
     /// <summary>
     /// The target tickable component, class or struct
     /// </summary>
     public ITickable<TInput, TState> target;
 
+    /// <summary>
+    /// Target name, is usually gameObject name if possible
+    /// </summary>
+    public override string targetName => (target is Component targetAsComponent) ? targetAsComponent.gameObject.name : "N/ng thiA";
+
+    /// <summary>
+    /// Advanced settings for this ticker. Exposed as TickerSettings so that it is fully serializable for the inspector
+    /// </summary>
     public TickerSettings settings = TickerSettings.Default;
 
     /// <summary>
@@ -187,47 +247,41 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     public TInput latestInput => inputTimeline.Latest;
 
     /// <summary>
-    /// The current playback time, based on no specific point of reference, but is expected to use the same time format as input and event history
-    /// </summary>
-    public double playbackTime { get; private set; }
-
-    /// <summary>
-    /// The last time that was Seeked to. Similar to playbackTime, but does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
-    /// </summary>
-    public double lastSeekTargetTime { get; private set; }
-
-    /// <summary>
     /// The most recent confirmed state
     /// </summary>
-    public TState lastConfirmedState => stateTimeline.Count > 0 ? stateTimeline.Latest : default;
+    public TState latestConfirmedState => stateTimeline.Count > 0 ? stateTimeline.Latest : default;
 
     /// <summary>
-    /// The most recent confirmed state time - the non-extrapolated playback time of the last confirmed state
+    /// Directly accesses the input timeline (inserted inputs paired with the time they apply at)
     /// </summary>
-    public double lastConfirmedStateTime => stateTimeline.Count > 0 ? stateTimeline.LatestTime : -1f;
-
-    /// <summary>
-    /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
-    /// </summary>
-    public bool isDebugPaused { get; private set; }
-
-    // Timelines!
     public readonly TimelineList<TInput> inputTimeline = new TimelineList<TInput>();
 
+    /// <summary>
+    /// Directly accesses the state timeline (inserted or generated states paired with the time they apply at)
+    /// </summary>
     public readonly TimelineList<TState> stateTimeline = new TimelineList<TState>();
 
+    /// <summary>
+    /// Directly acceses the event timeline (inserted events paired with the time they apply at)
+    /// </summary>
     private readonly TimelineList<TickerEvent> eventTimeline = new TimelineList<TickerEvent>();
 
     // for our clueless friends in ITickerBase-land who don't know what types we're using. ;)
-    public TimelineListBase inputTimelineBase => inputTimeline;
-    public TimelineListBase stateTimelineBase => stateTimeline;
+    public override TimelineListBase inputTimelineBase => inputTimeline;
+    public override TimelineListBase stateTimelineBase => stateTimeline;
 
+    // caches whether the state implements ITickerStateDebug
     private bool doesStateImplementDebug;
 
     public Ticker(ITickable<TInput, TState> target)
     {
         this.target = target;
         doesStateImplementDebug = typeof(ITickerStateDebug).IsAssignableFrom(typeof(TState));
+
+        // Ideally we'd clean up all tickers whenever one is destroyed, but we don't track that yet
+        CleanupAllTickers();
+        allTickers.Add(new WeakReference<TickerBase>(this));
+
         ConfirmCurrentState();
     }
 
@@ -267,7 +321,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// Seeks forward by the given deltaTime, if possible
     /// </summary>
-    public void SeekBy(float deltaTime)
+    public override void SeekBy(float deltaTime)
     {
         Seek(playbackTime + deltaTime);
     }
@@ -278,7 +332,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     ///  
     /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
     /// </summary>
-    public void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None)
+    public override void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None)
     {
         double initialPlaybackTime = playbackTime;
         Debug.Assert(settings.maxDeltaTime > 0f);
@@ -396,7 +450,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
                 if (numIterations == settings.maxSeekIterations)
                 {
                     if (settings.debugLogSeekWarnings)
-                        Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({lastConfirmedStateTime})");
+                        Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): Hit max {numIterations} iterations on {targetName}. T (Confirmed): {playbackTime.ToString("F2")} ({latestConfirmedStateTime})");
 
                     if (canAttemptConfirmNextState)
                     {
@@ -478,7 +532,7 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     /// <summary>
     /// Enables or disables debug pause. When paused, the Seek() function may run, but will always tick to the time it was originally.
     /// </summary>
-    public void SetDebugPaused(bool isDebugPaused)
+    public override void SetDebugPaused(bool isDebugPaused)
     {
         this.isDebugPaused = isDebugPaused;
     }
@@ -511,7 +565,17 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
     }
 
     /// <summary>
-    /// Calls an event for the current playback time
+    /// Inserts a new event at the current playback time.
+    /// * An event is a function called at a certain point at a timeline.
+    /// * The key advantage is that the function is called again at this point in time if a reconcile occurs.
+    /// * It's great for letting the outside world interact with the tightly controlled reconciled world, without getting forgotten in replays.
+    /// 
+    /// * For example: a jump pad implements OnTriggerEnter. When a player overlaps, it calls an event on the player that sets the player's y velocity to 10.
+    /// * Due to a server correction, the player reconciles to about 0.5 seconds before the jump and replays back to the current time.
+    /// * Without an event, the player won't jump at the right point in the timeline, if at all, because OnTriggerEnter only gets called during a new physics frame. Our reconcile could run straight through it.
+    /// * However, with the event, the jump function is called again at the original time it was supposed to be called.
+    /// 
+    /// (todo: allow multiple events at the same moment in time--there is no reason that shouldn't be possible, just an unfinished implementation)
     /// </summary>
     public void CallEvent(TickerEvent eventToCall)
     {
@@ -548,5 +612,13 @@ public class Ticker<TInput, TState> : ITickerBase, ITickerStateFunctions<TState>
         inputTimeline.Clear();
         eventTimeline.Clear();
         stateTimeline.Clear();
+    }
+
+    /// <summary>
+    /// Clears invalid entries from allTickers
+    /// </summary>
+    private static void CleanupAllTickers()
+    {
+        allTickers.RemoveAll(a => a == null);
     }
 }
