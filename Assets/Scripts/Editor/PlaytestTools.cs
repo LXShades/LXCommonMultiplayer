@@ -434,7 +434,7 @@ public class PlaytestTools : MonoBehaviour
     private static void BuildTypeFull() { buildType = BuildType.AllScenes; }
 
     [MenuItem(kBuildTypeMenu + "BuildType: All scenes", true)]
-    private static bool BuildTypeFullValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: All Scenes", buildType == BuildType.AllScenes); return true; }
+    private static bool BuildTypeFullValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: All scenes", buildType == BuildType.AllScenes); return true; }
 
     [MenuItem(kBuildTypeMenu + "BuildType: Current scene", priority = kBuildTypePrio+1)]
     private static void BuildTypeScripts() { buildType = BuildType.CurrentScene; }

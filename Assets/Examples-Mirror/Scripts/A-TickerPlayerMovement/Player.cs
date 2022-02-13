@@ -139,7 +139,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         /// <summary>
         /// Returns the ticker owned by this player
         /// </summary>
-        public ITickerBase GetTicker()
+        public TickerBase GetTicker()
         {
             return ticker;
         }

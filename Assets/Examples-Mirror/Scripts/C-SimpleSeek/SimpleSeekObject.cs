@@ -74,6 +74,6 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             transform.position = state.position;
         }
 
-        public ITickerBase GetTicker() => ticker;
+        public TickerBase GetTicker() => ticker;
     }
 }

@@ -7,7 +7,7 @@ using UnityEngine;
 [RequireComponent(typeof(CanvasRenderer))]
 public class TickerTimelineDebugUI : MonoBehaviour
 {
-    public ITickerBase targetTicker { get; set; }
+    public TickerBase targetTicker { get; set; }
 
     public float timelineLength = 5f;
 
@@ -53,6 +53,10 @@ public class TickerTimelineDebugUI : MonoBehaviour
             // got some more work to do on this
             //if (showServerTime)
             //    timeline.DrawTick(GameTicker.singleton.predictedServerTime, 2f, 2f, serverTimeColor, "ST", 3);
+        }
+        else
+        {
+            timeline.ClearDraw();
         }
     }
 }
