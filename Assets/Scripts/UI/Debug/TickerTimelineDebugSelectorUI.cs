@@ -65,20 +65,6 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         RepopulateDropdown();
         // initial play/pause text
         UpdatePlayPauseButtonText();
-
-        StartCoroutine(nameof(TickerFinderCoroutine));
-    }
-
-    private System.Collections.IEnumerator TickerFinderCoroutine()
-    {
-        while (enabled)
-        {
-            if (tickerTimeline.targetTicker == null)
-            {
-                RepopulateDropdown();
-            }
-            yield return new WaitForSeconds(1.0f);
-        }
     }
 
     private void OnEnable()
@@ -135,7 +121,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
                 if (timeDifference != 0f)
                 {
                     tickerTimeline.targetTicker.SetDebugPaused(false); // briefly allow seek
-                    tickerTimeline.targetTicker.Seek(targetTime);
+                    tickerTimeline.targetTicker.Seek(targetTime, TickerSeekFlags.DebugMessages);
                     tickerTimeline.targetTicker.SetDebugPaused(true); // briefly allow seek
                 }
             }

@@ -32,6 +32,11 @@ public enum TickerSeekFlags
     /// Use when you e.g. want to modify and replay a piece of the timeline, but don't want sounds, visual effects etc to play. Because it's not playing in realtime, it's just internally replaying a new version of things that already happened.
     /// </summary>
     TreatAsReplay = 4,
+
+    /// <summary>
+    /// Prints debug messages detailing basically every process that occurs in the Seek
+    /// </summary>
+    DebugMessages = 8,
 };
 
 public enum TickerMaxInputRateConstraint
@@ -39,7 +44,7 @@ public enum TickerMaxInputRateConstraint
     /// <summary>
     /// A new inputs is ignored if it shares the same quantised chunk of time (for example a fixed 0.05 interval from 0) as the last
     /// </summary>
-    QuantisedTime,
+    QuantizedTime,
 
     /// <summary>
     /// A new input is ignored if it is inserted in under 1/maxInputRate seconds since the last input was inserted.
@@ -94,7 +99,7 @@ public struct TickerSettings
         maxDeltaTime = 0.03334f,
         maxSeekIterations = 15,
         maxInputRate = 60,
-        maxInputRateConstraint = TickerMaxInputRateConstraint.QuantisedTime,
+        maxInputRateConstraint = TickerMaxInputRateConstraint.QuantizedTime,
         alwaysReconcile = false,
         historyLength = 1f,
         debugLogReconciles = false,
@@ -301,15 +306,24 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// </summary>
     public void InsertInput(TInput input, double time)
     {
-        int closestPriorInputIndex = inputTimeline.ClosestIndexBefore(time);
+        // Inclusive because otherwise items at the same time won't be detected and will get replaced
+        int closestPriorInputIndex = inputTimeline.ClosestIndexBeforeInclusive(time);
 
         if (settings.maxInputRate <= 0 || closestPriorInputIndex == -1
             || (settings.maxInputRateConstraint == TickerMaxInputRateConstraint.Flexible && time * settings.maxInputRate - inputTimeline.TimeAt(closestPriorInputIndex) * settings.maxInputRate >= 0.999f)
-            || (settings.maxInputRateConstraint == TickerMaxInputRateConstraint.QuantisedTime && TimeTool.Quantize(time, settings.maxInputRate) != TimeTool.Quantize(inputTimeline.TimeAt(closestPriorInputIndex), settings.maxInputRate)))
+            || (settings.maxInputRateConstraint == TickerMaxInputRateConstraint.QuantizedTime && TimeTool.Quantize(time, settings.maxInputRate) != TimeTool.Quantize(inputTimeline.TimeAt(closestPriorInputIndex), settings.maxInputRate)))
         {
             // Add current player input to input history
             inputTimeline.Set(time, input);
         }
+    }
+
+    /// <summary>
+    /// Inserts a single input into the input history quantized to the MaxInputRate
+    /// </summary>
+    public void InsertQuantizedInput(TInput input, double time)
+    {
+        InsertInput(input, TimeTool.Quantize(time, settings.maxInputRate));
     }
 
     /// <summary>
@@ -345,8 +359,12 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// </summary>
     public override void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None)
     {
+        string debugMessages = null;
         double initialPlaybackTime = playbackTime;
         Debug.Assert(settings.maxDeltaTime > 0f);
+
+        if ((flags & TickerSeekFlags.DebugMessages) != 0)
+            debugMessages = "";
 
         // in debug pause mode we never seek to other times
         if (isDebugPaused)
@@ -363,13 +381,17 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
 
             if (closestStateBeforeTargetTime != -1)
             {
+                if ((flags & TickerSeekFlags.DebugMessages) != 0)
+                    debugMessages += $"Applying earlier confirmed state: {playbackTime.ToString("F2")}->{stateTimeline.TimeAt(closestStateBeforeTargetTime).ToString("F2")} ({closestStateBeforeTargetTime})\n";
+
                 target.ApplyState(stateTimeline[closestStateBeforeTargetTime]);
                 playbackTime = stateTimeline.TimeAt(closestStateBeforeTargetTime);
+
             }
             else
             {
                 if (settings.debugLogSeekWarnings)
-                    Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): reverse seek could not find earlier state to seek to. Using current state.");
+                    debugMessages += $"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): reverse seek could not find earlier state to seek to. Using current state.\n";
             }
         }
 
@@ -418,9 +440,19 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
 
                     // use a delta if it's the crossing the beginning part of the input, otherwise extrapolate without delta
                     if (inputIndex + 1 < inputTimeline.Count && playbackTime <= inputTime && playbackTime + deltaTime > inputTime && (flags & TickerSeekFlags.IgnoreDeltas) == 0)
+                    {
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex + 1]);
+
+                        if ((flags & TickerSeekFlags.DebugMessages) != 0)
+                            debugMessages += $"Using input with Deltas: {inputIndex} ({inputTimeline.TimeAt(inputIndex).ToString("F2")})->{inputIndex + 1} ({inputTimeline.TimeAt(inputIndex + 1).ToString("F2")}) {GetStructDebugInfo(input)}\n";
+                    }
                     else
+                    {
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex]);
+
+                        if ((flags & TickerSeekFlags.DebugMessages) != 0)
+                            debugMessages += $"Using input with NoDeltas: {inputIndex} ({inputTimeline.TimeAt(inputIndex).ToString("F2")})\n";
+                    }
                 }
 
                 if (deltaTime > 0f)
@@ -442,6 +474,10 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
 
                     // run a tick
                     target.Tick((float)deltaTime, input, tickInfo);
+
+
+                    if ((flags & TickerSeekFlags.DebugMessages) != 0)
+                        debugMessages += $"Ticking {playbackTime.ToString("F2")}->{(playbackTime + deltaTime).ToString("F2")}\n";
 
                     playbackTime += deltaTime;
 
@@ -485,6 +521,10 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
 
         // Perform history cleanup
         CleanupHistory();
+
+        // Print debugs
+        if ((flags & TickerSeekFlags.DebugMessages) != 0)
+            Debug.Log(debugMessages);
     }
 
     /// <summary>
@@ -602,26 +642,36 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     private string GetStructDebugInfo<TStruct>(TStruct value)
     {
         StringBuilder output = new StringBuilder(512);
-        foreach (System.Reflection.FieldInfo field in typeof(TStruct).GetFields())
-        {
-            object fieldValue = field.GetValue(value);
-            if (fieldValue is System.Collections.IEnumerable enumerableValue)
-            {
-                int previousLength = output.Length;
-                output.Append($"{field.Name} [enumerable {fieldValue.GetType()}...]:\n");
-                
-                foreach (var enumerated in enumerableValue)
-                {
-                    output.Append(enumerated);
-                    output.Append("\n");
-                }
+        System.Reflection.FieldInfo[] fields = typeof(TStruct).GetFields();
+        System.Reflection.PropertyInfo[] properties = typeof(TStruct).GetProperties();
 
-                // indent everything under this value
-                output.Replace("\n", "\n> ", previousLength, output.Length - previousLength);
-            }
-            else
+        for (int type = 0; type < 2; type++)
+        {
+            int count = type == 0 ? fields.Length : properties.Length;
+
+            for (int i = 0; i < count; i++)
             {
-                output.Append($"{field.Name}: {field.GetValue(value)}\n");
+                string fieldName = type == 0 ? fields[i].Name : properties[i].Name;
+                object fieldValue = type == 0 ? fields[i].GetValue(value) : properties[i].GetValue(value);
+
+                if (fieldValue is System.Collections.IEnumerable enumerableValue)
+                {
+                    int previousLength = output.Length;
+                    output.Append($"{fieldName} [enumerable {fieldValue.GetType()}...]:\n");
+
+                    foreach (var enumerated in enumerableValue)
+                    {
+                        output.Append(enumerated);
+                        output.Append("\n");
+                    }
+
+                    // indent everything under this value
+                    output.Replace("\n", "\n> ", previousLength, output.Length - previousLength);
+                }
+                else
+                {
+                    output.Append($"{fieldName}: {fieldValue}\n");
+                }
             }
         }
 
