@@ -52,7 +52,7 @@ public class TickSynchroniser : NetworkBehaviour
     /// <summary>
     /// Called whenever the server or client sends a game time update
     /// </summary>
-    public virtual void OnSync()
+    public virtual void OnSentTimeSync()
     {
     }
 
@@ -116,7 +116,7 @@ public class TickSynchroniser : NetworkBehaviour
                 CmdTime(lastTickTime);
             }
 
-            OnSync();
+            OnSentTimeSync();
         }
     }
 

@@ -59,4 +59,42 @@ public class TickerTimelineDebugUI : MonoBehaviour
             timeline.ClearDraw();
         }
     }
+
+    private GUIStyle hoverBoxStyle
+    {
+        get
+        {
+            if (_hoverBoxStyle == null)
+            {
+                _hoverBoxStyle = new GUIStyle(GUI.skin.box);
+                _hoverBoxStyle.alignment = TextAnchor.UpperLeft;
+                _hoverBoxStyle.wordWrap = true;
+            }
+            return _hoverBoxStyle;
+        }
+    }
+    private GUIStyle _hoverBoxStyle;
+
+    private void OnGUI()
+    {
+        if (timeline.rectTransform.rect.Contains(timeline.rectTransform.InverseTransformPoint(Input.mousePosition)) && targetTicker != null)
+        {
+            double time = timeline.TimeAtScreenX(Input.mousePosition.x);
+            string lastInputInfo = targetTicker.GetInputInfoAtTime(time);
+            string lastStateInfo = targetTicker.GetStateInfoAtTime(time);
+
+            Rect infoBoxRect = new Rect(new Vector3(Input.mousePosition.x, Screen.height - Input.mousePosition.y), new Vector2(400f, 300f));
+            string textToDisplay = $"Time: {time.ToString("F2")}s\nInput:\n{lastInputInfo}\nState:\n{lastStateInfo}";
+            Vector2 size = hoverBoxStyle.CalcSize(new GUIContent(textToDisplay));
+
+            infoBoxRect.size = size;
+
+            if (infoBoxRect.xMax > Screen.width)
+                infoBoxRect.x = Screen.width - infoBoxRect.width;
+            if (infoBoxRect.yMax > Screen.height)
+                infoBoxRect.yMax = Screen.height - infoBoxRect.height;
+
+            GUI.Box(infoBoxRect, textToDisplay, hoverBoxStyle);
+        }
+    }
 }

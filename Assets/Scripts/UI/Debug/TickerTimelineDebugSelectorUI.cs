@@ -90,10 +90,6 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     {
         // preserve last selected item
         int newSelectedItemIndex = -1;
-        string currentlySelectedItemName = "";
-
-        if (dropdown.value > -1 && dropdown.value < dropdown.options.Count)
-            currentlySelectedItemName = dropdown.options[dropdown.value].text;
 
         List<Dropdown.OptionData> options = new List<Dropdown.OptionData>();
         dropdown.ClearOptions();

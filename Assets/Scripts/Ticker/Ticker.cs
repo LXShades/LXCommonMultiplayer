@@ -166,6 +166,17 @@ public abstract class TickerBase
     public abstract void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
     public abstract void SeekBy(float deltaTime);
 
+    /// <summary>
+    /// Gets a debug string describing the latest input available at [time]
+    /// </summary>
+    public abstract string GetInputInfoAtTime(double time);
+
+    /// <summary>
+    /// Gets a debug string describing the latest confirmed state available at [time]
+    /// </summary>
+    public abstract string GetStateInfoAtTime(double time);
+
+
     public abstract void SetDebugPaused(bool isDebugPaused);
 
     /// <summary>
@@ -562,6 +573,59 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
         }
 
         return stringBuilder.ToString();
+    }
+
+    /// <summary>
+    /// Gets a debug string describing the latest input available at [time]
+    /// </summary>
+    public override string GetInputInfoAtTime(double time)
+    {
+        int index = inputTimeline.ClosestIndexBefore(time);
+        if (index != -1)
+            return GetStructDebugInfo(inputTimeline[index]);
+        else
+            return "[N/A]";
+    }
+
+    /// <summary>
+    /// Gets a debug string describing the latest confirmed state available at [time]
+    /// </summary>
+    public override string GetStateInfoAtTime(double time)
+    {
+        int index = stateTimeline.ClosestIndexBefore(time);
+        if (index != -1)
+            return GetStructDebugInfo(stateTimeline[index]);
+        else
+            return "[N/A]";
+    }
+
+    private string GetStructDebugInfo<TStruct>(TStruct value)
+    {
+        StringBuilder output = new StringBuilder(512);
+        foreach (System.Reflection.FieldInfo field in typeof(TStruct).GetFields())
+        {
+            object fieldValue = field.GetValue(value);
+            if (fieldValue is System.Collections.IEnumerable enumerableValue)
+            {
+                int previousLength = output.Length;
+                output.Append($"{field.Name} [enumerable {fieldValue.GetType()}...]:\n");
+                
+                foreach (var enumerated in enumerableValue)
+                {
+                    output.Append(enumerated);
+                    output.Append("\n");
+                }
+
+                // indent everything under this value
+                output.Replace("\n", "\n> ", previousLength, output.Length - previousLength);
+            }
+            else
+            {
+                output.Append($"{field.Name}: {field.GetValue(value)}\n");
+            }
+        }
+
+        return output.ToString();
     }
 
     /// <summary>

@@ -89,6 +89,18 @@ public interface ITickerStateDebug
     void DebugDraw(UnityEngine.Color colour);
 }
 
+/// <summary>
+/// An empty ticker input. Can be used with tickers that don't actually require any input. In these cases inputs can either not be used at all, or used to influence deltas
+/// (as there are ticks that can deliberately follow the specific deltas between inputs when seeking, to allow variable input rates)
+/// </summary>
+public struct NullTickerInput : ITickerInput<NullTickerInput>
+{
+    public NullTickerInput WithDeltas(NullTickerInput previousInput) => default;
+}
+
+/// <summary>
+/// Helper class for collecting recent inputs from an input timeline so they can be sent to a server or client
+/// </summary>
 public struct TickerInputPack<TInput>
 {
     public TickerInputPack(TInput[] input, double[] times)
