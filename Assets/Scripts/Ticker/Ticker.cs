@@ -168,22 +168,6 @@ public abstract class TickerBase
     /// </summary>
     public static List<WeakReference<TickerBase>> allTickers = new List<WeakReference<TickerBase>>();
 
-    public abstract void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
-    public abstract void SeekBy(float deltaTime);
-
-    /// <summary>
-    /// Gets a debug string describing the latest input available at [time]
-    /// </summary>
-    public abstract string GetInputInfoAtTime(double time);
-
-    /// <summary>
-    /// Gets a debug string describing the latest confirmed state available at [time]
-    /// </summary>
-    public abstract string GetStateInfoAtTime(double time);
-
-
-    public abstract void SetDebugPaused(bool isDebugPaused);
-
     /// <summary>
     /// The name of the target component or struct
     /// </summary>
@@ -223,6 +207,167 @@ public abstract class TickerBase
     /// State history in this Ticker
     /// </summary>
     public abstract TimelineListBase stateTimelineBase { get; }
+
+    /// <summary>
+    /// Seeks to the given time. Ticks going forward beyond the latest confirmed state will call Tick on the target, with the closest available inputs.
+    /// New states up to that point may be confirmed into the timeline, unless DontConfirm is used.
+    ///  
+    /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
+    /// </summary>
+    public abstract void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
+
+
+    /// <summary>
+    /// Seeks forward by the given deltaTime, if possible
+    /// </summary>
+    public void SeekBy(float deltaTime, TickerSeekFlags flags = TickerSeekFlags.None) => Seek(playbackTime + deltaTime, flags);
+
+    /// <summary>
+    /// Applies the state at the given index without requiring type specialisation
+    /// </summary>
+    public abstract void GenericApplyState(int stateIndex);
+
+    /// <summary>
+    /// Ticks the target with the input at the given index without requiring type specialisation
+    /// If previousInputIndex is different to currentInputIndex and not -1, delta inputs are applied between them
+    /// </summary>
+    public abstract void GenericTickTarget(float deltaTime, int currentInputIndex, int previousInputIndex, TickInfo tickInfo);
+
+    /// <summary>
+    /// Confirms the current state without requiring type specialisation
+    /// </summary>
+    protected abstract void GenericConfirmCurrentState(bool doClearFutureStates);
+
+    /// <summary>
+    /// Prunes old history that shouldn't be needed anymore
+    /// </summary>
+    protected abstract void CleanupHistory();
+
+    /// <summary>
+    /// Gets a debug string describing the latest input available at [time]
+    /// </summary>
+    public abstract string GetInputInfoAtTime(double time);
+
+    /// <summary>
+    /// Gets a debug string describing the latest confirmed state available at [time]
+    /// </summary>
+    public abstract string GetStateInfoAtTime(double time);
+
+    /// <summary>
+    /// Toggles debug pause. During debug pause Seek will always seek to the same time as it was when the pause began
+    /// </summary>
+    public abstract void SetDebugPaused(bool isDebugPaused);
+
+    /// <summary>
+    /// [WIP] Seeks multiple timelines together in a fixed time interval. Each ticker is expected to run on the same time scale (e.g. seconds from start), but may seek to different target times if desired. There's a lot going on under the hood:
+    /// 
+    /// * Find the earliest point needed to begin the seek. (if a past state of one of the objects is overwritten, we need to begin the entire process from there again for them to update together)
+    /// * Iteratively tick each object at the intervals that suit each object.
+    /// 
+    /// This uses a different method than Seek(). Seek() typically confirms states at an interval of a) settings.maxDeltaTime or b) up to the next input or c) to the target time, whichever is the smallest delta.
+    /// SeekMultiple() instead confirms states at a) the specified maxInterval or b) to the target time. This is because running multiple timelines at variable intervals to each other while keeping them in sync 
+    /// would either produce deltas that would make sense for some and wouldn't make sense for others, or could cause some states to be slightly older than others during the seek, depending on the strategy used.
+    /// A quantized fixed-time strategy is used instead to keep everything together as much as possible.
+    /// 
+    /// WIP: Events not supported, some flags unsupported, just making what's needed for my project atm
+    /// </summary>
+    public static void SeekMultiple(MultiSeek seekOp)
+    {
+        StringBuilder debugMessages = (seekOp.flags & TickerSeekFlags.DebugMessages) != 0 ? new StringBuilder(512) : null;
+        double startTime = float.MaxValue;
+
+        // Find the starting time of the seek
+        foreach (MultiSeek.Operation op in seekOp.operations)
+            startTime = op.target.latestConfirmedStateTime < startTime ? op.target.latestConfirmedStateTime : startTime;
+
+        startTime = TimeTool.Quantize(startTime, seekOp.tickRate);
+
+        // Send all tickers back to the closest confirmed time available to them before startTime
+        foreach (MultiSeek.Operation op in seekOp.operations)
+        {
+            TickerBase ticker = op.target;
+            int closestStateToStart = ticker.stateTimelineBase.ClosestIndexBeforeInclusive(startTime);
+
+            if (closestStateToStart != -1)
+            {
+                ticker.GenericApplyState(closestStateToStart);
+                ticker.playbackTime = ticker.stateTimelineBase.TimeAt(closestStateToStart);
+                ticker.stateTimelineBase.TrimAfter(ticker.playbackTime);
+            }
+            else
+            {
+                ticker.playbackTime = startTime;
+                ticker.GenericConfirmCurrentState(true);
+                Debug.LogWarning($"TickerBase.SeekMultiple(): Ticker {ticker.targetName} did not have a valid state in the history to start at. Ignoring this, generating a new one from the current state, and proceeding.");
+            }
+        }
+
+        debugMessages?.Append($"TickerBase.SeekMultiple: {startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")}\n");
+
+        // Begin the ticking process
+        double currentTime = startTime;
+        float tickrateDelta = 1f / seekOp.tickRate;
+        int numIterations = 0;
+        float kMaxDelta = tickrateDelta * 2f;
+
+        // Run proper tick
+        while (currentTime < seekOp.targetTime && numIterations <= seekOp.maxIterations)
+        {
+            double nextTime = Math.Min(TimeTool.Quantize(currentTime + tickrateDelta, seekOp.tickRate), seekOp.targetTime);
+            bool canConfirmNextState = nextTime != seekOp.targetTime || seekOp.targetTime == TimeTool.Quantize(seekOp.targetTime, seekOp.tickRate);
+
+            if (numIterations == seekOp.maxIterations)
+            {
+                Debug.LogWarning($"TickerBase.SeekMultiple({seekOp.targetTime.ToString("F1")}) hit max iterations {seekOp.maxIterations}. Abandoning process and leaving the latest result which may not be accurate to the target time.");
+                nextTime = seekOp.targetTime;
+                canConfirmNextState = true; // todo - otherwise possible freeze when max iterations is reached and that's no good
+            }
+
+            TickInfo tickInfo = new TickInfo()
+            {
+                isConfirming = canConfirmNextState,
+                isReplaying = false, // todo
+                seekFlags = seekOp.flags,
+                time = startTime
+            };
+
+            foreach (MultiSeek.Operation op in seekOp.operations)
+            {
+                TickerBase ticker = op.target;
+
+                // Previous input is quantized to our tickrate, meaning if there are multiple inputs between a single interval in our low tickrate (ie tickrate < input rate), we accept the quantized one only
+                // This is unique to the multi seek. In regular Seek, inputs will define the deltas, this one uses a fixed delta so needs to ensure it uses the inputs closest to those deltas
+                int currentInput = ticker.inputTimelineBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(ticker.playbackTime, seekOp.tickRate));
+                float currentDelta = (float)(nextTime - ticker.playbackTime);
+                int prevInput = ticker.inputTimelineBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(ticker.playbackTime - tickrateDelta, seekOp.tickRate));
+
+                if (currentDelta > kMaxDelta)
+                {
+                    Debug.LogWarning($"TickerBase.SeekMultiple({seekOp.targetTime.ToString("F1")}) delta on {ticker.targetName} was too big ({currentDelta.ToString("F2")}), clamping and continuing.");
+                    currentDelta = kMaxDelta;
+                }
+
+                debugMessages?.Append($"{ticker} Tick({ticker.playbackTime.ToString("F2")}->{nextTime.ToString("F2")} dt={currentDelta.ToString("F2")}, curInput={currentInput} prevInput={prevInput}). Confirm {(canConfirmNextState ? "yes" : "no")}\n");
+
+                ticker.GenericTickTarget(currentDelta, currentInput, prevInput, tickInfo);
+                ticker.playbackTime = nextTime;
+
+                if (canConfirmNextState)
+                    ticker.GenericConfirmCurrentState(false);
+            }
+
+            currentTime = nextTime;
+            numIterations++;
+        }
+
+        // Run history cleanups
+        foreach  (MultiSeek.Operation op in seekOp.operations)
+            op.target.CleanupHistory();
+
+        // Done!
+        if (debugMessages != null && debugMessages.Length > 0)
+            Debug.Log(debugMessages.ToString());
+    }
 }
 
 /// <summary>
@@ -298,7 +443,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
         CleanupAllTickers();
         allTickers.Add(new WeakReference<TickerBase>(this));
 
-        ConfirmCurrentState();
+        ConfirmCurrentState(false);
     }
 
     /// <summary>
@@ -344,14 +489,6 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     }
 
     /// <summary>
-    /// Seeks forward by the given deltaTime, if possible
-    /// </summary>
-    public override void SeekBy(float deltaTime)
-    {
-        Seek(playbackTime + deltaTime);
-    }
-
-    /// <summary>
     /// Seeks to the given time. Ticks going forward beyond the latest confirmed state will call Tick on the target, with the closest available inputs.
     /// New states up to that point may be confirmed into the timeline, unless DontConfirm is used.
     ///  
@@ -359,12 +496,9 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// </summary>
     public override void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None)
     {
-        string debugMessages = null;
+        StringBuilder debugMessages = (flags & TickerSeekFlags.DebugMessages) != 0 ? new StringBuilder() : null;
         double initialPlaybackTime = playbackTime;
         Debug.Assert(settings.maxDeltaTime > 0f);
-
-        if ((flags & TickerSeekFlags.DebugMessages) != 0)
-            debugMessages = "";
 
         // in debug pause mode we never seek to other times
         if (isDebugPaused)
@@ -377,22 +511,17 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
         if (isRewinding || canAttemptConfirmNextState)
         {
             // Try rewind. If canAttemptConfirmNextState, the closest earlier keyframe will happen to be the latest confirmed state
-            int closestStateBeforeTargetTime = stateTimeline.ClosestIndexBefore(targetTime, 0f);
+            int closestStateBeforeTargetTime = stateTimeline.ClosestIndexBeforeInclusive(targetTime, 0f);
 
             if (closestStateBeforeTargetTime != -1)
             {
-                if ((flags & TickerSeekFlags.DebugMessages) != 0)
-                    debugMessages += $"Applying earlier confirmed state: {playbackTime.ToString("F2")}->{stateTimeline.TimeAt(closestStateBeforeTargetTime).ToString("F2")} ({closestStateBeforeTargetTime})\n";
+                debugMessages?.Append($"Applying earlier confirmed state: {playbackTime.ToString("F2")}->{stateTimeline.TimeAt(closestStateBeforeTargetTime).ToString("F2")} ({closestStateBeforeTargetTime})\n");
 
                 target.ApplyState(stateTimeline[closestStateBeforeTargetTime]);
                 playbackTime = stateTimeline.TimeAt(closestStateBeforeTargetTime);
-
             }
-            else
-            {
-                if (settings.debugLogSeekWarnings)
-                    debugMessages += $"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): reverse seek could not find earlier state to seek to. Using current state.\n";
-            }
+            else if (isRewinding && settings.debugLogSeekWarnings)
+                Debug.LogWarning($"Ticker.Seek({initialPlaybackTime.ToString("F2")}->{targetTime.ToString("F2")}): reverse seek could not find earlier state to seek to. Using current state.");
         }
 
         // Begin moving forward through the timeline
@@ -443,15 +572,13 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
                     {
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex + 1]);
 
-                        if ((flags & TickerSeekFlags.DebugMessages) != 0)
-                            debugMessages += $"Using input with Deltas: {inputIndex} ({inputTimeline.TimeAt(inputIndex).ToString("F2")})->{inputIndex + 1} ({inputTimeline.TimeAt(inputIndex + 1).ToString("F2")}) {GetStructDebugInfo(input)}\n";
+                        debugMessages?.Append($"Using input with Deltas: {inputIndex} ({inputTimeline.TimeAt(inputIndex).ToString("F2")})->{inputIndex + 1} ({inputTimeline.TimeAt(inputIndex + 1).ToString("F2")}) {GetStructDebugInfo(input)}\n");
                     }
                     else
                     {
                         input = inputTimeline[inputIndex].WithDeltas(inputTimeline[inputIndex]);
 
-                        if ((flags & TickerSeekFlags.DebugMessages) != 0)
-                            debugMessages += $"Using input with NoDeltas: {inputIndex} ({inputTimeline.TimeAt(inputIndex).ToString("F2")})\n";
+                        debugMessages?.Append($"Using input with NoDeltas: {inputIndex} ({inputTimeline.TimeAt(inputIndex).ToString("F2")})\n");
                     }
                 }
 
@@ -475,9 +602,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
                     // run a tick
                     target.Tick((float)deltaTime, input, tickInfo);
 
-
-                    if ((flags & TickerSeekFlags.DebugMessages) != 0)
-                        debugMessages += $"Ticking {playbackTime.ToString("F2")}->{(playbackTime + deltaTime).ToString("F2")}\n";
+                    debugMessages?.Append($"Ticking {playbackTime.ToString("F2")}->{(playbackTime + deltaTime).ToString("F2")}\n");
 
                     playbackTime += deltaTime;
 
@@ -488,7 +613,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
 
                         // save confirmed state into the timeline.
                         // reapply the confirmed state to self to ensure we get the same result (states can be compressed and decompressed with slightly different results, we need max consistency)
-                        target.ApplyState(ConfirmCurrentState());
+                        target.ApplyState(ConfirmCurrentState(false));
                     }
                 }
 
@@ -503,7 +628,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
                     {
                         // we can't process everything, risking a lockup, so accept the time we're given and call it confirmed
                         playbackTime = targetTime;
-                        ConfirmCurrentState();
+                        ConfirmCurrentState(false);
                     }
 
                     break;
@@ -523,8 +648,8 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
         CleanupHistory();
 
         // Print debugs
-        if ((flags & TickerSeekFlags.DebugMessages) != 0)
-            Debug.Log(debugMessages);
+        if (debugMessages != null && debugMessages.Length > 0)
+            Debug.Log(debugMessages?.ToString());
     }
 
     /// <summary>
@@ -539,7 +664,9 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     }
 
     /// <summary>
-    /// Applies a state into the history. If the state differs from the earlier state, playbackTime will be reverted and the next Seek will technically be a reconcile.
+    /// Inserts a state into the history.
+    /// 
+    /// If the new state differs from the original confirmed state, states following that time will be cleared, playbackTime will be reverted and the next Seek will need to start from this earlier time.
     /// 
     /// CAUTION: If the state differs from the original state at that time:
     /// * The new state is confirmed
@@ -550,8 +677,8 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     {
         int index = stateTimeline.IndexAt(time, 0.0001f);
 
-        // if we have a state at that time which is already equal, we don't need to rewind or do anything! things are as they should be.
-        if (settings.alwaysReconcile || index == -1 || !stateTimeline[index].Equals(state))
+        // If we have a state at this time and it's not correct 
+        if (index == -1 || !stateTimeline[index].Equals(state) || settings.alwaysReconcile)
         {
             if (settings.debugLogReconciles)
             {
@@ -571,13 +698,49 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     }
 
     /// <summary>
-    /// Confirms the current character state. Needed to teleport or otherwise influence movement (except where events are used)
+    /// Confirms the current character state. Needed to teleport or otherwise influence movement (except where events are used).
+    /// [doValidateFutureStates==true]: Clears future states
     /// </summary>
-    public TState ConfirmCurrentState()
+    public TState ConfirmCurrentState(bool doClearFutureStates = true)
     {
         TState state = target.MakeState();
         stateTimeline.Set(playbackTime, state);
+
+        if (doClearFutureStates)
+            stateTimeline.TrimAfter(playbackTime);
+
         return state;
+    }
+
+    /// <summary>
+    /// Confirms the current character state but does not return the state (perhaps we don't know the generic type)
+    /// </summary>
+    protected override void GenericConfirmCurrentState(bool doClearFutureStates)
+    {
+        ConfirmCurrentState(doClearFutureStates);
+    }
+
+    /// <summary>
+    /// Applies the state at the index
+    /// </summary>
+    public override void GenericApplyState(int index)
+    {
+        target.ApplyState(stateTimeline[index]);
+    }
+
+    public override void GenericTickTarget(float deltaTime, int currentInputIndex, int previousInputIndex, TickInfo tickInfo)
+    {
+        TInput inputToUse = default;
+
+        if (currentInputIndex >= 0 && currentInputIndex < inputTimeline.Count)
+        {
+            if (previousInputIndex >= 0 && previousInputIndex < inputTimeline.Count)
+                inputToUse = inputTimeline[currentInputIndex].WithDeltas(inputTimeline[previousInputIndex]);
+            else
+                inputToUse = inputTimeline[currentInputIndex].WithDeltas(inputTimeline[currentInputIndex]);
+        }
+
+        target.Tick(deltaTime, inputToUse, tickInfo);
     }
 
     /// <summary>
@@ -708,7 +871,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// <summary>
     /// Prunes old history that shouldn't be needed anymore
     /// </summary>
-    private void CleanupHistory()
+    protected override void CleanupHistory()
     {
         double trimTo = playbackTime - settings.historyLength;
 

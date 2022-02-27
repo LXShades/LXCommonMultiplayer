@@ -41,6 +41,12 @@ public class TimelineListBase
     public virtual int ClosestIndexAfter(double time, double tolerance = 0f) => -1;
 
     /// <summary>
+    /// Returns the nearest item after or at the given time, or within the tolerance range
+    /// If there are multiple items within the tolerance, the closest one after the time is returned
+    /// </summary>
+    public virtual int ClosestIndexAfterInclusive(double time, double tolerance = 0f) => -1;
+
+    /// <summary>
     /// Returns the nearest item before the given time, or within the tolerance range
     /// If there are multiple items within the tolerance, the closest one before the time is returned
     /// </summary>
@@ -58,6 +64,13 @@ public class TimelineListBase
     /// If there are no items within or before the tolerance, the earliest index in the timeline is returned
     /// </summary>
     public virtual int ClosestIndexBeforeOrEarliest(double time, double tolerance = 0f) => -1;
+
+    /// <summary>
+    /// Returns the nearest item before or at the given time, or within the tolerance range
+    /// If there are multiple items within the tolerance, the closest one before the time is returned.
+    /// If there are no items within or before the tolerance, the earliest index in the timeline is returned
+    /// </summary>
+    public virtual int ClosestIndexBeforeOrEarliestInclusive(double time, double tolerance = 0f) => -1;
 
     /// <summary>
     /// Removes the item at the given index
@@ -152,6 +165,20 @@ public class TimelineList<T> : TimelineListBase
         return -1;
     }
 
+    public override int ClosestIndexAfterInclusive(double time, double tolerance = 0f)
+    {
+        if (items.Count > 0)
+        {
+            for (int index = items.Count - 1; index >= 0; index--)
+            {
+                if (items[index].time >= time - tolerance)
+                    return index;
+            }
+        }
+
+        return -1;
+    }
+
     public override int ClosestIndexBefore(double time, double tolerance = 0f)
     {
         for (int index = 0; index < items.Count; index++)
@@ -178,6 +205,20 @@ public class TimelineList<T> : TimelineListBase
     {
         int index = ClosestIndexBefore(time, tolerance);
         
+        if (index == -1)
+        {
+            return items.Count - 1;
+        }
+        else
+        {
+            return index;
+        }
+    }
+
+    public override int ClosestIndexBeforeOrEarliestInclusive(double time, double tolerance = 0f)
+    {
+        int index = ClosestIndexBeforeInclusive(time, tolerance);
+
         if (index == -1)
         {
             return items.Count - 1;
