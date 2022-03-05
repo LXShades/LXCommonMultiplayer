@@ -56,6 +56,54 @@ public static class DebugDraw
     }
 
     /// <summary>
+    /// Draws an arrow between start and end in world coordinates
+    /// </summary>
+    public static void DrawArrow(Vector3 start, Vector3 end, Color color)
+    {
+        DebugShape output = GetNewShape(color);
+
+        float length = Vector3.Distance(start, end);
+        float arrowHeadRatio = 0.2f;
+        float arrowWidth = length * arrowHeadRatio;
+        Vector3 direction = (end - start) / length;
+        Vector3 localRight = direction.y > -0.99f && direction.y < 0.99f ? Vector3.Cross(direction, Vector3.up).normalized : Vector3.right;
+        Vector3 localUp = Vector3.Cross(direction, localRight).normalized;
+        Vector3 arrowSection = end - direction * (length * arrowHeadRatio);
+
+        output.points.Add(start);
+        output.points.Add(end);
+
+        output.points.Add(arrowSection + localUp * arrowWidth);
+        output.points.Add(end);
+        output.points.Add(arrowSection - localUp * arrowWidth);
+        output.points.Add(end);
+        output.points.Add(arrowSection + localRight * arrowWidth);
+        output.points.Add(end);
+        output.points.Add(arrowSection - localRight * arrowWidth);
+        output.points.Add(end);
+
+        RequestDrawThisFrame();
+    }
+
+    /// <summary>
+    /// Draws a cross at the specified position
+    /// </summary>
+    public static void DrawCross(Vector3 position, Color color, float crossSize = 0.5f)
+    {
+        float halfSize = crossSize * 0.5f;
+        DebugShape output = GetNewShape(color);
+
+        output.points.Add(position + new Vector3(halfSize, 0f, 0f));
+        output.points.Add(position - new Vector3(halfSize, 0f, 0f));
+        output.points.Add(position + new Vector3(0f, halfSize, 0f));
+        output.points.Add(position - new Vector3(0f, halfSize, 0f));
+        output.points.Add(position + new Vector3(0f, 0f, halfSize));
+        output.points.Add(position - new Vector3(0f, 0f, halfSize));
+
+        RequestDrawThisFrame();
+    }
+
+    /// <summary>
     /// Draws a sphere of the given world position and radius
     /// </summary>
     public static void DrawSphere(Vector3 position, float radius, Color color, int numLongitudeSegments = 4, int numCircleSegments = 16)
@@ -124,7 +172,7 @@ public static class DebugDraw
         DebugShape output = GetNewShape(color);
 
         Vector3 localUp = (end - start).normalized;
-        Vector3 localRight = Vector3.Cross(new Vector3(0.99f, 0.99f, 0.99f), localUp).normalized;
+        Vector3 localRight = localUp.y > -0.99f && localUp.y < 0.99f ? Vector3.Cross(Vector3.up, localUp).normalized : Vector3.right;
         Vector3 localForward = Vector3.Cross(localUp, localRight).normalized;
         float radsPerLongitude = kRadsInCircle / numLongitudeSegments;
         float radsPerCircleSegment = kRadsInCircle / numTipSegments / 4f;

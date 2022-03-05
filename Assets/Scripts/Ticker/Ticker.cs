@@ -194,6 +194,16 @@ public abstract class TickerBase
     public double latestConfirmedStateTime => stateTimelineBase.Count > 0 ? stateTimelineBase.LatestTime : -1f;
 
     /// <summary>
+    /// Whether the ticker is currently ticking in a Seek() or MultiSeek() processs
+    /// </summary>
+    public bool isInTick { get; protected set; }
+
+    /// <summary>
+    /// While in a tick, this contains information about the tick
+    /// </summary>
+    public TickInfo currentTickInfo { get; protected set; }
+
+    /// <summary>
     /// Whether the ticker is temporarily paused. When paused, the Seek() function may run, but will always tick to the time it was originally
     /// </summary>
     public bool isDebugPaused { get; protected set; }
@@ -209,13 +219,17 @@ public abstract class TickerBase
     public abstract TimelineListBase stateTimelineBase { get; }
 
     /// <summary>
+    /// Directly acceses the event timeline (inserted events paired with the time they apply at)
+    /// </summary>
+    protected readonly TimelineList<TickerEvent> eventTimeline = new TimelineList<TickerEvent>();
+
+    /// <summary>
     /// Seeks to the given time. Ticks going forward beyond the latest confirmed state will call Tick on the target, with the closest available inputs.
     /// New states up to that point may be confirmed into the timeline, unless DontConfirm is used.
     ///  
     /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
     /// </summary>
     public abstract void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None);
-
 
     /// <summary>
     /// Seeks forward by the given deltaTime, if possible
@@ -331,6 +345,14 @@ public abstract class TickerBase
                 time = startTime
             };
 
+            // Prepare all the tickers for the tick
+            foreach (MultiSeek.Operation op in seekOp.operations)
+            {
+                op.target.isInTick = true;
+                op.target.currentTickInfo = tickInfo;
+            }
+
+            // Run all the tickers for this interval
             foreach (MultiSeek.Operation op in seekOp.operations)
             {
                 TickerBase ticker = op.target;
@@ -349,12 +371,34 @@ public abstract class TickerBase
 
                 debugMessages?.Append($"{ticker} Tick({ticker.playbackTime.ToString("F2")}->{nextTime.ToString("F2")} dt={currentDelta.ToString("F2")}, curInput={currentInput} prevInput={prevInput}). Confirm {(canConfirmNextState ? "yes" : "no")}\n");
 
-                ticker.GenericTickTarget(currentDelta, currentInput, prevInput, tickInfo);
+                // Invoke events
+                TimelineList<TickerEvent> eventTimeline = ticker.eventTimeline;
+                for (int i = 0; i < ticker.eventTimeline.Count; i++)
+                {
+                    if (eventTimeline.TimeAt(i) >= ticker.playbackTime && eventTimeline.TimeAt(i) < nextTime)
+                        eventTimeline[i]?.Invoke(tickInfo);
+                }
+
+                // Do the tick
+                try
+                {
+                    ticker.GenericTickTarget(currentDelta, currentInput, prevInput, tickInfo);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+
+                // Finalise the result
                 ticker.playbackTime = nextTime;
 
                 if (canConfirmNextState)
                     ticker.GenericConfirmCurrentState(false);
             }
+
+            // Finalise tick
+            foreach (MultiSeek.Operation op in seekOp.operations)
+                op.target.isInTick = false;
 
             currentTime = nextTime;
             numIterations++;
@@ -421,11 +465,6 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// Directly accesses the state timeline (inserted or generated states paired with the time they apply at)
     /// </summary>
     public readonly TimelineList<TState> stateTimeline = new TimelineList<TState>();
-
-    /// <summary>
-    /// Directly acceses the event timeline (inserted events paired with the time they apply at)
-    /// </summary>
-    private readonly TimelineList<TickerEvent> eventTimeline = new TimelineList<TickerEvent>();
 
     // for our clueless friends in ITickerBase-land who don't know what types we're using. ;)
     public override TimelineListBase inputTimelineBase => inputTimeline;
@@ -600,7 +639,10 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
                     }
 
                     // run a tick
+                    isInTick = true;
+                    currentTickInfo = tickInfo;
                     target.Tick((float)deltaTime, input, tickInfo);
+                    isInTick = false;
 
                     debugMessages?.Append($"Ticking {playbackTime.ToString("F2")}->{(playbackTime + deltaTime).ToString("F2")}\n");
 

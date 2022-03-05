@@ -27,9 +27,14 @@ public class NetPlayer : NetworkBehaviour
     public GameObject character;
 
     /// <summary>
-    /// List of all players currently known in the game
+    /// Dictionary of all players currently known in the game by ID
     /// </summary>
-    public static Dictionary<int, NetPlayer> players = new Dictionary<int, NetPlayer>();
+    public static Dictionary<int, NetPlayer> playerById = new Dictionary<int, NetPlayer>();
+
+    /// <summary>
+    /// ALWAYS NULL CHECK EACH PLAYER! List of all players currently known in the game. May contain null gaps and order is not guaranteed
+    /// </summary>
+    public static List<NetPlayer> players = new List<NetPlayer>();
 
     /// <summary>
     /// Returns the local NetPlayer if applicable
@@ -60,7 +65,8 @@ public class NetPlayer : NetworkBehaviour
     {
         base.OnStartClient();
 
-        players[playerId] = this;
+        playerById[playerId] = this;
+        players.Add(this);
 
         DontDestroyOnLoad(gameObject);
     }
@@ -74,7 +80,8 @@ public class NetPlayer : NetworkBehaviour
 
         playerId = FindNewPlayerId();
         playerName = ValidateName(FindNewPlayerName());
-        players[playerId] = this;
+        playerById[playerId] = this;
+        players.Add(this);
 
         DontDestroyOnLoad(gameObject);
 
@@ -104,13 +111,14 @@ public class NetPlayer : NetworkBehaviour
 
     private void OnDestroy()
     {
-        if (players.ContainsKey(playerId) && players[playerId] == this)
-            players.Remove(playerId);
+        if (playerById.ContainsKey(playerId) && playerById[playerId] == this)
+            playerById.Remove(playerId);
+        players.Remove(this);
     }
 
     public static NetPlayer FindPlayerForCharacter(GameObject characterObject)
     {
-        foreach (var kvp in players)
+        foreach (var kvp in playerById)
         {
             if (kvp.Value && kvp.Value.character == characterObject)
             {
@@ -122,7 +130,7 @@ public class NetPlayer : NetworkBehaviour
 
     public static NetPlayer FindPlayerForConnection(NetworkConnectionToClient connection)
     {
-        foreach (var kvp in players)
+        foreach (var kvp in playerById)
         {
             if (kvp.Value && kvp.Value.connectionToClient == connection)
             {
@@ -136,7 +144,7 @@ public class NetPlayer : NetworkBehaviour
     {
         for (int i = 0; ; i++)
         {
-            if (!players.ContainsKey(i) || players[i] == null)
+            if (!playerById.ContainsKey(i) || playerById[i] == null)
             {
                 return i;
             }
@@ -184,7 +192,7 @@ public class NetPlayer : NetworkBehaviour
 
     private bool DoesPlayerNameExist(string inName)
     {
-        foreach (var kvp in players)
+        foreach (var kvp in playerById)
         {
             if (kvp.Value != this && kvp.Value != null && kvp.Value.playerName == inName)
                 return true;
