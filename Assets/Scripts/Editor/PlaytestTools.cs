@@ -1,4 +1,4 @@
-ï»¿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -19,18 +19,10 @@ public class PlaytestTools : MonoBehaviour
 
     private enum EditorRole
     {
-        None = 0,
-        Host = 1,
-        Server = 2,
-        Client = 3
+        Standalone = 0,
+        Server = 1,
+        Client = 2
     }
-
-    private enum StandaloneServerRole
-    {
-        Server = 0,
-        HeadlessServer = 1,
-        Host = 2
-    } 
 
     private enum BuildType
     {
@@ -66,14 +58,20 @@ public class PlaytestTools : MonoBehaviour
 
     private static EditorRole editorRole
     {
-        get => (EditorRole)EditorPrefs.GetInt("editorRole");
-        set => EditorPrefs.SetInt("editorRole", (int)value);
+        get { return (EditorRole)EditorPrefs.GetInt("editorRole"); }
+        set { EditorPrefs.SetInt("editorRole", (int)value); }
     }
 
-    private static StandaloneServerRole standaloneServerRole
+    private static bool serverIsHost
     {
-        get => (StandaloneServerRole)EditorPrefs.GetInt("serverRole");
-        set => EditorPrefs.SetInt("serverRole", (int)value);
+        get => EditorPrefs.GetBool("serverHasHost", true);
+        set => EditorPrefs.SetBool("serverHasHost", value);
+    }
+
+    private static bool serverIsHeadless
+    {
+        get => EditorPrefs.GetBool("serverIsHeadless", true);
+        set => EditorPrefs.SetBool("serverIsHeadless", value);
     }
 
     private static BuildTarget playtestBuildTarget => isWin64 ? BuildTarget.StandaloneWindows64 : BuildTarget.StandaloneWindows;
@@ -82,8 +80,8 @@ public class PlaytestTools : MonoBehaviour
 
     private static string[] pendingAssembliesForCompile
     {
-        get => SessionState.GetString("playtestTools_pendingAssembliesForCompile", "").Split(new char[] { 'Â¬' }, System.StringSplitOptions.RemoveEmptyEntries);
-        set => SessionState.SetString("playtestTools_pendingAssembliesForCompile", string.Join("Â¬", value));
+        get => SessionState.GetString("playtestTools_pendingAssembliesForCompile", "").Split(new char[] { '¬' }, System.StringSplitOptions.RemoveEmptyEntries);
+        set => SessionState.SetString("playtestTools_pendingAssembliesForCompile", string.Join("¬", value));
     }
 
     private const string kMultiplayerMenu = "Multiplayer/Playtest/";
@@ -96,7 +94,8 @@ public class PlaytestTools : MonoBehaviour
     private const int kMultiplayerPrio = 10;
     private const int kPlayerCountPrio = 30;
     private const int kEditorRolePrio = 50;
-    private const int kBuildTypePrio = 70;
+    private const int kServerTypePrio = 70;
+    private const int kBuildTypePrio = 90;
     private const int kBuildPlatformPrio = 110;
     private const int kFinalBuildPrio = 130;
 
@@ -361,39 +360,27 @@ public class PlaytestTools : MonoBehaviour
         int playerIndex = 0;
         int numWindowsTotal = numTestPlayers;
         string sceneParams = $"-scene \"{EditorSceneManager.GetActiveScene().path}\"";
+        string serverParams = serverIsHost && editorRole != EditorRole.Standalone ? "-host" : "-server";
+        string headlessParams = serverIsHeadless ? "-batchmode -nographics -console" : "";
 
         switch (editorRole)
         {
             case EditorRole.Client:
                 CommandLine.editorCommands = "-connect 127.0.0.1";
-                RunBuild($"-host {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
                 break;
             case EditorRole.Server:
-                CommandLine.editorCommands = $"-server -scene \"{EditorSceneManager.GetActiveScene().path}\"";
-                RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
-                break;
-            case EditorRole.Host:
-                CommandLine.editorCommands = $"-host 127.0.0.1 -scene \"{EditorSceneManager.GetActiveScene().path}\"";
-                numWindowsTotal = numTestPlayers - 1;
-                break;
-            case EditorRole.None:
-                if (standaloneServerRole == StandaloneServerRole.Server)
-                {
-                    numWindowsTotal = numTestPlayers + 1;
-                    RunBuild($"-server {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                CommandLine.editorCommands = $"{serverParams} {sceneParams}\"";
+
+                if (!serverIsHost)
                     RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
-                }
-                else if (standaloneServerRole == StandaloneServerRole.HeadlessServer)
-                {
-                    numWindowsTotal = numTestPlayers; // numWindowsTotal refers to visible client windows
-                    RunBuild($"-server -batchmode -nographics {sceneParams}");
+                break;
+            case EditorRole.Standalone:
+                numWindowsTotal = serverIsHeadless || !serverIsHost ? numTestPlayers : numTestPlayers + 1;
+                RunBuild($"{serverParams} {sceneParams} {headlessParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+
+                if (!serverIsHost)
                     RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
-                }
-                else if (standaloneServerRole == StandaloneServerRole.Host)
-                {
-                    numWindowsTotal = numTestPlayers;
-                    RunBuild($"-host {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
-                }
                 break;
         }
 
@@ -402,45 +389,39 @@ public class PlaytestTools : MonoBehaviour
             RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
 
         // Start the editor if applicable
-        if (editorRole != EditorRole.None)
+        if (editorRole != EditorRole.Standalone)
             EditorApplication.isPlaying = true;
     }
 
-    [MenuItem(kEditorRoleMenu + "Standalone (Host)", priority = kEditorRolePrio)]
-    private static void StandaloneHost() { editorRole = EditorRole.None; standaloneServerRole = StandaloneServerRole.Host; }
+    [MenuItem(kEditorRoleMenu + "Standalone Only", priority = kEditorRolePrio)]
+    private static void Standalone() { editorRole = EditorRole.Standalone; }
 
-    [MenuItem(kEditorRoleMenu + "Standalone (Host)", true)]
-    private static bool StandaloneHostValidate() { Menu.SetChecked(kEditorRoleMenu + "Standalone (Host)", editorRole == EditorRole.None && standaloneServerRole == StandaloneServerRole.Host); return true; }
+    [MenuItem(kEditorRoleMenu + "Standalone Only", true)]
+    private static bool StandaloneValidate() { Menu.SetChecked(kEditorRoleMenu + "Standalone Only", editorRole == EditorRole.Standalone); return true; }
 
-    [MenuItem(kEditorRoleMenu + "Standalone (Server)", priority = kEditorRolePrio+1)]
-    private static void StandaloneServer() { editorRole = EditorRole.None; standaloneServerRole = StandaloneServerRole.Server; }
-
-    [MenuItem(kEditorRoleMenu + "Standalone (Server)", true)]
-    private static bool StandaloneServerValidate() { Menu.SetChecked(kEditorRoleMenu + "Standalone (Server)", editorRole == EditorRole.None && standaloneServerRole == StandaloneServerRole.Server); return true; }
-
-    [MenuItem(kEditorRoleMenu + "Standalone (Headless Server)", priority = kEditorRolePrio + 2)]
-    private static void StandaloneHeadlessServer() { editorRole = EditorRole.None; standaloneServerRole = StandaloneServerRole.HeadlessServer; }
-
-    [MenuItem(kEditorRoleMenu + "Standalone (Headless Server)", true)]
-    private static bool StandaloneHeadlessServerValidate() { Menu.SetChecked(kEditorRoleMenu + "Standalone (Headless Server)", editorRole == EditorRole.None && standaloneServerRole == StandaloneServerRole.HeadlessServer); return true; }
-
-    [MenuItem(kEditorRoleMenu + "Editor is Host", priority = kEditorRolePrio+3)]
-    private static void EditorIsHost() { editorRole = EditorRole.Host; }
-
-    [MenuItem(kEditorRoleMenu + "Editor is Host", true)]
-    private static bool EditorIsHostValidate() { Menu.SetChecked(kEditorRoleMenu + "Editor is Host", editorRole == EditorRole.Host); return true; }
-
-    [MenuItem(kEditorRoleMenu + "Editor is Server", priority = kEditorRolePrio+4)]
+    [MenuItem(kEditorRoleMenu + "Editor is Server", priority = kEditorRolePrio+1)]
     private static void EditorIsServer() { editorRole = EditorRole.Server; }
 
     [MenuItem(kEditorRoleMenu + "Editor is Server", true)]
     private static bool EditorIsServerValidate() { Menu.SetChecked(kEditorRoleMenu + "Editor is Server", editorRole == EditorRole.Server); return true; }
 
-    [MenuItem(kEditorRoleMenu + "Editor is Client", priority = kEditorRolePrio+5)]
+    [MenuItem(kEditorRoleMenu + "Editor is Client", priority = kEditorRolePrio+2)]
     private static void EditorIsClient() { editorRole = EditorRole.Client; }
 
     [MenuItem(kEditorRoleMenu + "Editor is Client", true)]
     private static bool EditorIsClientValidate() { Menu.SetChecked(kEditorRoleMenu + "Editor is Client", editorRole == EditorRole.Client); return true; }
+
+    [MenuItem(kEditorRoleMenu + "Server is Host", priority = kServerTypePrio)]
+    private static void ServerHasHost() { serverIsHost = !serverIsHost; }
+
+    [MenuItem(kEditorRoleMenu + "Server is Host", true)]
+    private static bool ServerHasHostValidate() { Menu.SetChecked(kEditorRoleMenu + "Server is Host", serverIsHost); return true; }
+
+    [MenuItem(kEditorRoleMenu + "Server is Headless", priority = kServerTypePrio + 1)]
+    private static void ServerIsHeadless() { serverIsHeadless= !serverIsHeadless; }
+
+    [MenuItem(kEditorRoleMenu + "Server is Headless", true)]
+    private static bool ServerIsHeadlessValidate() { Menu.SetChecked(kEditorRoleMenu + "Server is Headless", serverIsHeadless); return editorRole != EditorRole.Server && !serverIsHost; }
 
     [MenuItem(kPlayerCountMenu + "1 player", priority = kPlayerCountPrio)]
     private static void OneTestPlayer() { numTestPlayers = 1; }

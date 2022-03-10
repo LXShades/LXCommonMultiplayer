@@ -1,0 +1,85 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+/// <summary>
+/// Monitors server/client time as determined by a TickSynchroniser.
+/// - Red line is the last server time we received
+/// - Yellow line is the predictive time we're running at
+/// - Blue is the server's feedback, usually telling us when the server acknowledged our latest inputs. So if it's staying above the red line, great!
+/// - Balance line shows how much faster/slower the game is running to keep synchronised with the server
+/// </summary>
+public class ServerTimeMonitorUI : MonoBehaviour
+{
+    [Header("Debug target")]
+    public bool autoFindTarget = true;
+    public TickSynchroniser target;
+
+    [Header("Speed balance line")]
+    public RectTransform balanceLine;
+    public float range = 0.2f;
+
+    [Header("Graphs")]
+    public GraphGraphic timeGraphs;
+
+    [Header("Graph labels")]
+    public Text timeLabel;
+    public Text leftLabel;
+    public Text rightLabel;
+
+    private double lastServerTime;
+    private double lastLocalTime;
+
+    private GraphGraphic.GraphCurve predictedServerTimeCurve;    // time of self, based on predicted server time
+    private GraphGraphic.GraphCurve lastReceivedServerTimeCurve; // time last received from server
+    private GraphGraphic.GraphCurve serverLocalTimeCurve;        // time of self on server, as last recieved from server
+
+    private double lastAddedServerTickRealtime;
+
+    private void Awake()
+    {
+        leftLabel.text = $"{Mathf.RoundToInt(-range * 100)}%";
+        rightLabel.text = $"{Mathf.RoundToInt(range * 100)}%";
+
+        lastReceivedServerTimeCurve = timeGraphs.AddCurve(Color.red);
+        predictedServerTimeCurve = timeGraphs.AddCurve(Color.yellow);
+        serverLocalTimeCurve = timeGraphs.AddCurve(Color.blue);
+    }
+
+    private void LateUpdate()
+    {
+        if (target == null && autoFindTarget && (int)Time.time != (int)(Time.time - Time.deltaTime))
+            target = FindObjectOfType<TickSynchroniser>();
+
+        if (target != null)
+        {
+            float parentWidth = (balanceLine.transform.parent as RectTransform).sizeDelta.x; // .rect.width maybe? sizeDelta seems to do whatever it wants
+            float gameSpeed = (float)((target.lastTickTime - lastServerTime) / (Time.time - lastLocalTime));
+
+            balanceLine.anchoredPosition = new Vector2((gameSpeed - 1f) * parentWidth / 2f / range, 0f);
+
+            timeLabel.text = $"{((gameSpeed - 1f) * 100).ToString("F1")}%";
+
+            // we only need to add points as server ticks come in really (especially for the server data)
+            if (target.timeOfLastServerUpdate > lastAddedServerTickRealtime)
+            {
+                // Our local predicted time
+                predictedServerTimeCurve.data.Insert(Time.realtimeSinceStartup, (float)(target.lastTickTime - Time.realtimeSinceStartup));
+
+                // Times on server: server time, and our local time from the server's perspective
+                double serverTimeOnGraph = Time.realtimeSinceStartup - (target.lastTickTime - target.timeOnServer);
+                lastReceivedServerTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer - Time.realtimeSinceStartupAsDouble));
+                serverLocalTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer + target.lastAckedClientOffset - Time.realtimeSinceStartupAsDouble));
+
+                timeGraphs.ClearTimeAfter(Time.realtimeSinceStartup + 2f);
+
+                lastAddedServerTickRealtime = target.timeOfLastServerUpdate;
+
+                timeGraphs.Redraw();
+            }
+
+
+            lastServerTime = target.lastTickTime;
+            lastLocalTime = Time.timeAsDouble;
+        }
+    }
+}

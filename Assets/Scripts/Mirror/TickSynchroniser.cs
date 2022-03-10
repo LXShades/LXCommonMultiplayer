@@ -32,9 +32,25 @@ public class TickSynchroniser : NetworkBehaviour
     public float autoCalculatedClientExtrapolation => (float)(Time.timeAsDouble + autoCalculatedTimeExtrapolation - timeOnServer - (Time.timeAsDouble - timeOfLastServerUpdate));
     public float autoCalculatedTimeExtrapolation { get; private set; }
 
-    protected double timeOnServer;
-    protected double timeOfLastServerUpdate;
-    public double lastTickTime { get; protected set; } // last local tick time
+    /// <summary>
+    /// Time on the server, as far as we were last told with no prediction
+    /// </summary>
+    public double timeOnServer { get; protected set; }
+
+    /// <summary>
+    /// Time.time that we last received a server update
+    /// </summary>
+    public double timeOfLastServerUpdate { get; protected set; }
+
+    /// <summary>
+    /// [client] The last client offset we received from the server (an offset of how far ahead or behind our inputs were when the server received them)
+    /// </summary>
+    public double lastAckedClientOffset => clientTimeOffsetHistory.Latest;
+
+    /// <summary>
+    /// Our time after the last tick we ran, with prediction depending on settings
+    /// </summary>
+    public double lastTickTime { get; protected set; }
 
     protected TimelineList<float> clientTimeOffsetHistory = new TimelineList<float>();
 
@@ -84,10 +100,16 @@ public class TickSynchroniser : NetworkBehaviour
                 {
                     float worstKnownTimeOffset = float.MaxValue;
 
-                    for (int i = 0; i < clientTimeOffsetHistory.Count; i++)
+                    int historyEndIndex = clientTimeOffsetHistory.ClosestIndexBeforeOrEarliest(Time.timeAsDouble - 0.5f); // HACK - todo - offset history is still delayed by ping so latest data isn't always valid. needs more accurate compensation
+                    for (int i = 0; i < historyEndIndex; i++)
                         worstKnownTimeOffset = Mathf.Min(clientTimeOffsetHistory[i], worstKnownTimeOffset);
 
-                    autoCalculatedTimeExtrapolation -= worstKnownTimeOffset - 0.005f; // magic number, todo?
+                    float adjustment = -worstKnownTimeOffset - 0.005f;
+                    autoCalculatedTimeExtrapolation += adjustment; // magic number, todo?
+
+                    // since we've adjusted the time, the offset history technically won't be valid anymore, so we'll adjust that as well
+                    for (int i = 0; i < clientTimeOffsetHistory.Count; i++)
+                        clientTimeOffsetHistory[i] += adjustment;
                 }
 
                 RunTick(Time.timeAsDouble + autoCalculatedTimeExtrapolation);
