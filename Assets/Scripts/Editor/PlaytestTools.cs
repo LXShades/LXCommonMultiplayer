@@ -360,8 +360,8 @@ public class PlaytestTools : MonoBehaviour
         int playerIndex = 0;
         int numWindowsTotal = numTestPlayers;
         string sceneParams = $"-scene \"{EditorSceneManager.GetActiveScene().path}\"";
-        string serverParams = serverIsHost && editorRole != EditorRole.Standalone ? "-host" : "-server";
-        string headlessParams = serverIsHeadless ? "-batchmode -nographics -console" : "";
+        string serverParams = serverIsHost ? "-host" : "-server";
+        string headlessParams = serverIsHeadless && !serverIsHost ? "-batchmode -nographics -console" : "";
 
         switch (editorRole)
         {

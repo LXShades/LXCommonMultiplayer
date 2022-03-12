@@ -15,6 +15,7 @@ namespace UnityMultiplayerEssentials.Examples
     /// * Host game (-host)
     /// * Set a custom port (-port)
     /// * Position all windows for playtests (-pos)
+    /// * Open a console for dedicated servers (-console)
     /// </summary>
     public abstract class CommandLineExecutor : MonoBehaviour
     {
@@ -30,6 +31,8 @@ namespace UnityMultiplayerEssentials.Examples
         public const string kHostParam = "-host";
         public const string kServerParam = "-server";
         public const string kPortParam = "-port";
+        public const string kWindowPositionParam = "-pos";
+        public const string kOpenConsoleParam = "-console";
 
         /// <summary>
         /// By default, Start() loads a scene if desired and then runs the command line
@@ -141,9 +144,10 @@ namespace UnityMultiplayerEssentials.Examples
         private static extern bool SetWindowPos(System.IntPtr hwnd, System.IntPtr hwndInsertAfter, int x, int y, int cx, int cy, uint flags);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
-        private static void PreInitWindowPosition()
+        private static void PreInit()
         {
             RepositionWindow();
+            OpenConsoleIfDedicated();
         }
 
         private static void RepositionWindow()
@@ -157,7 +161,7 @@ namespace UnityMultiplayerEssentials.Examples
 
             int windowX = 0, windowY = 0;
 
-            if (CommandLine.GetCommand("-pos", 2, out string[] posParams))
+            if (CommandLine.GetCommand(kWindowPositionParam, 2, out string[] posParams))
             {
                 int.TryParse(posParams[0], out windowX);
                 int.TryParse(posParams[1], out windowY);
@@ -165,6 +169,19 @@ namespace UnityMultiplayerEssentials.Examples
 
             SetForegroundWindow(GetActiveWindow());
             SetWindowPos(GetActiveWindow(), System.IntPtr.Zero, windowX, windowY, 1280, 720, SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOREDRAW | SWP_NOSIZE | SWP_NOZORDER | SWP_ASYNCWINDOWPOS);
+        }
+
+        [System.Runtime.InteropServices.DllImport("Kernel32.dll")]
+        private static extern bool AllocConsole();
+
+        private static void OpenConsoleIfDedicated()
+        {
+            if (CommandLine.HasCommand(kOpenConsoleParam))
+            {
+                AllocConsole();
+                System.Console.SetOut(new System.IO.StreamWriter(System.Console.OpenStandardOutput()) { AutoFlush = true });
+                Application.logMessageReceivedThreaded += (logString, stackTrace, type) => System.Console.WriteLine(logString);
+            }
         }
 #endif
     }

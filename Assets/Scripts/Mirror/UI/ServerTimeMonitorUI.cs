@@ -1,3 +1,4 @@
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -26,6 +27,9 @@ public class ServerTimeMonitorUI : MonoBehaviour
     public Text leftLabel;
     public Text rightLabel;
 
+    [Header("Extra")]
+    public Text infoBox;
+
     private double lastServerTime;
     private double lastLocalTime;
 
@@ -52,34 +56,55 @@ public class ServerTimeMonitorUI : MonoBehaviour
 
         if (target != null)
         {
-            float parentWidth = (balanceLine.transform.parent as RectTransform).sizeDelta.x; // .rect.width maybe? sizeDelta seems to do whatever it wants
-            float gameSpeed = (float)((target.lastTickTime - lastServerTime) / (Time.time - lastLocalTime));
+            UpdateBalanceLine();
 
-            balanceLine.anchoredPosition = new Vector2((gameSpeed - 1f) * parentWidth / 2f / range, 0f);
+            UpdateGraphs();
 
-            timeLabel.text = $"{((gameSpeed - 1f) * 100).ToString("F1")}%";
-
-            // we only need to add points as server ticks come in really (especially for the server data)
-            if (target.timeOfLastServerUpdate > lastAddedServerTickRealtime)
-            {
-                // Our local predicted time
-                predictedServerTimeCurve.data.Insert(Time.realtimeSinceStartup, (float)(target.lastTickTime - Time.realtimeSinceStartup));
-
-                // Times on server: server time, and our local time from the server's perspective
-                double serverTimeOnGraph = Time.realtimeSinceStartup - (target.lastTickTime - target.timeOnServer);
-                lastReceivedServerTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer - Time.realtimeSinceStartupAsDouble));
-                serverLocalTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer + target.lastAckedClientOffset - Time.realtimeSinceStartupAsDouble));
-
-                timeGraphs.ClearTimeAfter(Time.realtimeSinceStartup + 2f);
-
-                lastAddedServerTickRealtime = target.timeOfLastServerUpdate;
-
-                timeGraphs.Redraw();
-            }
-
+            UpdateInfoBox();
 
             lastServerTime = target.lastTickTime;
             lastLocalTime = Time.timeAsDouble;
         }
+    }
+
+    private void UpdateBalanceLine()
+    {
+        float parentWidth = (balanceLine.transform.parent as RectTransform).sizeDelta.x; // .rect.width maybe? sizeDelta seems to do whatever it wants
+        float gameSpeed = (float)((target.lastTickTime - lastServerTime) / (Time.time - lastLocalTime));
+
+        // Update time
+        balanceLine.anchoredPosition = new Vector2((gameSpeed - 1f) * parentWidth / 2f / range, 0f);
+
+        timeLabel.text = $"{((gameSpeed - 1f) * 100).ToString("F1")}%";
+    }
+
+    private void UpdateGraphs()
+    {
+        // we only need to add a point when a server tick comes in really (especially for the server data)
+        if (target.timeOfLastServerUpdate > lastAddedServerTickRealtime)
+        {
+            // Our local predicted time
+            predictedServerTimeCurve.data.Insert(Time.realtimeSinceStartup, (float)(target.lastTickTime - Time.realtimeSinceStartup));
+
+            // Times on server: server time, and our local time from the server's perspective
+            double serverTimeOnGraph = Time.realtimeSinceStartup - (target.lastTickTime - target.timeOnServer);
+            lastReceivedServerTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer - Time.realtimeSinceStartupAsDouble));
+            serverLocalTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer + target.lastAckedClientOffset - Time.realtimeSinceStartupAsDouble));
+
+            timeGraphs.ClearTimeAfter(Time.realtimeSinceStartup + 2f);
+
+            lastAddedServerTickRealtime = target.timeOfLastServerUpdate;
+
+            timeGraphs.Redraw();
+        }
+    }
+
+    private static StringBuilder updateInfoBoxStringBuilder = new StringBuilder();
+
+    private void UpdateInfoBox()
+    {
+        infoBox.text = $"ServerTime: {target.timeOnServer.ToString("F1")}\nClientTime: {target.lastTickTime.ToString("F1")}\n" +
+            $"Effective RTT: {((int)((target.lastTickTime - target.timeOnServer - (Time.timeAsDouble - target.timeOfLastServerUpdate)) * 1000f)).ToString()}ms\n"
+            + $"LastServerInputOffset: {((int)(target.lastAckedClientOffset * 1000f)).ToString()}ms";
     }
 }
