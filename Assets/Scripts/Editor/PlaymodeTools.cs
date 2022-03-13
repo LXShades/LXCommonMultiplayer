@@ -32,6 +32,9 @@ public static class PlaymodeTools
         set => SessionState.SetString("_playModeCommandLineParms", value);
     }
 
+    public const string kPlaymodeMenu = "Multiplayer/Playmode/";
+    public const int kPlaymodePrio = PlaytestTools.kBuildTypePrio + 10;
+
     [InitializeOnLoadMethod]
     private static void OnEditorInit()
     {
@@ -56,9 +59,6 @@ public static class PlaymodeTools
         // To cover when user changes the boot scene. The boot scene is always assumed to be scene 0.
         EditorBuildSettings.sceneListChanged += ReassignBootScene;
     }
-
-    private const string kPlaymodeMenu = "Multiplayer/Playmode Override/";
-    private const int kPlaymodePrio = 190;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void OnGameInit()

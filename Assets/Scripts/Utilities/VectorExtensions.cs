@@ -88,4 +88,20 @@ public static class VectorExtensions
     {
         return Mathf.Abs(vec.sqrMagnitude - 1f) <= sqrTolerance ? vec : vec.normalized;
     }
+
+    /// <summary>
+    /// Returns the Vector2 as a Vector3 with z=0f
+    /// </summary>
+    public static Vector3 ToVector3(in this Vector2 vec)
+    {
+        return new Vector3(vec.x, vec.y, 0f);
+    }
+
+    /// <summary>
+    /// Returns the Vector3 as a Vector2
+    /// </summary>
+    public static Vector2 ToVector2(in this Vector3 vec)
+    {
+        return new Vector2(vec.x, vec.y);
+    }
 }

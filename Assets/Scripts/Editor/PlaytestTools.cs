@@ -84,20 +84,21 @@ public class PlaytestTools : MonoBehaviour
         set => SessionState.SetString("playtestTools_pendingAssembliesForCompile", string.Join("¬", value));
     }
 
-    private const string kMultiplayerMenu = "Multiplayer/Playtest/";
-    private const string kEditorRoleMenu = "Multiplayer/Playtest/";
-    private const string kPlayerCountMenu = "Multiplayer/Playtest/";
-    private const string kBuildTypeMenu = "Multiplayer/Playtest/";
-    private const string kBuildPlatformMenu = "Multiplayer/Build Platform/";
-    private const string kFinalBuildMenu = "Multiplayer/Final Build/";
+    public const string kMultiplayerMenu = "Multiplayer/Playtest/";
+    public const string kEditorRoleMenu = "Multiplayer/Playtest/";
+    public const string kPlayerCountMenu = "Multiplayer/Playtest/";
+    public const string kServerTypeMenu = "Multiplayer/Playtest/";
+    public const string kBuildTypeMenu = "Multiplayer/Playtest/";
+    public const string kBuildPlatformMenu = "Multiplayer/Build Platform/";
+    public const string kFinalBuildMenu = "Multiplayer/Final Build/";
 
-    private const int kMultiplayerPrio = 10;
-    private const int kPlayerCountPrio = 30;
-    private const int kEditorRolePrio = 50;
-    private const int kServerTypePrio = 70;
-    private const int kBuildTypePrio = 90;
-    private const int kBuildPlatformPrio = 110;
-    private const int kFinalBuildPrio = 130;
+    public const int kMultiplayerPrio = 10;
+    public const int kPlayerCountPrio = 30;
+    public const int kEditorRolePrio = 50;
+    public const int kServerTypePrio = 70;
+    public const int kBuildTypePrio = 90;
+    public const int kBuildPlatformPrio = 200;
+    public const int kFinalBuildPrio = 300;
 
 
     [InitializeOnLoadMethod]
@@ -361,7 +362,10 @@ public class PlaytestTools : MonoBehaviour
         int numWindowsTotal = numTestPlayers;
         string sceneParams = $"-scene \"{EditorSceneManager.GetActiveScene().path}\"";
         string serverParams = serverIsHost ? "-host" : "-server";
-        string headlessParams = serverIsHeadless && !serverIsHost ? "-batchmode -nographics -console" : "";
+        
+        // add headless params to the server if applicable if valid
+        serverParams = serverIsHeadless && !serverIsHost && editorRole != EditorRole.Server ? 
+            serverParams + " -batchmode -nographics -console" : serverParams;
 
         switch (editorRole)
         {
@@ -377,7 +381,7 @@ public class PlaytestTools : MonoBehaviour
                 break;
             case EditorRole.Standalone:
                 numWindowsTotal = serverIsHeadless || !serverIsHost ? numTestPlayers : numTestPlayers + 1;
-                RunBuild($"{serverParams} {sceneParams} {headlessParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
 
                 if (!serverIsHost)
                     RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
@@ -415,13 +419,13 @@ public class PlaytestTools : MonoBehaviour
     private static void ServerHasHost() { serverIsHost = !serverIsHost; }
 
     [MenuItem(kEditorRoleMenu + "Server is Host", true)]
-    private static bool ServerHasHostValidate() { Menu.SetChecked(kEditorRoleMenu + "Server is Host", serverIsHost); return true; }
+    private static bool ServerHasHostValidate() { Menu.SetChecked(kServerTypeMenu + "Server is Host", serverIsHost); return true; }
 
     [MenuItem(kEditorRoleMenu + "Server is Headless", priority = kServerTypePrio + 1)]
     private static void ServerIsHeadless() { serverIsHeadless= !serverIsHeadless; }
 
     [MenuItem(kEditorRoleMenu + "Server is Headless", true)]
-    private static bool ServerIsHeadlessValidate() { Menu.SetChecked(kEditorRoleMenu + "Server is Headless", serverIsHeadless); return editorRole != EditorRole.Server && !serverIsHost; }
+    private static bool ServerIsHeadlessValidate() { Menu.SetChecked(kServerTypeMenu + "Server is Headless", serverIsHeadless); return editorRole != EditorRole.Server && !serverIsHost; }
 
     [MenuItem(kPlayerCountMenu + "1 player", priority = kPlayerCountPrio)]
     private static void OneTestPlayer() { numTestPlayers = 1; }

@@ -42,6 +42,8 @@ public static class DebugDraw
 
     private static bool hasBufferedPausedShapes = false;
 
+    public static float lineThickness = 2f;
+
     /// <summary>
     /// Draws a line between start and end in world coordinates
     /// </summary>
@@ -259,6 +261,7 @@ public static class DebugDraw
 
     private static void OnFinalRenderDebugShapes(Camera cam)
     {
+        lineMaterial.SetFloat("_LineThickness", lineThickness);
         lineMaterial.SetPass(0);
 
         GL.PushMatrix();
