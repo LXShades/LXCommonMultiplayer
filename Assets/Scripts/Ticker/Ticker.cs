@@ -391,14 +391,18 @@ public abstract class TickerBase
 
                 // Finalise the result
                 ticker.playbackTime = nextTime;
-
-                if (canConfirmNextState)
-                    ticker.GenericConfirmCurrentState(false);
             }
 
             // Finalise tick
             foreach (MultiSeek.Operation op in seekOp.operations)
+            {
+                // We confirm states at the end, so that different tickers can influence each other without these influences being erased
+                // e.g. character is simulated, then rocks are simulated, rocks impart a force on characters.
+                // if we confirmed the state of the character before we simulated the rock, their state would be saved before the force is imparted and the force wouldn't exist in the timeline
+                if (canConfirmNextState)
+                    op.target.GenericConfirmCurrentState(false);
                 op.target.isInTick = false;
+            }
 
             currentTime = nextTime;
             numIterations++;

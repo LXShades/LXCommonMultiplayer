@@ -84,6 +84,12 @@ public class PlaytestTools : MonoBehaviour
         set => SessionState.SetString("playtestTools_pendingAssembliesForCompile", string.Join("¬", value));
     }
 
+    private static string[] batchFiles = new string[]
+    {
+        "connect self.bat", "start \"\" \"[buildExecutable]\" -connect 127.0.0.1",
+        "host scene 1.bat", "start \"\" \"[buildExecutable]\" -host -scene 1",
+    };
+
     public const string kMultiplayerMenu = "Multiplayer/Playtest/";
     public const string kEditorRoleMenu = "Multiplayer/Playtest/";
     public const string kPlayerCountMenu = "Multiplayer/Playtest/";
@@ -337,6 +343,13 @@ public class PlaytestTools : MonoBehaviour
                 }
                 else
                 {
+                    // Output some .bat files
+                    for (int i = 0; i < batchFiles.Length - 1; i += 2)
+                    {
+                        if (!File.Exists($"{playtestBuildPath}/{batchFiles[i]}"))
+                            File.WriteAllText($"{playtestBuildPath}/{batchFiles[i]}", batchFiles[i + 1].Replace("[buildExecutable]", $"{Application.productName}.exe"));
+                    }
+
                     return true;
                 }
             }
@@ -380,8 +393,8 @@ public class PlaytestTools : MonoBehaviour
                     RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
                 break;
             case EditorRole.Standalone:
-                numWindowsTotal = serverIsHeadless || !serverIsHost ? numTestPlayers : numTestPlayers + 1;
-                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                numWindowsTotal = !serverIsHeadless && !serverIsHost ? numTestPlayers + 1 : numTestPlayers;
+                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(serverIsHeadless && !serverIsHost ? playerIndex : playerIndex++, numWindowsTotal))}");
 
                 if (!serverIsHost)
                     RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");

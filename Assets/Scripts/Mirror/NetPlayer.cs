@@ -65,10 +65,13 @@ public class NetPlayer : NetworkBehaviour
     {
         base.OnStartClient();
 
-        playerById[playerId] = this;
-        players.Add(this);
+        if (!NetworkServer.active) // host player will do this in OnStartServer, don't do it twice
+        {
+            playerById[playerId] = this;
+            players.Add(this);
 
-        DontDestroyOnLoad(gameObject);
+            DontDestroyOnLoad(gameObject);
+        }
     }
 
     /// <summary>
