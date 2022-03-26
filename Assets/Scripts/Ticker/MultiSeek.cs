@@ -47,6 +47,11 @@ public class MultiSeek : IDisposable
     public int maxIterations;
 
     /// <summary>
+    /// Max allowed delta time in a tick. Clamps unexpected gaps. Default value = 1/tickRate * 2
+    /// </summary>
+    public float maxDeltaTime;
+
+    /// <summary>
     /// Grabs a new MultiSeek, pooled
     /// </summary>
     public static MultiSeek MakeNew(double targetTime, int tickRate = 30, TickerSeekFlags flags = TickerSeekFlags.None)
@@ -66,6 +71,7 @@ public class MultiSeek : IDisposable
         output.tickRate = tickRate;
         output.flags = flags;
         output.maxIterations = 15;
+        output.maxDeltaTime = 1f / tickRate * 2f;
 
         return output;
     }
@@ -77,6 +83,8 @@ public class MultiSeek : IDisposable
 
     public void Add(TickerBase target)
     {
+        if (target.isDebugPaused)
+            return; // don't sign up debug-paused tickers for ticking
 #if DEBUG
         Debug.Assert(operations.FindIndex(a => a.target == target) == -1);
 #endif

@@ -73,7 +73,7 @@ public struct TickerSettings
     public bool alwaysReconcile;
 
     [Header("History")]
-    [Tooltip("How long to keep input, state, etc history in seconds. Should be able to fit in a bit more ")]
+    [Tooltip("How long to keep input, state, and event history in seconds both past and future, relative to last seeked time. Recommended at least a second, or more if you'd like to scrub back and forth through the timeline for debugging.")]
     public float historyLength;
 
     [Header("Debug")]
@@ -114,6 +114,7 @@ public struct TickInfo
 {
     /// <summary>
     /// The time of this tick. This is evaluated after deltaTime (so eg first frame with deltaTime=0.5, time is 0.5). Therefore this is not guaranteed to start at 0.
+    /// If deltaTime is clamped (due to too many iterations or missing data), time is still the intended target time which may be further ahead than previousTime+deltaTime
     /// </summary>
     public double time;
 
@@ -273,30 +274,37 @@ public abstract class TickerBase
     public abstract void SetDebugPaused(bool isDebugPaused);
 
     /// <summary>
-    /// [WIP] Seeks multiple timelines together in a fixed time interval. Each ticker is expected to run on the same time scale (e.g. seconds from start), but may seek to different target times if desired. There's a lot going on under the hood:
+    /// [WIP] Seeks multiple timelines together in a fixed time interval. Each ticker is expected to run on the same time scale (e.g. seconds from start), but may seek to different target times if desired.
+    /// There's a lot going on under the hood:
     /// 
     /// * Find the earliest point needed to begin the seek. (if a past state of one of the objects is overwritten, we need to begin the entire process from there again for them to update together)
-    /// * Iteratively tick each object at the intervals that suit each object.
+    /// * Iteratively tick each object at a fixed-time interval slightly adjusted to suit each object
     /// 
     /// This uses a different method than Seek(). Seek() typically confirms states at an interval of a) settings.maxDeltaTime or b) up to the next input or c) to the target time, whichever is the smallest delta.
-    /// SeekMultiple() instead confirms states at a) the specified maxInterval or b) to the target time. This is because running multiple timelines at variable intervals to each other while keeping them in sync 
+    /// SeekMultiple() instead confirms states at a) the specified tickRate or b) to the target time. This is because running multiple timelines at variable intervals to each other while keeping them in sync 
     /// would either produce deltas that would make sense for some and wouldn't make sense for others, or could cause some states to be slightly older than others during the seek, depending on the strategy used.
     /// A quantized fixed-time strategy is used instead to keep everything together as much as possible.
     /// 
-    /// WIP: Events not supported, some flags unsupported, just making what's needed for my project atm
+    /// WIP: Some flags unsupported, just making what's needed for my project atm
     /// </summary>
     public static void SeekMultiple(MultiSeek seekOp)
     {
+        if (seekOp.operations.Count <= 0)
+            return;
+
         StringBuilder debugMessages = (seekOp.flags & TickerSeekFlags.DebugMessages) != 0 ? new StringBuilder(512) : null;
         double startTime = float.MaxValue;
 
-        // Find the starting time of the seek
+        // Find the starting time of the seek. This is the earliest confirmed state in each timeline
         foreach (MultiSeek.Operation op in seekOp.operations)
             startTime = op.target.latestConfirmedStateTime < startTime ? op.target.latestConfirmedStateTime : startTime;
 
         startTime = TimeTool.Quantize(startTime, seekOp.tickRate);
 
+        debugMessages?.Append($"BEGIN TickerBase.SeekMultiple(): {startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")}\n");
+
         // Send all tickers back to the closest confirmed time available to them before startTime
+        // to ensure determinism by enforcing the correct delta
         foreach (MultiSeek.Operation op in seekOp.operations)
         {
             TickerBase ticker = op.target;
@@ -304,50 +312,51 @@ public abstract class TickerBase
 
             if (closestStateToStart != -1)
             {
-                ticker.GenericApplyState(closestStateToStart);
                 ticker.playbackTime = ticker.stateTimelineBase.TimeAt(closestStateToStart);
-                ticker.stateTimelineBase.TrimAfter(ticker.playbackTime);
+                ticker.GenericApplyState(closestStateToStart);
             }
             else
             {
                 ticker.playbackTime = startTime;
                 ticker.GenericConfirmCurrentState(true);
-                Debug.LogWarning($"TickerBase.SeekMultiple(): Ticker {ticker.targetName} did not have a valid state in the history to start at. Ignoring this, generating a new one from the current state, and proceeding.");
-            }
-        }
 
-        debugMessages?.Append($"TickerBase.SeekMultiple: {startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")}\n");
+                Debug.LogWarning($@"TickerBase.SeekMultiple(): Ticker {
+                    ticker.targetName
+                    } did not have a valid state in the history to start at. Ignoring this, generating a new one from the current state, and proceeding.");
+            }
+            
+            ticker.stateTimelineBase.TrimAfter(ticker.playbackTime);
+        }
 
         // Begin the ticking process
         double currentTime = startTime;
         float tickrateDelta = 1f / seekOp.tickRate;
         int numIterations = 0;
-        float kMaxDelta = tickrateDelta * 2f;
 
-        // Run proper tick
+        // Run each proper tick
         while (currentTime < seekOp.targetTime && numIterations <= seekOp.maxIterations)
         {
             double nextTime = Math.Min(TimeTool.Quantize(currentTime + tickrateDelta, seekOp.tickRate), seekOp.targetTime);
             bool canConfirmNextState = nextTime != seekOp.targetTime || seekOp.targetTime == TimeTool.Quantize(seekOp.targetTime, seekOp.tickRate);
 
-            if (numIterations == seekOp.maxIterations)
+            if (numIterations == seekOp.maxIterations && nextTime != seekOp.targetTime)
             {
-                Debug.LogWarning($"TickerBase.SeekMultiple({seekOp.targetTime.ToString("F1")}) hit max iterations {seekOp.maxIterations}. Abandoning process and leaving the latest result which may not be accurate to the target time.");
+                Debug.LogWarning($@"TickerBase.SeekMultiple({seekOp.targetTime.ToString("F1")}) hit max iterations {seekOp.maxIterations}. Using the latest result we have and confirming anyway.");
                 nextTime = seekOp.targetTime;
                 canConfirmNextState = true; // todo - otherwise possible freeze when max iterations is reached and that's no good
             }
 
-            TickInfo tickInfo = new TickInfo()
-            {
-                isConfirming = canConfirmNextState,
-                isReplaying = false, // todo
-                seekFlags = seekOp.flags,
-                time = startTime
-            };
-
             // Prepare all the tickers for the tick
             foreach (MultiSeek.Operation op in seekOp.operations)
             {
+                TickInfo tickInfo = new TickInfo()
+                {
+                    isConfirming = canConfirmNextState,
+                    isReplaying = nextTime <= op.target.lastSeekTargetTime,
+                    seekFlags = seekOp.flags,
+                    time = nextTime
+                };
+
                 op.target.isInTick = true;
                 op.target.currentTickInfo = tickInfo;
             }
@@ -363,28 +372,28 @@ public abstract class TickerBase
                 float currentDelta = (float)(nextTime - ticker.playbackTime);
                 int prevInput = ticker.inputTimelineBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(ticker.playbackTime - tickrateDelta, seekOp.tickRate));
 
-                if (currentDelta > kMaxDelta)
+                if (currentDelta > seekOp.maxDeltaTime)
                 {
+                    // When does this happen? I guess it could happen if startTime initially gets the earliest confirmed time across all the targets,
+                    // and then some of the other targets have states earlier than that time but they go back further than the max delta
                     Debug.LogWarning($"TickerBase.SeekMultiple({seekOp.targetTime.ToString("F1")}) delta on {ticker.targetName} was too big ({currentDelta.ToString("F2")}), clamping and continuing.");
-                    currentDelta = kMaxDelta;
+                    currentDelta = seekOp.maxDeltaTime;
                 }
 
                 debugMessages?.Append($"{ticker} Tick({ticker.playbackTime.ToString("F2")}->{nextTime.ToString("F2")} dt={currentDelta.ToString("F2")}, curInput={currentInput} prevInput={prevInput}). Confirm {(canConfirmNextState ? "yes" : "no")}\n");
 
-                // Do the tick
                 try
                 {
-                    // Invoke events
+                    // Invoke events before the tick so that actual tick can become aware of and respond to latest events as quickly as possible
                     TimelineList<TickerEvent> eventTimeline = ticker.eventTimeline;
                     for (int i = 0; i < ticker.eventTimeline.Count; i++)
                     {
                         if (eventTimeline.TimeAt(i) >= ticker.playbackTime && eventTimeline.TimeAt(i) < nextTime)
-                        {
-                            eventTimeline[i]?.Invoke(tickInfo);
-                        }
+                            eventTimeline[i]?.Invoke(op.target.currentTickInfo);
                     }
 
-                    ticker.GenericTickTarget(currentDelta, currentInput, prevInput, tickInfo);
+                    // Run the tick
+                    ticker.GenericTickTarget(currentDelta, currentInput, prevInput, op.target.currentTickInfo);
                 }
                 catch (Exception e)
                 {
@@ -404,6 +413,7 @@ public abstract class TickerBase
                 if (canConfirmNextState)
                     op.target.GenericConfirmCurrentState(false);
                 op.target.isInTick = false;
+                op.target.lastSeekTargetTime = nextTime;
             }
 
             currentTime = nextTime;
@@ -415,6 +425,8 @@ public abstract class TickerBase
             op.target.CleanupHistory();
 
         // Done!
+        debugMessages?.Append($"END TickerBase.SeekMultiple(): {startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")}\n");
+
         if (debugMessages != null && debugMessages.Length > 0)
             Debug.Log(debugMessages.ToString());
     }
@@ -921,12 +933,19 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// </summary>
     protected override void CleanupHistory()
     {
-        double trimTo = playbackTime - settings.historyLength;
+        double trimBefore = playbackTime - settings.historyLength;
+        double trimAfter = playbackTime + settings.historyLength;
 
         // we always want to have a confirmed state ready for us among other things, so we tend to preserve at least one item in each list as the "last known"
-        inputTimeline.TrimBeforeExceptLatest(trimTo);
-        eventTimeline.TrimBeforeExceptLatest(trimTo);
-        stateTimeline.TrimBeforeExceptLatest(trimTo);
+        inputTimeline.TrimBeforeExceptLatest(trimBefore);
+        eventTimeline.TrimBeforeExceptLatest(trimBefore);
+        stateTimeline.TrimBeforeExceptLatest(trimBefore);
+
+        // trim states too far into the future as well - they often interfere with e.g. getting the latest valid input in the event of a major clock correction
+        // this is a big source of UNEXPECTED ERRORS (oh no!), make sure you don't have inputs lying ridiculously far ahead for example!
+        inputTimeline.TrimAfter(trimAfter);
+        eventTimeline.TrimAfter(trimAfter);
+        stateTimeline.TrimAfter(trimAfter);
     }
 
     /// <summary>

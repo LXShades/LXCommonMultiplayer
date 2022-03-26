@@ -105,7 +105,10 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     private void OnDropdownSelectionChanged(int value)
     {
         if (value > -1 && value < selectableTickers.Count)
+        {
             tickerTimeline.targetTicker = selectableTickers[value];
+            UpdatePlayPauseButtonText();
+        }
     }
 
     private void OnTimelineDrag(BaseEventData eventData)
