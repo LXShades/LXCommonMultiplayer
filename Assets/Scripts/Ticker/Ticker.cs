@@ -371,17 +371,19 @@ public abstract class TickerBase
 
                 debugMessages?.Append($"{ticker} Tick({ticker.playbackTime.ToString("F2")}->{nextTime.ToString("F2")} dt={currentDelta.ToString("F2")}, curInput={currentInput} prevInput={prevInput}). Confirm {(canConfirmNextState ? "yes" : "no")}\n");
 
-                // Invoke events
-                TimelineList<TickerEvent> eventTimeline = ticker.eventTimeline;
-                for (int i = 0; i < ticker.eventTimeline.Count; i++)
-                {
-                    if (eventTimeline.TimeAt(i) >= ticker.playbackTime && eventTimeline.TimeAt(i) < nextTime)
-                        eventTimeline[i]?.Invoke(tickInfo);
-                }
-
                 // Do the tick
                 try
                 {
+                    // Invoke events
+                    TimelineList<TickerEvent> eventTimeline = ticker.eventTimeline;
+                    for (int i = 0; i < ticker.eventTimeline.Count; i++)
+                    {
+                        if (eventTimeline.TimeAt(i) >= ticker.playbackTime && eventTimeline.TimeAt(i) < nextTime)
+                        {
+                            eventTimeline[i]?.Invoke(tickInfo);
+                        }
+                    }
+
                     ticker.GenericTickTarget(currentDelta, currentInput, prevInput, tickInfo);
                 }
                 catch (Exception e)

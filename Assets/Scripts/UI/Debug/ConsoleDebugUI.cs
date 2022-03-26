@@ -20,9 +20,17 @@ public class ConsoleDebugUI : MonoBehaviour
 
     private bool doRefreshLogNextFrame = false;
 
+    private bool hasInitiallyCleared = false;
+
     private void OnEnable()
     {
         Application.logMessageReceived += OnLogMessageReceived;
+
+        if (!hasInitiallyCleared)
+        {
+            hasInitiallyCleared = true;
+            debugLogText.text = "";
+        }
     }
 
     private void OnDisable()
