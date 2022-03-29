@@ -90,7 +90,7 @@ public static class DebugDraw
     /// <summary>
     /// Draws a cross at the specified position
     /// </summary>
-    public static void DrawCross(Vector3 position, Color color, float crossSize = 0.5f)
+    public static void DrawCross(Vector3 position, float crossSize, Color color)
     {
         float halfSize = crossSize * 0.5f;
         DebugShape output = GetNewShape(color);
@@ -158,6 +158,28 @@ public static class DebugDraw
         for (float longitude = radsPerLongitude; longitude < kRadsInCircle - 0.001f; longitude += radsPerLongitude)
         {
             Vector3 next = position + new Vector3(Mathf.Sin(longitude) * radius, 0f, Mathf.Cos(longitude) * radius);
+            output.points.Add(last);
+            output.points.Add(next);
+            last = next;
+        }
+
+        RequestDrawThisFrame();
+    }
+
+    /// <summary>
+    /// Draws an up-oriented circle of the given world position and radius
+    /// </summary>
+    public static void DrawCircle(Vector3 position, float radius, Color color, Vector3 up, int numSegments = 16)
+    {
+        DebugShape output = GetNewShape(color);
+        float radsPerLongitude = kRadsInCircle / numSegments;
+        Vector3 right = Mathf.Abs(Vector3.Dot(up, Vector3.up)) < 0.99f ? Vector3.Cross(up, Vector3.up): Vector3.right;
+        Vector3 forward = Vector3.Cross(right, up);
+        Vector3 last = position + forward * radius;
+
+        for (float longitude = radsPerLongitude; longitude <= kRadsInCircle + 0.001f; longitude += radsPerLongitude)
+        {
+            Vector3 next = position + (right * Mathf.Sin(longitude) + forward * Mathf.Cos(longitude)) * radius;
             output.points.Add(last);
             output.points.Add(next);
             last = next;

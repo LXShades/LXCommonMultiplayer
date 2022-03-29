@@ -251,7 +251,7 @@ public abstract class TickerBase
     /// <summary>
     /// Confirms the current state without requiring type specialisation
     /// </summary>
-    protected abstract void GenericConfirmCurrentState(bool doClearFutureStates);
+    protected abstract void GenericConfirmCurrentState(bool doClearFutureStates, bool doReapplyCurrentState);
 
     /// <summary>
     /// Prunes old history that shouldn't be needed anymore
@@ -301,7 +301,7 @@ public abstract class TickerBase
 
         startTime = TimeTool.Quantize(startTime, seekOp.tickRate);
 
-        debugMessages?.Append($"BEGIN TickerBase.SeekMultiple(): {startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")}\n");
+        debugMessages?.Append($"BEGIN TickerBase.SeekMultiple({startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")})\n");
 
         // Send all tickers back to the closest confirmed time available to them before startTime
         // to ensure determinism by enforcing the correct delta
@@ -318,7 +318,7 @@ public abstract class TickerBase
             else
             {
                 ticker.playbackTime = startTime;
-                ticker.GenericConfirmCurrentState(true);
+                ticker.GenericConfirmCurrentState(true, true);
 
                 Debug.LogWarning($@"TickerBase.SeekMultiple(): Ticker {
                     ticker.targetName
@@ -411,7 +411,7 @@ public abstract class TickerBase
                 // e.g. character is simulated, then rocks are simulated, rocks impart a force on characters.
                 // if we confirmed the state of the character before we simulated the rock, their state would be saved before the force is imparted and the force wouldn't exist in the timeline
                 if (canConfirmNextState)
-                    op.target.GenericConfirmCurrentState(false);
+                    op.target.GenericConfirmCurrentState(false, true);
                 op.target.isInTick = false;
                 op.target.lastSeekTargetTime = nextTime;
             }
@@ -425,7 +425,7 @@ public abstract class TickerBase
             op.target.CleanupHistory();
 
         // Done!
-        debugMessages?.Append($"END TickerBase.SeekMultiple(): {startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")}\n");
+        debugMessages?.Append($"END TickerBase.SeekMultiple({startTime.ToString("F2")}->{seekOp.targetTime.ToString("F2")})\n");
 
         if (debugMessages != null && debugMessages.Length > 0)
             Debug.Log(debugMessages.ToString());
@@ -672,8 +672,9 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
                         playbackTime = confirmStateTime;
 
                         // save confirmed state into the timeline.
-                        // reapply the confirmed state to self to ensure we get the same result (states can be compressed and decompressed with slightly different results, we need max consistency)
-                        target.ApplyState(ConfirmCurrentState(false));
+                        // we also reapply the confirmed state to self to ensure we get the same result in events of lossy compression
+                        // (lossy-compressed states lose some precision, so we apply that loss of precision here and now for consistency)
+                        ConfirmCurrentState(false, true);
                     }
                 }
 
@@ -688,7 +689,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
                     {
                         // we can't process everything, risking a lockup, so accept the time we're given and call it confirmed
                         playbackTime = targetTime;
-                        ConfirmCurrentState(false);
+                        ConfirmCurrentState(false, true);
                     }
 
                     break;
@@ -760,14 +761,17 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// <summary>
     /// Confirms the current character state. Needed to teleport or otherwise influence movement (except where events are used).
     /// [doValidateFutureStates==true]: Clears future states
+    /// [reapplyCurrentState==true]: Applies the state we just confirmed. Usual reason: Lossy compression meaning saved/loaded states aren't identical to actual state
     /// </summary>
-    public TState ConfirmCurrentState(bool doClearFutureStates = true)
+    public TState ConfirmCurrentState(bool doClearFutureStates = true, bool reapplyCurrentState = false)
     {
         TState state = target.MakeState();
         stateTimeline.Set(playbackTime, state);
 
         if (doClearFutureStates)
             stateTimeline.TrimAfter(playbackTime);
+        if (reapplyCurrentState)
+            target.ApplyState(state);
 
         return state;
     }
@@ -775,9 +779,9 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// <summary>
     /// Confirms the current character state but does not return the state (perhaps we don't know the generic type)
     /// </summary>
-    protected override void GenericConfirmCurrentState(bool doClearFutureStates)
+    protected override void GenericConfirmCurrentState(bool doClearFutureStates, bool doReapplyConfirmedState)
     {
-        ConfirmCurrentState(doClearFutureStates);
+        ConfirmCurrentState(doClearFutureStates, doReapplyConfirmedState);
     }
 
     /// <summary>
