@@ -13,7 +13,7 @@ public class Timer
     /// <summary>
     /// Returns the time since the timer started, in seconds
     /// </summary>
-    public float timeSinceStart => Time.time - startTime;
+    public float timeSinceStart => startTime > -1f ? Time.time - startTime : -1f;
 
     /// <summary>
     /// The progress of the timer, starting at 0 and ending at 1 when the timer is finished
@@ -38,11 +38,14 @@ public class Timer
     /// </summary>
     public bool isRunning => Time.time < finishedTime;
 
-    // The Time.time value when this timer was last started
-    public float startTime = 0.0f;
+    /// <summary>The Time.time value when this timer was last started</summary>
+    public float startTime { get; private set; } = 0.0f;
 
-    // The Time.time value when this time will be finished
-    public float finishedTime = 0.0f;
+    /// <summary>The Time.time value when this timer will be finished</summary>
+    public float finishedTime { get; private set; } = 0.0f;
+
+    /// <summary>Returns whether the timer has just finished on this frame</summary>
+    public bool hasJustFinished => startTime < Time.time - Time.deltaTime && Time.time >= finishedTime;
 
     /// <summary>
     /// Starts the timer with the given duration
@@ -62,5 +65,14 @@ public class Timer
     {
         startTime = Time.time;
         finishedTime = Time.time;
+    }
+
+    /// <summary>
+    /// Stops and resets the timer
+    /// </summary>
+    public void Stop()
+    {
+        startTime = -1.0f;
+        finishedTime = -1.0f;
     }
 }
