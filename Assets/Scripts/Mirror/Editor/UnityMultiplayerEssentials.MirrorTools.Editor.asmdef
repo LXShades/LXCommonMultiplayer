@@ -1,0 +1,20 @@
+{
+    "name": "UnityMultiplayerEssentials.MirrorTools.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:30817c1a0e6d646d99c048fc403f5979",
+        "GUID:e63798dd1b8c01447931ccce2ef09bdc",
+        "GUID:c65c1cd68cfb7f845a24f1f37f1d4004"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

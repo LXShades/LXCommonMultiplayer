@@ -372,7 +372,7 @@ public class PlaytestTools : MonoBehaviour
     public static void Run()
     {
         int playerIndex = 0;
-        int numWindowsTotal = numTestPlayers;
+        int numGraphicalWindows = numTestPlayers;
         string sceneParams = $"-scene \"{EditorSceneManager.GetActiveScene().path}\"";
         string serverParams = serverIsHost ? "-host" : "-server";
         
@@ -380,30 +380,34 @@ public class PlaytestTools : MonoBehaviour
         serverParams = serverIsHeadless && !serverIsHost && editorRole != EditorRole.Server ? 
             serverParams + " -batchmode -nographics -console" : serverParams;
 
+        // Kick off the server
         switch (editorRole)
         {
             case EditorRole.Client:
                 CommandLine.editorCommands = "-connect 127.0.0.1";
-                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+
+                numGraphicalWindows = !serverIsHeadless && !serverIsHost ? numTestPlayers : numTestPlayers - 1;
+                numTestPlayers--; // don't make an extra window, we are definitely a player
+                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(serverIsHeadless && !serverIsHost ? playerIndex : playerIndex++, numGraphicalWindows))}");
                 break;
             case EditorRole.Server:
                 CommandLine.editorCommands = $"{serverParams} {sceneParams}\"";
 
                 if (!serverIsHost)
-                    RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                    RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numGraphicalWindows))}");
                 break;
             case EditorRole.Standalone:
-                numWindowsTotal = !serverIsHeadless && !serverIsHost ? numTestPlayers + 1 : numTestPlayers;
-                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(serverIsHeadless && !serverIsHost ? playerIndex : playerIndex++, numWindowsTotal))}");
+                numGraphicalWindows = !serverIsHeadless && !serverIsHost ? numTestPlayers + 1 : numTestPlayers;
+                RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(serverIsHeadless && !serverIsHost ? playerIndex : playerIndex++, numGraphicalWindows))}");
 
                 if (!serverIsHost)
-                    RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+                    RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numGraphicalWindows))}");
                 break;
         }
 
         // Connect the remaining players
         for (int i = 0; i < numTestPlayers - 1; i++)
-            RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numWindowsTotal))}");
+            RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numGraphicalWindows))}");
 
         // Start the editor if applicable
         if (editorRole != EditorRole.Standalone)

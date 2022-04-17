@@ -10,11 +10,16 @@ public class NetMan : NetworkManager
     public delegate void ConnectionEvent(NetworkConnection connection);
     public delegate void BasicEvent();
 
-    [Header("UnityMultiplayerEssentials")]
+    [Header("Multiplayer Essentials Extensions")]
     /// <summary>
-    /// Auto-created object that can hold server state and settings
+    /// Auto-created networked object that can hold server/game state and settings
     /// </summary>
-    public ServerStateBase serverStatePrefab;
+    public GameState gameStatePrefab;
+
+    /// <summary>
+    /// Logs when connecting, disconnecting, etc
+    /// </summary>
+    public bool enableVerboseLogging;
 
     /// <summary>
     /// Connected to the server as a client
@@ -149,6 +154,9 @@ public class NetMan : NetworkManager
     {
         base.OnClientConnect();
         onClientConnect?.Invoke(NetworkClient.connection);
+
+        if (enableVerboseLogging)
+            Debug.Log("[NetMan] Connected to server!");
     }
 
     public override void OnClientDisconnect()
@@ -157,63 +165,88 @@ public class NetMan : NetworkManager
         onClientDisconnect?.Invoke(NetworkClient.connection);
 
         StopClient();
+
+        if (enableVerboseLogging)
+            Debug.Log("[NetMan] Disconnected from server!");
     }
 
     public override void OnServerConnect(NetworkConnection conn)
     {
         base.OnServerConnect(conn);
         onServerConnect?.Invoke(conn);
+
+        if (enableVerboseLogging)
+            Debug.Log($"[NetMan] Client {conn.address} has connected!");
     }
 
     public override void OnServerDisconnect(NetworkConnection conn)
     {
         onServerDisconnect?.Invoke(conn);
+
+        if (enableVerboseLogging)
+            Debug.Log($"[NetMan] Client {conn.address} has disconnected!");
+
         base.OnServerDisconnect(conn);
     }
 
     public override void OnStartHost()
     {
         base.OnStartHost();
+
+        if (enableVerboseLogging)
+            Debug.Log("[NetMan] Started host!");
     }
 
     public override void OnStartServer()
     {
         base.OnStartServer();
 
-        if (serverStatePrefab != null)
+        if (gameStatePrefab != null)
         {
-            GameObject serverState = Instantiate(serverStatePrefab).gameObject;
+            GameObject serverState = Instantiate(gameStatePrefab).gameObject;
             NetworkServer.Spawn(serverState);
         }
 
         onServerStarted?.Invoke();
+
+        if (enableVerboseLogging)
+            Debug.Log("[NetMan] Started server!");
     }
 
     public override void OnStopServer()
     {
-        if (ServerStateBase.instance != null)
+        if (GameState.singleton != null)
         {
-            NetworkServer.UnSpawn(ServerStateBase.instance.gameObject);
-            Destroy(ServerStateBase.instance.gameObject);
+            NetworkServer.UnSpawn(GameState.singleton.gameObject);
+            Destroy(GameState.singleton.gameObject);
         }
 
         base.OnStopServer();
+
+        if (enableVerboseLogging)
+            Debug.Log("[NetMan] Stopped server!");
     }
 
     public override void OnStopHost()
     {
-        if (ServerStateBase.instance != null)
+        if (GameState.singleton != null)
         {
-            NetworkServer.UnSpawn(ServerStateBase.instance.gameObject);
-            Destroy(ServerStateBase.instance.gameObject);
+            NetworkServer.UnSpawn(GameState.singleton.gameObject);
+            Destroy(GameState.singleton.gameObject);
         }
 
         base.OnStopHost();
+
+        if (enableVerboseLogging)
+            Debug.Log("[NetMan] Stopped host!");
     }
 
     public override void OnServerAddPlayer(NetworkConnection conn)
     {
         base.OnServerAddPlayer(conn);
         onServerAddPlayer?.Invoke(conn);
+
+        if (enableVerboseLogging)
+            Debug.Log($"[NetMan] Added player for {conn.address}");
     }
 }

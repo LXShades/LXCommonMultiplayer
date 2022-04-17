@@ -3,8 +3,14 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Spawner is a helper class for spawning GameObjects, predictively or otherwise, through a single code path
+/// </summary>
 public class Spawner : MonoBehaviour
 {
+    /// <summary>
+    /// Used for client spawn predictions. Sets a client-generated ID to associate the spawn with, and if successful the client will receive the ID when the object finally spawns
+    /// </summary>
     public struct SpawnPrediction
     {
         /// <summary>
@@ -48,6 +54,8 @@ public class Spawner : MonoBehaviour
 
     public List<GameObject> spawnablePrefabs = new List<GameObject>();
 
+    public string[] prefabSearchFolders = new string[] { "Assets/Prefabs" };
+
     private byte localPlayerId;
     private byte nextClientPredictionId = 0;
 
@@ -78,7 +86,7 @@ public class Spawner : MonoBehaviour
         NetMan.singleton.onClientConnect += (NetworkConnection conn) => RegisterSpawnHandlers();
     }
 
-    void RegisterSpawnHandlers()
+    private void RegisterSpawnHandlers()
     {
         NetworkClient.ClearSpawners();
 
@@ -110,7 +118,7 @@ public class Spawner : MonoBehaviour
     /// </summary>
     public static GameObject StartSpawn(GameObject prefab, Vector3 position, Quaternion rotation, ref SpawnPrediction prediction)
     {
-        if (NetworkClient.isConnected && !NetworkServer.active && (!prefab.GetComponent<NetworkIdentity>() || !prefab.GetComponent<Predictable>()))
+        if (NetworkClient.isConnected && !NetworkServer.active && !CanPredictSpawn(prefab))
         {
             Debug.LogError($"Cannot predict {prefab.name}! It must be predictable and networkable.");
             return null;
@@ -120,7 +128,7 @@ public class Spawner : MonoBehaviour
 
         if (obj.TryGetComponent(out NetworkIdentity identity) && obj.TryGetComponent(out Predictable predictable))
         {
-            // player-specific "predictable object ID" which we can use later to replace the object
+            // this can happen on both client and server: add it to the dictionary of predicted objects then move on to the next
             singleton.predictedSpawns[prediction.currentId] = predictable;
             identity.predictedId = prediction.currentId;
             predictable.isPrediction = !NetworkServer.active;
@@ -131,25 +139,47 @@ public class Spawner : MonoBehaviour
         return obj;
     }
 
+    /// <summary>
+    /// Spawns a prefab immediately
+    /// </summary>
     public static GameObject Spawn(GameObject prefab)
     {
+        if (IsPrefabNetworked(prefab) && NetworkClient.isConnected && !NetworkServer.active)
+        {
+            Debug.LogError($"Cannot spawn {prefab.name} on client. It is networked. If it is predictable and you want to predict it, use StartSpawn and pass the SpawnPrediction to the server.");
+            return null;
+        }
+
         GameObject obj = Instantiate(prefab);
 
         FinalizeSpawn(obj);
         return obj;
     }
 
+    /// <summary>
+    /// Spawns a prefab immediately with a position and rotation
+    /// </summary>
     public static GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation)
     {
+        // Note: Ensure SpawnHandler is up to date if there are other things you want the client to be able to do later (SpawnHandler currently just uses 'Instantiate')
+        if (IsPrefabNetworked(prefab) && NetworkClient.isConnected && !NetworkServer.active)
+        {
+            Debug.LogError($"Cannot spawn {prefab.name} on client. It is networked. If it is predictable and you want to predict it, use StartSpawn and pass the SpawnPrediction to the server.");
+            return null;
+        }
+
         GameObject obj = Instantiate(prefab, position, rotation);
 
         FinalizeSpawn(obj);
         return obj;
     }
 
+    /// <summary>
+    /// Spawns a prefab immediately with prediction
+    /// </summary>
     public static GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, ref SpawnPrediction prediction)
     {
-        GameObject obj = StartSpawn(prefab, position, rotation);
+        GameObject obj = StartSpawn(prefab, position, rotation, ref prediction);
 
         if (obj)
             FinalizeSpawn(obj);
@@ -159,36 +189,44 @@ public class Spawner : MonoBehaviour
 
     /// <summary>
     /// Finalizes and networks a spawn, sending relevant info to clients if server.
-    /// Client predictions do nothing extra, but this can be called anyway so the code path can be reused
+    /// Client predictions do nothing extra here, but this can be called anyway so the code path can be reused
     /// </summary>
-    /// <param name="target"></param>
     public static void FinalizeSpawn(GameObject target)
     {
         if (NetworkServer.active && target.TryGetComponent(out NetworkIdentity identity))
-        {
             NetworkServer.Spawn(target);
-        }
     }
 
+    /// <summary>
+    /// Despawns an object, calling despawn callbacks immediately before destruction
+    /// </summary>
     public static void Despawn(GameObject target)
     {
         foreach (var spawnable in target.GetComponents<ISpawnCallbacks>())
-        {
             spawnable.OnBeforeDespawn();
-        }
+
         Destroy(target);
     }
 
+    /// <summary>
+    /// Whether a client could predict the spawn of the given prefab
+    /// </summary>
     public static bool CanPredictSpawn(GameObject prefab)
     {
         return prefab.GetComponent<Predictable>() && prefab.GetComponent<NetworkIdentity>();
     }
 
-    public static SpawnPrediction MakeSpawnPrediction()
+    /// <summary>
+    /// Whether the given prefab is networked
+    /// </summary>
+    public static bool IsPrefabNetworked(GameObject prefab)
     {
-        return new SpawnPrediction() { startId = (ushort)((singleton.localPlayerId << 8) | singleton.nextClientPredictionId) };
+        return prefab.GetComponent<NetworkIdentity>() != null;
     }
 
+    /// <summary>
+    /// Basically needs to be set to ensure this client doesn't acknowledge prediction IDs from other players' objects
+    /// </summary>
     public static void SetLocalPlayerId(byte localPlayerId)
     {
         singleton.localPlayerId = localPlayerId;
@@ -200,6 +238,7 @@ public class Spawner : MonoBehaviour
         {
             if (predictedSpawns.TryGetValue(spawnMessage.predictedId, out Predictable predictable) && predictable != null)
             {
+                // See if this was a spawn we predicted
                 if (predictable.TryGetComponent(out NetworkIdentity identity) && identity.assetId == spawnMessage.assetId)
                 {
                     // it's the same object, and we predicted it, let's replace it!
@@ -209,20 +248,19 @@ public class Spawner : MonoBehaviour
                 }
             }
 
-            return Spawn(prefabByGuid[spawnMessage.assetId], spawnMessage.position, spawnMessage.rotation);
+            return Instantiate(prefabByGuid[spawnMessage.assetId], spawnMessage.position, spawnMessage.rotation);
         }
         else
         {
-            return Spawn(NetworkClient.spawnableObjects[spawnMessage.sceneId].gameObject, spawnMessage.position, spawnMessage.rotation);
+            return Instantiate(NetworkClient.spawnableObjects[spawnMessage.sceneId].gameObject, spawnMessage.position, spawnMessage.rotation);
         }
     }
 
     private void UnspawnHandler(GameObject target)
     {
         foreach (var spawnable in target.GetComponents<ISpawnCallbacks>())
-        {
             spawnable.OnBeforeDespawn();
-        }
+
         Destroy(target);
     }
 
@@ -234,6 +272,11 @@ public class Spawner : MonoBehaviour
             if (predictable.wasPredicted)
                 predictable.onPredictionSuccessful?.Invoke();
         }
+    }
+
+    public static SpawnPrediction MakeSpawnPrediction()
+    {
+        return new SpawnPrediction() { startId = (ushort)((singleton.localPlayerId << 8) | singleton.nextClientPredictionId) };
     }
 }
 

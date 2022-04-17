@@ -57,6 +57,8 @@ namespace UnityMultiplayerEssentials.Examples
             // Execute remaining command line commands
             if (op != null)
                 op.completed += (AsyncOperation operation) => ExecuteCommandLine();
+            else
+                ExecuteCommandLine();
         }
 
         /// <summary>
