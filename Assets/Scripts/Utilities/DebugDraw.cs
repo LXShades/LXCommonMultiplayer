@@ -237,6 +237,20 @@ public static class DebugDraw
         RequestDrawThisFrame();
     }
 
+    public static void DrawCapsuleFromCentres(Vector3 start, Vector3 end, float radius, Color color, int numLongitudeSegments = 4, int numTipSegments = 8)
+    {
+        Vector3 startToEnd = (end - start).normalized;
+        DrawCapsule(start - startToEnd * radius, end + startToEnd * radius, radius, color, numLongitudeSegments, numTipSegments);
+    }
+
+    public static void DrawCharacterController(CharacterController controller, Color color)
+    {
+        Vector3 scale = controller.transform.lossyScale;
+        float controllerRadius = controller.radius * Mathf.Max(scale.x, scale.z), controllerHeight = controller.height * scale.y;
+        Vector3 center = controller.transform.TransformPoint(controller.center.x, controller.center.y, controller.center.z);
+        DrawCapsule(center + Vector3.up * (controllerHeight * 0.5f), center - Vector3.up * (controllerHeight * 0.5f), controllerRadius, color);
+    }
+
     private static void RequestDrawThisFrame()
     {
         Camera.onPostRender -= OnFinalRenderDebugShapes;

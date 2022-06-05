@@ -197,6 +197,14 @@ public class NetMan : NetworkManager
             Debug.Log("[NetMan] Started host!");
     }
 
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+
+        if (enableVerboseLogging)
+            Debug.Log($"[NetMan] Started client! NetworkAddress is {networkAddress}");
+    }
+
     public override void OnStartServer()
     {
         base.OnStartServer();

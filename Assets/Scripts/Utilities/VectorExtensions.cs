@@ -3,6 +3,22 @@
 public static class VectorExtensions
 {
     /// <summary>
+    /// Creates a vector with all components initialised to inAllComponents
+    /// </summary>
+    public static Vector3 AllComponents(float inAllComponents)
+    {
+        return new Vector3(inAllComponents, inAllComponents, inAllComponents);
+    }
+
+    /// <summary>
+    /// Returns a component-wise multiplied vector
+    /// </summary>
+    public static Vector3 Multiplied(in this Vector3 vec, in Vector3 other)
+    {
+        return new Vector3(vec.x * other.x, vec.y * other.y, vec.z * other.z);
+    }
+
+    /// <summary>
     /// Returns the horizontal components (x,z) of the vector
     /// </summary>
     public static Vector3 Horizontal(in this Vector3 vec)
@@ -87,6 +103,64 @@ public static class VectorExtensions
     public static Vector3 NormalizedWithSqrTolerance(in this Vector3 vec, float sqrTolerance = 0.0001f)
     {
         return Mathf.Abs(vec.sqrMagnitude - 1f) <= sqrTolerance ? vec : vec.normalized;
+    }
+
+    /// <summary>
+    /// Pushes the sphere at spherePosition of radius 'radius' away from pointToAvoid if it overlaps the point.
+    /// The pushback goes as far along 'normal' as needed to push the point out of the sphere.
+    /// If the sphere would collide with the point if the sphere were going along an infinite line against normal, i.e. goes beyond it, the pushback will still occur
+    /// </summary>
+    public static Vector3 SphereAvoidPointAlongNormalUnclamped(Vector3 spherePosition, float sphereRadius, Vector3 pointToAvoid, Vector3 normal)
+    {
+        normal.Normalize();
+
+        Vector3 sphereOnPlane = spherePosition + normal * Vector3.Dot(pointToAvoid - spherePosition, normal);
+        float planarDistance = Vector3.Distance(sphereOnPlane, pointToAvoid) / sphereRadius;
+
+        if (planarDistance >= 0f && planarDistance < 1f)
+        {
+            float pushAwayAmount = Mathf.Sqrt(1f - planarDistance * planarDistance) * sphereRadius;
+            float alongNormal = Vector3.Dot(spherePosition - pointToAvoid, normal);
+
+            if (alongNormal < pushAwayAmount)
+                spherePosition = sphereOnPlane + normal * pushAwayAmount;
+        }
+
+        return spherePosition;
+    }
+
+    /// <summary>
+    /// Tries to "slip" a sphere colliding against a corner at CornerPosition.
+    /// This assumes a vertical wall where the top edge is cornerPosition that the sphere has collided with.
+    /// spherePosition is the starting position of the sphere
+    /// sphereStep is the vector the sphere is moving along e.g. velocity * deltaTime
+    /// The output is an updated vector that tries to preserve the step movement but slide it down the wall
+    /// </summary>
+    public static Vector3 SphereSlipCornerXZ(Vector3 spherePosition, float sphereRadius, Vector3 sphereStep, Vector3 cornerPosition, Vector3 wallNormal, float wallPadding = 0.01f)
+    {
+        wallNormal.Normalize();
+
+        // Try and touch the wall, but keep the y movement going (note: we assume it's a wall, proper slope support would be better when possible)
+        Vector3 nextSpherePosition = spherePosition + sphereStep;
+        if (nextSpherePosition.y < cornerPosition.y)
+        {
+            // we slide down the wall, further down than the point of collision, so we assume the whole wall pushes us away
+            if (Vector3.Dot(nextSpherePosition - cornerPosition, wallNormal) < sphereRadius + wallPadding)
+            {
+                return nextSpherePosition + wallNormal * (Vector3.Dot(cornerPosition - nextSpherePosition, wallNormal) + (sphereRadius + wallPadding));
+            }
+            else
+            {
+                return nextSpherePosition;
+            }
+        }
+        else
+        {
+            // we slide down the wall a bit, but still being pushed away by the point of collision
+            return VectorExtensions.SphereAvoidPointAlongNormalUnclamped(nextSpherePosition, sphereRadius + wallPadding, cornerPosition, wallNormal);
+        }
+
+        return nextSpherePosition;
     }
 
     /// <summary>

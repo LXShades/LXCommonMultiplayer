@@ -32,6 +32,7 @@ Shader "Unlit/UnityMultiplayerEssentials/ThickLineShader"
             {
                 float4 vertex : POSITION;
                 fixed4 color : COLOR;
+                UNITY_FOG_COORDS(1)
             };
 
             struct g2f

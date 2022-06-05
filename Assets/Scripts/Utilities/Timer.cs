@@ -45,7 +45,7 @@ public class Timer
     public float finishedTime { get; private set; } = 0.0f;
 
     /// <summary>Returns whether the timer has just finished on this frame</summary>
-    public bool hasJustFinished => startTime < Time.time - Time.deltaTime && Time.time >= finishedTime;
+    public bool hasJustFinished => Time.time >= finishedTime && Time.time - Time.deltaTime < finishedTime;
 
     /// <summary>
     /// Starts the timer with the given duration
