@@ -27,6 +27,15 @@ public static class VectorExtensions
     }
 
     /// <summary>
+    /// Returns the horizontal components (x,z) of the vector, normalised
+    /// </summary>
+    public static Vector3 HorizontalNormalized(in this Vector3 vec)
+    {
+        Vector2 normalized = new Vector2(vec.x, vec.z).normalized;
+        return new Vector3(normalized.x, 0f, normalized.y);
+    }
+
+    /// <summary>
     /// Sets the horizontal component of the vector only
     /// </summary>
     public static void SetHorizontal(ref this Vector3 vec, Vector3 value)
@@ -177,5 +186,13 @@ public static class VectorExtensions
     public static Vector2 ToVector2(in this Vector3 vec)
     {
         return new Vector2(vec.x, vec.y);
+    }
+
+    /// <summary>
+    /// Returns the horizontal distance between two vectors
+    /// </summary>
+    public static float HorizontalDistance(Vector3 a, Vector3 b)
+    {
+        return Mathf.Sqrt((a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z));
     }
 }
