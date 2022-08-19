@@ -173,6 +173,18 @@ public static class VectorExtensions
     }
 
     /// <summary>
+    /// Returns the vector snapped to a world-axis grid originating at gridOrigin. For axes that do not need snapping, supply 0 as the grid unit size
+    /// </summary>
+    public static Vector3 OnGrid(in this Vector3 vec, Vector3 gridOrigin, Vector3 gridUnitSize)
+    {
+        return new Vector3(
+            gridUnitSize.x > 0f ? gridOrigin.x + Mathf.RoundToInt((vec.x - gridOrigin.x) / gridUnitSize.x) * gridUnitSize.x : vec.x,
+            gridUnitSize.y > 0f ? gridOrigin.y + Mathf.RoundToInt((vec.y - gridOrigin.y) / gridUnitSize.y) * gridUnitSize.y : vec.y,
+            gridUnitSize.z > 0f ? gridOrigin.z + Mathf.RoundToInt((vec.z - gridOrigin.z) / gridUnitSize.z) * gridUnitSize.z : vec.z
+        );
+    }
+
+    /// <summary>
     /// Returns the Vector2 as a Vector3 with z=0f
     /// </summary>
     public static Vector3 ToVector3(in this Vector2 vec)

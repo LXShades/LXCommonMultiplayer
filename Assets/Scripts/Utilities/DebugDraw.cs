@@ -58,6 +58,25 @@ public static class DebugDraw
     }
 
     /// <summary>
+    /// Draws a horizontally flat grid between start and end
+    /// </summary>
+    public static void DrawHorizontalGrid(Vector3 start, Vector3 end, float y, Color color, int numDivisions)
+    {
+        DebugShape output = GetNewShape(color);
+
+        Vector3 startToEnd = end - start;
+        for (int i = 0; i <= numDivisions; i++)
+        {
+            output.points.Add(new Vector3(start.x + startToEnd.x * i / numDivisions, y, start.z));
+            output.points.Add(new Vector3(start.x + startToEnd.x * i / numDivisions, y, end.z));
+            output.points.Add(new Vector3(start.x, y, start.z + startToEnd.z * i / numDivisions));
+            output.points.Add(new Vector3(end.x, y, start.z + startToEnd.z * i / numDivisions));
+        }
+
+        RequestDrawThisFrame();
+    }
+
+    /// <summary>
     /// Draws an arrow between start and end in world coordinates
     /// </summary>
     public static void DrawArrow(Vector3 start, Vector3 end, Color color)
