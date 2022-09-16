@@ -183,6 +183,7 @@ public static class PlaymodeTools
         playModeCommandType = PlayModeCommands.Custom;
         window.ShowUtility();
         UpdateEditorCommands();
+        ReassignBootScene();
     }
 
     [MenuItem(kPlaymodeMenu + "Custom command line...", validate = true)]
