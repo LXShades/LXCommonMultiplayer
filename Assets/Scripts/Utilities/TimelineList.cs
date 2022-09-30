@@ -229,6 +229,25 @@ public class TimelineList<T> : TimelineListBase
         }
     }
 
+    public bool TryGetPointsAtTime(double time, out int previousIndex, out int nextIndex, out float blend)
+    {
+        for (int i = 1; i < items.Count; i++)
+        {
+            if (items[i].time <= time && items[i - 1].time > time)
+            {
+                previousIndex = i;
+                nextIndex = i - 1;
+                blend = (float)((time - items[i].time) / (items[i - 1].time - items[i].time));
+                return true;
+            }
+        }
+
+        previousIndex = -1;
+        nextIndex = -1;
+        blend = 0f;
+        return false;
+    }
+
     public void Set(double time, T item, double tolerance = 0f)
     {
         for (int index = 0; index < items.Count; index++)
