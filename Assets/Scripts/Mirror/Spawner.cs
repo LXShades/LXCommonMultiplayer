@@ -55,6 +55,7 @@ public class Spawner : MonoBehaviour
     public List<GameObject> spawnablePrefabs = new List<GameObject>();
 
     public string[] prefabSearchFolders = new string[] { "Assets/Prefabs" };
+    public string[] prefabExcludeFolders = new string[] { "" };
 
     private byte localPlayerId;
     private byte nextClientPredictionId = 0;

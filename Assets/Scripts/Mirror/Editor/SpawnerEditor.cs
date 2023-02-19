@@ -18,14 +18,29 @@ public class SpawnerEditor : Editor
             foreach (string prefabGuid in prefabs)
             {
                 string prefabPath = AssetDatabase.GUIDToAssetPath(prefabGuid);
+                string prefabPathLower = prefabPath.ToLower();
                 bool isInCorrectFolder = spawner.prefabSearchFolders.Length == 0;
 
+                // Include file if it's in the search folder
                 foreach (string searchFolder in spawner.prefabSearchFolders)
                 {
-                    if (prefabPath.ToLower().StartsWith(searchFolder.ToLower()))
+                    if (prefabPathLower.StartsWith(searchFolder.ToLower()))
                     {
                         isInCorrectFolder = true;
                         break;
+                    }
+                }
+
+                // But exclude it if it's it's also in the exclude folder
+                if (isInCorrectFolder)
+                {
+                    foreach (string excludeFolder in spawner.prefabExcludeFolders)
+                    {
+                        if (prefabPathLower.StartsWith(excludeFolder.ToLower()))
+                        {
+                            isInCorrectFolder = false;
+                            break;
+                        }
                     }
                 }
 
@@ -42,7 +57,7 @@ public class SpawnerEditor : Editor
                                 if (!isSpawnerDirty)
                                 {
                                     isSpawnerDirty = true;
-                                    Undo.RecordObject(spawner, "Scan Prefabs");
+                                    Undo.RecordObject(spawner, "Scan spawner prefabs");
                                 }
 
                                 spawner.spawnablePrefabs.Add(prefabAsset);
@@ -54,6 +69,16 @@ public class SpawnerEditor : Editor
 
             if (isSpawnerDirty)
             {
+                EditorUtility.SetDirty(spawner);
+            }
+        }
+
+        if (GUILayout.Button("Clear Prefab List"))
+        {
+            if (spawner.spawnablePrefabs.Count > 0)
+            {
+                Undo.RecordObject(spawner, "Clear spawner prefabs");
+                spawner.spawnablePrefabs.Clear();
                 EditorUtility.SetDirty(spawner);
             }
         }
