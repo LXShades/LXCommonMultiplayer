@@ -9,7 +9,7 @@ public class NetSpawnPoint : MonoBehaviour
     /// <summary>
     /// All spawn points currently available, by index. May contain null gaps
     /// </summary>
-    public static Dictionary<int, NetSpawnPoint> spawnPoints = new Dictionary<int, NetSpawnPoint>();
+    public static SortedDictionary<int, NetSpawnPoint> spawnPoints = new SortedDictionary<int, NetSpawnPoint>();
 
     /// <summary>
     /// Per-level spawner index
@@ -35,6 +35,39 @@ public class NetSpawnPoint : MonoBehaviour
         else
             Debug.LogWarning($"[MultiplayerEssentials] {gameObject.name} was not in the spawn point list, expected index {spawnerIndex}. This shouldn't normally happen and could be caused by additive scenes (currently unsupported here).");
 
+    }
+
+    /// <summary>
+    /// Tries to find a spawn point for the given index, or the next closest spawn point.
+    /// This corresponds to the ascending order of the spawner indexes, but might not correspond with the actual spawner index itself.
+    /// </summary>
+    public static NetSpawnPoint FindSpawnPointForOrderedIndex(int index)
+    {
+        int numValidIndexes = 0;
+        foreach (var kvp in spawnPoints)
+        {
+            if (kvp.Value != null)
+                numValidIndexes++;
+        }
+
+        if (numValidIndexes > 0)
+        {
+            index %= numValidIndexes;
+
+            int searchIndex = 0;
+            foreach (var kvp in spawnPoints)
+            {
+                if (kvp.Value != null)
+                {
+                    if (searchIndex == index)
+                        return kvp.Value;
+
+                    searchIndex++;
+                }
+            }
+        }
+
+        return null;
     }
 
 #if UNITY_EDITOR
@@ -85,8 +118,7 @@ public class NetSpawnPoint : MonoBehaviour
         UnityEditor.EditorApplication.update -= RefreshSpawnerIds;
     }
 
-    static List<Transform> transformChain = new List<Transform>();
-
+    private static List<Transform> transformChain = new List<Transform>();
     private void RecalculateHierarchyPosition()
     {
         transformChain.Clear();

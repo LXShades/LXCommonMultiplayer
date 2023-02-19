@@ -95,10 +95,21 @@ public class NetPlayer : NetworkBehaviour
             var identity = Instantiate(characterPrefab);
             NetworkServer.Spawn(identity.gameObject, this.gameObject); // note: need to call Spawn before assigning Character, as net ID needs initialising for character SyncVar
             character = identity.gameObject;
+
+            NetSpawnPoint spawnPoint = NetSpawnPoint.FindSpawnPointForOrderedIndex(playerId);
+            if (spawnPoint != null)
+            {
+                character.transform.position = spawnPoint.transform.position;
+                character.transform.rotation = spawnPoint.transform.rotation;
+            }
+            else
+            {
+                Debug.LogWarning("[MultiplayerEssentials] No valid spawn points found, spawning character at 0.");
+            }
         }
         else
         {
-            Debug.Log($"[MultiplayerEssentials] No character created for {playerName}, prefab missing.");
+            Debug.LogWarning($"[MultiplayerEssentials] No character created for {playerName}, prefab missing.");
         }
     }
 

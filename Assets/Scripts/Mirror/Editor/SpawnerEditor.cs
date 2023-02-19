@@ -50,7 +50,7 @@ public class SpawnerEditor : Editor
 
                     if (prefabAsset)
                     {
-                        if (prefabAsset.GetComponent<NetworkBehaviour>() != null)
+                        if (prefabAsset.GetComponent<NetworkIdentity>() != null)
                         {
                             if (!spawner.spawnablePrefabs.Contains(prefabAsset))
                             {
