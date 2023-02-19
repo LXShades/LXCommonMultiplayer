@@ -13,7 +13,7 @@ public class ServerTimeMonitorUI : MonoBehaviour
 {
     [Header("Debug target")]
     public bool autoFindTarget = true;
-    public TickSynchroniser target;
+    public TimeSynchroniser target;
 
     [Header("Speed balance line")]
     public RectTransform balanceLine;
@@ -52,7 +52,7 @@ public class ServerTimeMonitorUI : MonoBehaviour
     private void LateUpdate()
     {
         if (target == null && autoFindTarget && (int)Time.time != (int)(Time.time - Time.deltaTime))
-            target = FindObjectOfType<TickSynchroniser>();
+            target = FindObjectOfType<TimeSynchroniser>();
 
         if (target != null)
         {
@@ -62,7 +62,7 @@ public class ServerTimeMonitorUI : MonoBehaviour
 
             UpdateInfoBox();
 
-            lastServerTime = target.lastTickTime;
+            lastServerTime = target.lastUpdateGameTime;
             lastLocalTime = Time.timeAsDouble;
         }
     }
@@ -70,7 +70,7 @@ public class ServerTimeMonitorUI : MonoBehaviour
     private void UpdateBalanceLine()
     {
         float parentWidth = (balanceLine.transform.parent as RectTransform).sizeDelta.x; // .rect.width maybe? sizeDelta seems to do whatever it wants
-        float gameSpeed = (float)((target.lastTickTime - lastServerTime) / (Time.time - lastLocalTime));
+        float gameSpeed = (float)((target.lastUpdateGameTime - lastServerTime) / (Time.time - lastLocalTime));
 
         // Update time
         balanceLine.anchoredPosition = new Vector2((gameSpeed - 1f) * parentWidth / 2f / range, 0f);
@@ -84,10 +84,10 @@ public class ServerTimeMonitorUI : MonoBehaviour
         if (target.timeOfLastServerUpdate > lastAddedServerTickRealtime)
         {
             // Our local predicted time
-            predictedServerTimeCurve.data.Insert(Time.realtimeSinceStartup, (float)(target.lastTickTime - Time.realtimeSinceStartup));
+            predictedServerTimeCurve.data.Insert(Time.realtimeSinceStartup, (float)(target.lastUpdateGameTime - Time.realtimeSinceStartup));
 
             // Times on server: server time, and our local time from the server's perspective
-            double serverTimeOnGraph = Time.realtimeSinceStartup - (target.lastTickTime - target.timeOnServer);
+            double serverTimeOnGraph = Time.realtimeSinceStartup - (target.lastUpdateGameTime - target.timeOnServer);
             lastReceivedServerTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer - Time.realtimeSinceStartupAsDouble));
             serverLocalTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer + target.lastAckedClientOffset - Time.realtimeSinceStartupAsDouble));
 
@@ -103,8 +103,8 @@ public class ServerTimeMonitorUI : MonoBehaviour
 
     private void UpdateInfoBox()
     {
-        infoBox.text = $"ServerTime: {target.timeOnServer.ToString("F1")}\nClientTime: {target.lastTickTime.ToString("F1")}\n" +
-            $"Effective RTT: {((int)((target.lastTickTime - target.timeOnServer - (Time.timeAsDouble - target.timeOfLastServerUpdate)) * 1000f)).ToString()}ms\n"
+        infoBox.text = $"ServerTime: {target.timeOnServer.ToString("F1")}\nClientTime: {target.lastUpdateGameTime.ToString("F1")}\n" +
+            $"Effective RTT: {((int)((target.lastUpdateGameTime - target.timeOnServer - (Time.timeAsDouble - target.timeOfLastServerUpdate)) * 1000f)).ToString()}ms\n"
             + $"LastServerInputOffset: {((int)(target.lastAckedClientOffset * 1000f)).ToString()}ms";
     }
 }

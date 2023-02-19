@@ -10,12 +10,12 @@ using UnityEngine;
 /// * Clients listen to cues from the server, figuring out what GameTime they should run, and calling its Tick() function accordingly as well.
 /// * Clients' GameTime runs slightly ahead of the server depending on latency.
 /// * -> A client will run enough time ahead that its inputs can reliably reach the server before the server runs the same GameTime.
-/// * -> To do this, the server tells the client its (CGT - SGT) offset, where CGT is client GameTime and SGH is server GameTime, which should always be above zero.
+/// * -> To do this, the server tells the client its (CGT - SGT) offset, where CGT is client GameTime and SGT is server GameTime, which should always be above zero.
 /// * -> A client can give itself more time if it detects that offset fluctuates too much.
 /// * GameTime is stored in doubles because we use it to calculate deltas, which are tiny. In terms of deltas, GameTimes will get comparatively imprecise within an hour.
 /// 
 /// </summary>
-public class TickSynchroniser : NetworkBehaviour
+public class TimeSynchroniser : NetworkBehaviour
 {
     [Header("Automatic client time calculation")]
     [Tooltip("When enabled, time is automatically continually adjusted based on a sampling of the client-server time offset history")]
@@ -74,7 +74,7 @@ public class TickSynchroniser : NetworkBehaviour
     /// <summary>
     /// Our time after the last tick we ran, with prediction depending on settings
     /// </summary>
-    public double lastTickTime { get; protected set; }
+    public double lastUpdateGameTime { get; protected set; }
 
     /// <summary>
     /// When a time adjustment is ongoing, this is an offset that's being progressively added to autoCalculatedTimeOffset (after being set, this value gradually gravitates towards 0)
@@ -91,11 +91,11 @@ public class TickSynchroniser : NetworkBehaviour
     protected Dictionary<NetworkConnectionToClient, double> lastClientGameTime = new Dictionary<NetworkConnectionToClient, double>();
 
     /// <summary>
-    /// Updates the current game time and delta time.
+    /// Sent on Update after the current game time and delta time are set.
     /// 
-    /// WARNING! Unfortunately, networked time is not reliable--as the server and client attempts to resync, time could occasionally go backwards! deltaTime may be negative in such cases.
+    /// TIME IS A LIE! gameTime may speed up and slow down on clients to stay in sync. It MAY EVEN RUN BACKWARDS during desyncs! deltaTime may be negative, or huge, in such cases.
     /// </summary>
-    public virtual void Tick(double gameTime, float deltaTime)
+    public virtual void OnUpdate(double gameTime, float deltaTime)
     {
     }
 
@@ -108,28 +108,32 @@ public class TickSynchroniser : NetworkBehaviour
 
     protected virtual void Update()
     {
-        double lastFrameTickTime = lastTickTime;
+        double lastFrameTickTime = lastUpdateGameTime;
 
         // Refresh networked timers, run ticks if necessary
         if (NetworkServer.active)
         {
-            RunTick(Time.timeAsDouble);
+            // We kind of fake this info
+            timeOnServer = Time.timeAsDouble;
+            timeOfLastServerUpdate = Time.timeAsDouble;
+
+            RunUpdate(Time.timeAsDouble);
         }
         else
         {
             if (!useAutomaticClientTimePrediction)
             {
-                RunTick(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + manualClientPredictionAmount);
+                RunUpdate(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + manualClientPredictionAmount);
             }
             else
             {
                 UpdateTimeAdjustment();
 
-                RunTick(Time.timeAsDouble + autoCalculatedTimeOffset);
+                RunUpdate(Time.timeAsDouble + autoCalculatedTimeOffset);
             }
         }
 
-        if (TimeTool.IsTick(lastTickTime, lastFrameTickTime, syncsPerSecond))
+        if (TimeTool.IsTick(lastUpdateGameTime, lastFrameTickTime, syncsPerSecond))
         {
             if (NetworkServer.active)
             {
@@ -141,14 +145,14 @@ public class TickSynchroniser : NetworkBehaviour
                         double clientTime;
                         lastClientGameTime.TryGetValue(conn.Value, out clientTime);
 
-                        TargetTimeAndOffset(conn.Value, lastTickTime, (float)(clientTime - lastTickTime));
+                        TargetTimeAndOffset(conn.Value, lastUpdateGameTime, (float)(clientTime - lastUpdateGameTime));
                     }
                 }
             }
             else
             {
                 // tell server our current time
-                CmdTime(lastTickTime);
+                CmdTime(lastUpdateGameTime);
             }
 
             OnSentTimeSync();
@@ -260,9 +264,9 @@ public class TickSynchroniser : NetworkBehaviour
         lastClientGameTime[connection] = gameTime;
     }
 
-    private void RunTick(double gameTime)
+    private void RunUpdate(double gameTime)
     {
-        Tick(gameTime, (float)(gameTime - lastTickTime));
-        lastTickTime = gameTime;
+        OnUpdate(gameTime, (float)(gameTime - lastUpdateGameTime));
+        lastUpdateGameTime = gameTime;
     }
 }

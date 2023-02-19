@@ -39,18 +39,19 @@ public enum TickerSeekFlags
     DebugMessages = 8,
 };
 
-public enum TickerMaxInputRateConstraint
+public enum TickerTickRateConstraint
 {
     /// <summary>
-    /// A new inputs is ignored if it shares the same quantised chunk of time (for example a fixed 0.05 interval from 0) as the last
+    /// A new input is ignored if it shares the same quantised chunk of time (for example a fixed 0.05 interval from 0) as the last.
+    /// Inputs are all inserted at a fixed rate, between these quantized time chunks, and ticks occur at this rate
     /// </summary>
     QuantizedTime,
 
     /// <summary>
-    /// A new input is ignored if it is inserted in under 1/maxInputRate seconds since the last input was inserted.
-    /// Works for many cases but may not work well with TimeTool.Quantize setups after long periods of time, as the floating points become fuzzy
+    /// A new input is ignored if it is inserted in under 1/maxInputRate seconds since the last input was inserted. Otherwise, it can be inserted at any time.
+    /// Works for many cases, but can fail when using TimeTool.Quantize intervals after long periods of time even if that interval is the tick rate, as the floating points become fuzzy and begin to overlap
     /// </summary>
-    Flexible
+    Variable
 }
 
 [System.Serializable]
@@ -64,9 +65,9 @@ public struct TickerSettings
 
     [Header("Input")]
     [Tooltip("The maximum input rate in hz. If <=0, the input rate is unlimited. This should be restricted sensibly so that clients do not send too many inputs and save CPU.")]
-    public int maxInputRate;
-    [Tooltip("Defines how the input rate will be constrained")]
-    public TickerMaxInputRateConstraint maxInputRateConstraint;
+    public int maxTickRate;
+    [Tooltip("Defines how the input and confirmed state rate will be constrained")]
+    public TickerTickRateConstraint maxTickRateConstraint;
 
     [Header("Reconciling")]
     [Tooltip("Whether to reconcile even if the server's confirmed state matched the local state at the time")]
@@ -96,10 +97,10 @@ public struct TickerSettings
 
     public static TickerSettings Default = new TickerSettings()
     {
-        maxDeltaTime = 0.03334f,
+        maxDeltaTime = 1f / 30f,
         maxSeekIterations = 15,
-        maxInputRate = 60,
-        maxInputRateConstraint = TickerMaxInputRateConstraint.QuantizedTime,
+        maxTickRate = 60,
+        maxTickRateConstraint = TickerTickRateConstraint.QuantizedTime,
         alwaysReconcile = false,
         historyLength = 1f,
         debugLogReconciles = false,
@@ -452,7 +453,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// <summary>
     /// Target name, is usually gameObject name if possible
     /// </summary>
-    public override string targetName => (target is Component targetAsComponent) ? targetAsComponent.gameObject.name : "N/ng thiA";
+    public override string targetName => (target is Component targetAsComponent) ? targetAsComponent.gameObject.name : "N/A";
 
     /// <summary>
     /// Advanced settings for this ticker. Exposed as TickerSettings so that it is fully serializable for the inspector
@@ -511,9 +512,9 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
         // Inclusive because otherwise items at the same time won't be detected and will get replaced
         int closestPriorInputIndex = inputTimeline.ClosestIndexBeforeInclusive(time);
 
-        if (settings.maxInputRate <= 0 || closestPriorInputIndex == -1
-            || (settings.maxInputRateConstraint == TickerMaxInputRateConstraint.Flexible && time * settings.maxInputRate - inputTimeline.TimeAt(closestPriorInputIndex) * settings.maxInputRate >= 0.999f)
-            || (settings.maxInputRateConstraint == TickerMaxInputRateConstraint.QuantizedTime && TimeTool.Quantize(time, settings.maxInputRate) != TimeTool.Quantize(inputTimeline.TimeAt(closestPriorInputIndex), settings.maxInputRate)))
+        if (settings.maxTickRate <= 0 || closestPriorInputIndex == -1
+            || (settings.maxTickRateConstraint == TickerTickRateConstraint.Variable && time * settings.maxTickRate - inputTimeline.TimeAt(closestPriorInputIndex) * settings.maxTickRate >= 0.999f)
+            || (settings.maxTickRateConstraint == TickerTickRateConstraint.QuantizedTime && TimeTool.Quantize(time, settings.maxTickRate) != TimeTool.Quantize(inputTimeline.TimeAt(closestPriorInputIndex), settings.maxTickRate)))
         {
             // Add current player input to input history
             inputTimeline.Set(time, input);
@@ -525,7 +526,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// </summary>
     public void InsertQuantizedInput(TInput input, double time)
     {
-        InsertInput(input, TimeTool.Quantize(time, settings.maxInputRate));
+        InsertInput(input, TimeTool.Quantize(time, settings.maxTickRate));
     }
 
     /// <summary>
@@ -736,6 +737,9 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
     /// </summary>
     public void ConfirmStateAt(TState state, double time)
     {
+        if (isDebugPaused)
+            return;
+
         int index = stateTimeline.IndexAt(time, 0.0001f);
 
         // If we have a state at this time and it's not correct 
@@ -770,7 +774,7 @@ public class Ticker<TInput, TState> : TickerBase, ITickerStateFunctions<TState>,
 
         if (doClearFutureStates)
             stateTimeline.TrimAfter(playbackTime);
-        if (reapplyCurrentState)
+        if (reapplyCurrentState && !isDebugPaused)
             target.ApplyState(state);
 
         return state;

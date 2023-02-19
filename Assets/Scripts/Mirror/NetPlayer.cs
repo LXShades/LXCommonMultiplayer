@@ -24,7 +24,9 @@ public class NetPlayer : NetworkBehaviour
 
     [Tooltip("Character owned by this player")]
     [SyncVar]
-    public GameObject character;
+    public uint characterNetId;
+
+    public GameObject character => NetworkIdentity.spawned.GetValueOrDefault(characterNetId)?.gameObject;
 
     /// <summary>
     /// Dictionary of all players currently known in the game by ID
@@ -45,6 +47,11 @@ public class NetPlayer : NetworkBehaviour
     /// Returns the local NetPlayer's character if available
     /// </summary>
     public static GameObject localCharacter => localPlayer ? localPlayer.character : null;
+
+    /// <summary>
+    /// Called whenever any player character is spawned by a NetPlayer
+    /// </summary>
+    public static event System.Action<NetPlayer, GameObject> onAssignedLocalCharacter;
 
     /// <summary>
     /// Default set of player names
@@ -94,7 +101,10 @@ public class NetPlayer : NetworkBehaviour
         {
             var identity = Instantiate(characterPrefab);
             NetworkServer.Spawn(identity.gameObject, this.gameObject); // note: need to call Spawn before assigning Character, as net ID needs initialising for character SyncVar
-            character = identity.gameObject;
+            characterNetId = identity.netId;
+
+            if (localPlayer == this)
+                onAssignedLocalCharacter?.Invoke(this, character.gameObject);
 
             NetSpawnPoint spawnPoint = NetSpawnPoint.FindSpawnPointForOrderedIndex(playerId);
             if (spawnPoint != null)
@@ -121,6 +131,13 @@ public class NetPlayer : NetworkBehaviour
         base.OnStartLocalPlayer();
 
         localPlayer = this;
+        if (character != null)
+            onAssignedLocalCharacter?.Invoke(this, character.gameObject);
+    }
+
+    public override void OnDeserialize(NetworkReader reader, bool initialState)
+    {
+        base.OnDeserialize(reader, initialState);
     }
 
     private void OnDestroy()
