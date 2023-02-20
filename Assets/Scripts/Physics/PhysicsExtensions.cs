@@ -5,6 +5,10 @@ public static class PhysicsExtensions
     private const int kMaxHits = 128;
 
     private static RaycastHit[] hitBuffer = new RaycastHit[kMaxHits];
+    private static Collider[] overlapBuffer = new Collider[kMaxHits];
+
+    private static int[] collidingLayerMaskPerLayer = new int[32];
+    private static bool[] hasCollidingLayerMaskPerLayer = new bool[32];
 
     public struct Parameters
     {
@@ -39,6 +43,77 @@ public static class PhysicsExtensions
     {
         int numHits = Physics.CapsuleCastNonAlloc(pointA, pointB, radius, direction, hitBuffer, maxDistance, layerMask, triggerInteraction);
         return GetFilteredResult(hitBuffer, numHits, out hitInfo, in parameters);
+    }
+
+    /// <summary>
+    /// Returns colliders overlapping this one
+    /// </summary>
+    public static int Overlap(Collider collider, QueryTriggerInteraction triggerInteraction, in Parameters parameters, Collider[] overlapsOut)
+    {
+        int numCollidersOut = 0;
+        int numOverlaps = 0;
+        Transform transform = collider.transform;
+
+        switch (collider)
+        {
+            // todo: support collider include/exclude layers? (pain)
+            case BoxCollider asBox:
+                numOverlaps = Physics.OverlapBoxNonAlloc(transform.TransformPoint(asBox.center), VectorExtensions.Multiplied(asBox.size, transform.lossyScale) * 0.5f, overlapBuffer, transform.rotation, GetCollidingLayerMaskForLayer(collider.gameObject.layer), triggerInteraction);
+                break;
+            case SphereCollider asSphere:
+                numOverlaps = Physics.OverlapSphereNonAlloc(transform.TransformPoint(asSphere.center), asSphere.radius, overlapBuffer, GetCollidingLayerMaskForLayer(collider.gameObject.layer), triggerInteraction);
+                break;
+            default:
+                // note: if it's not supported, doesn't mean it's not possible, just means I haven't had to use it yet
+                Debug.LogError($"[PhysicsExtensions.OverlapCollider] Unsupported collider type {collider.GetType()}, sorry!");
+                return 0;
+        }
+
+        for (int i = 0; i < numOverlaps && numCollidersOut < overlapsOut.Length; i++)
+        {
+            Collider overlap = overlapBuffer[i];
+            if (overlap != parameters.ignoreObject && overlap != collider)
+                overlapsOut[numCollidersOut++] = overlap;
+        }
+        return numCollidersOut;
+    }
+
+    /// <summary>
+    /// Returns whether a collider has any overlaps
+    /// </summary>
+    public static bool HasOverlap(Collider collider, QueryTriggerInteraction triggerInteraction, in Parameters parameters)
+    {
+        int numOverlaps = 0;
+        Transform transform = collider.transform;
+        switch (collider)
+        {
+            // todo: support collider include/exclude layers? (pain)
+            case BoxCollider asBox:
+                numOverlaps = Physics.OverlapBoxNonAlloc(transform.TransformPoint(asBox.center), VectorExtensions.Multiplied(asBox.size, transform.lossyScale) * 0.5f, overlapBuffer, transform.rotation, GetCollidingLayerMaskForLayer(collider.gameObject.layer), triggerInteraction);
+                break;
+            default:
+                // note: if it's not supported, doesn't mean it's not possible, just means I haven't had to use it yet
+                Debug.LogError($"[PhysicsExtensions.OverlapCollider] Unsupported collider type {collider.GetType()}, sorry!");
+                return false;
+        }
+
+        return GetFilteredResult(overlapBuffer, numOverlaps, in parameters, collider);
+    }
+
+    public static int GetCollidingLayerMaskForLayer(int layer)
+    {
+        if (layer < 0 || layer > 32)
+            return 0;
+
+        if (!hasCollidingLayerMaskPerLayer[layer])
+        {
+            int mask = 0;
+            for (int i = 0; i < 32; i++)
+                mask |= Physics.GetIgnoreLayerCollision(layer, i) ? 0 : (1 << i);
+            collidingLayerMaskPerLayer[layer] = mask;
+        }
+
+        return collidingLayerMaskPerLayer[layer];
     }
 
     /// <summary>
@@ -89,5 +164,18 @@ public static class PhysicsExtensions
                 return false;
             }
         }
+    }
+
+    private static bool GetFilteredResult(Collider[] buffer, int numInBuffer, in Parameters parameters, Collider additionalIgnore)
+    {
+        for (int i = 0; i < numInBuffer; i++)
+        {
+            if (buffer[i] != additionalIgnore && buffer[i] != parameters.ignoreObject)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -26,6 +26,10 @@ public class NetPlayer : NetworkBehaviour
     [SyncVar]
     public uint characterNetId;
 
+    [Header("Spawn behaviour")]
+    [Tooltip("Automatically positions the character when spawning them")]
+    public bool automaticallyPositionCharacters = true;
+
     public GameObject character => NetworkIdentity.spawned.GetValueOrDefault(characterNetId)?.gameObject;
 
     /// <summary>
@@ -49,9 +53,14 @@ public class NetPlayer : NetworkBehaviour
     public static GameObject localCharacter => localPlayer ? localPlayer.character : null;
 
     /// <summary>
-    /// Called whenever any player character is spawned by a NetPlayer
+    /// [Server/client] Called whenever the local player character is spawned by a NetPlayer
     /// </summary>
     public static event System.Action<NetPlayer, GameObject> onAssignedLocalCharacter;
+
+    /// <summary>
+    /// [Server] Called whenever any player character is spawned by a NetPlayer
+    /// </summary>
+    public static event System.Action<NetPlayer, GameObject> onServerSpawnedCharacter;
 
     /// <summary>
     /// Default set of player names
@@ -103,9 +112,6 @@ public class NetPlayer : NetworkBehaviour
             NetworkServer.Spawn(identity.gameObject, this.gameObject); // note: need to call Spawn before assigning Character, as net ID needs initialising for character SyncVar
             characterNetId = identity.netId;
 
-            if (localPlayer == this)
-                onAssignedLocalCharacter?.Invoke(this, character.gameObject);
-
             NetSpawnPoint spawnPoint = NetSpawnPoint.FindSpawnPointForOrderedIndex(playerId);
             if (spawnPoint != null)
             {
@@ -116,6 +122,10 @@ public class NetPlayer : NetworkBehaviour
             {
                 Debug.LogWarning("[MultiplayerEssentials] No valid spawn points found, spawning character at 0.");
             }
+
+            if (identity.TryGetComponent(out INetPlayerCharacter netPlayerCharacter))
+                netPlayerCharacter.ServerOnFinishedSpawn(this);
+            onServerSpawnedCharacter?.Invoke(this, character.gameObject);
         }
         else
         {
@@ -132,7 +142,11 @@ public class NetPlayer : NetworkBehaviour
 
         localPlayer = this;
         if (character != null)
+        {
+            if (character.TryGetComponent(out INetPlayerCharacter netPlayerCharacter))
+                netPlayerCharacter.OnAssignedLocal(this);
             onAssignedLocalCharacter?.Invoke(this, character.gameObject);
+        }
     }
 
     public override void OnDeserialize(NetworkReader reader, bool initialState)
@@ -231,4 +245,20 @@ public class NetPlayer : NetworkBehaviour
 
         return false;
     }
+}
+
+/// <summary>
+/// Allows spawned characters to receive some events from the owning NetPlayer, if desired
+/// </summary>
+public interface INetPlayerCharacter
+{
+    /// <summary>
+    /// Called by NetPlayer when finished spawning and positioning the character
+    /// </summary>
+    public void ServerOnFinishedSpawn(NetPlayer owner);
+
+    /// <summary>
+    /// Called by NetPlayer when the local player owner of the character becomes known
+    /// </summary>
+    public void OnAssignedLocal(NetPlayer owner);
 }
