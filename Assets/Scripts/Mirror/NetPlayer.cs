@@ -109,7 +109,7 @@ public class NetPlayer : NetworkBehaviour
         if (characterPrefab)
         {
             var identity = Instantiate(characterPrefab);
-            NetworkServer.Spawn(identity.gameObject, this.gameObject); // note: need to call Spawn before assigning Character, as net ID needs initialising for character SyncVar
+            NetworkServer.Spawn(identity.gameObject, this.connectionToClient); // note: need to call Spawn before assigning Character, as net ID needs initialising for character SyncVar
             characterNetId = identity.netId;
 
             NetSpawnPoint spawnPoint = NetSpawnPoint.FindSpawnPointForOrderedIndex(playerId);
@@ -202,7 +202,7 @@ public class NetPlayer : NetworkBehaviour
 
         if (DoesPlayerNameExist(defaultPlayerNames[initialId]))
         {
-            for (int id = initialId + 1; id != initialId; id = (id + 1) % defaultPlayerNames.Length)
+            for (int id = (initialId + 1) % defaultPlayerNames.Length; id != initialId; id = (id + 1) % defaultPlayerNames.Length)
             {
                 if (!DoesPlayerNameExist(defaultPlayerNames[id]))
                     return defaultPlayerNames[id];
