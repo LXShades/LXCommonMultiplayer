@@ -73,7 +73,7 @@ public class GameState : NetworkBehaviour
         if (singleton != null)
         {
             Destroy(gameObject);
-            Debug.LogWarning("There is already a NetGameState running");
+            Debug.LogWarning($"[{gameObject.name}.Awake()] There is already a NetGameState running");
             return;
         }
 
@@ -126,8 +126,14 @@ public class GameState : NetworkBehaviour
     /// <summary>
     /// Changes the game state to another game state prefab
     /// </summary>
-    public static void ChangeGameState(GameObject newGameStatePrefab)
+    public static void ServerChangeGameState(GameObject newGameStatePrefab)
     {
+        if (!NetworkServer.active)
+        {
+            Debug.LogError($"[{nameof(GameState)}.{nameof(ServerChangeGameState)}] cannot be called on client");
+            return;
+        }
+
         if (singleton != null)
         {
             Destroy(singleton.gameObject);

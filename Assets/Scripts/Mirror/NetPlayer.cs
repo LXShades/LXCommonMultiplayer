@@ -1,4 +1,5 @@
 using Mirror;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -55,12 +56,22 @@ public class NetPlayer : NetworkBehaviour
     /// <summary>
     /// [Server/client] Called whenever the local player character is spawned by a NetPlayer
     /// </summary>
-    public static event System.Action<NetPlayer, GameObject> onAssignedLocalCharacter;
+    public static event Action<NetPlayer, GameObject> onAssignedLocalCharacter;
 
     /// <summary>
     /// [Server] Called whenever any player character is spawned by a NetPlayer
     /// </summary>
-    public static event System.Action<NetPlayer, GameObject> onServerSpawnedCharacter;
+    public static event Action<NetPlayer, GameObject> onServerSpawnedCharacter;
+
+    /// <summary>
+    /// [Server, client] Called when a player is added and OnStartServer/client called. Use RegisterOnPlayerAdded
+    /// </summary>
+    private static event Action<NetPlayer> onPlayerAdded;
+
+    /// <summary>
+    /// [Server, client] Called when a player is destroyed
+    /// </summary>
+    public static event Action<NetPlayer> onPlayerDestroyed;
 
     /// <summary>
     /// Default set of player names
@@ -87,6 +98,8 @@ public class NetPlayer : NetworkBehaviour
             players.Add(this);
 
             DontDestroyOnLoad(gameObject);
+
+            onPlayerAdded?.Invoke(this);
         }
     }
 
@@ -131,6 +144,8 @@ public class NetPlayer : NetworkBehaviour
         {
             Debug.LogWarning($"[MultiplayerEssentials] No character created for {playerName}, prefab missing.");
         }
+
+        onPlayerAdded?.Invoke(this);
     }
 
     /// <summary>
@@ -159,6 +174,31 @@ public class NetPlayer : NetworkBehaviour
         if (playerById.ContainsKey(playerId) && playerById[playerId] == this)
             playerById.Remove(playerId);
         players.Remove(this);
+
+        onPlayerDestroyed?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Calls a callback when a player is added. If callOnExisting is true, the function is called for all players currently existing
+    /// Make sure to deregister this when done, as it's a static delegate and could call on your dead object.
+    /// </summary>
+    public static void RegisterOnPlayerAdded(Action<NetPlayer> functionToCall, bool callOnExisting)
+    {
+        onPlayerAdded += functionToCall;
+
+        if (callOnExisting)
+        {
+            foreach (NetPlayer player in NetPlayer.players)
+            {
+                if (player)
+                    functionToCall?.Invoke(player);
+            }
+        }
+    }
+
+    public static void UnregisterOnPlayerAdded(Action<NetPlayer> functionToCall)
+    {
+        onPlayerAdded -= functionToCall;
     }
 
     public static NetPlayer FindPlayerForCharacter(GameObject characterObject)
@@ -198,7 +238,7 @@ public class NetPlayer : NetworkBehaviour
 
     private string FindNewPlayerName()
     {
-        int initialId = Random.Range(0, defaultPlayerNames.Length);
+        int initialId = UnityEngine.Random.Range(0, defaultPlayerNames.Length);
 
         if (DoesPlayerNameExist(defaultPlayerNames[initialId]))
         {
