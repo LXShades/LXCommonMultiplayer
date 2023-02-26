@@ -111,15 +111,14 @@ public class GameState : NetworkBehaviour
                     RpcTimeTilRestart(nextTimeTilRestart);
 
                 timeTilRestart = nextTimeTilRestart;
-
-                // Inform end of win screen
-                if (nextTimeTilRestart <= 0f)
-                    onWinScreenEnded?.Invoke(this);
             }
 
             // end the win screen, do this here just in case timetilrestart started with 0
             if (timeTilRestart <= 0f)
+            {
                 _isWinScreen = false;
+                onWinScreenEnded?.Invoke(this);
+            }
         }
     }
 
@@ -180,6 +179,7 @@ public class GameState : NetworkBehaviour
         if (!_isWinScreen)
         {
             _isWinScreen = true;
+            timeTilRestart = winScreenDuration;
             onGameEnded?.Invoke(this);
         }
     }

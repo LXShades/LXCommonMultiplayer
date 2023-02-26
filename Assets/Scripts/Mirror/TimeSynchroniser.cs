@@ -62,6 +62,11 @@ public class TimeSynchroniser : NetworkBehaviour
     public double timeOnServer { get; protected set; }
 
     /// <summary>
+    /// Our time after the last tick we ran, with prediction depending on settings
+    /// </summary>
+    public double timeOnLastUpdate { get; protected set; }
+
+    /// <summary>
     /// Time.timeAsDouble that we last received the server time (todo: use realtime?)
     /// </summary>
     public double timeOfLastServerUpdate { get; protected set; }
@@ -70,11 +75,6 @@ public class TimeSynchroniser : NetworkBehaviour
     /// [client] The last client offset we received from the server (an offset of how far ahead or behind our inputs were when the server received them)
     /// </summary>
     public double lastAckedClientOffset => clientTimeOffsetHistory.Latest;
-
-    /// <summary>
-    /// Our time after the last tick we ran, with prediction depending on settings
-    /// </summary>
-    public double lastUpdateGameTime { get; protected set; }
 
     /// <summary>
     /// When a time adjustment is ongoing, this is an offset that's being progressively added to autoCalculatedTimeOffset (after being set, this value gradually gravitates towards 0)
@@ -108,7 +108,7 @@ public class TimeSynchroniser : NetworkBehaviour
 
     protected virtual void Update()
     {
-        double lastFrameTickTime = lastUpdateGameTime;
+        double lastFrameTime = timeOnLastUpdate;
 
         // Refresh networked timers, run ticks if necessary
         if (NetworkServer.active)
@@ -133,7 +133,7 @@ public class TimeSynchroniser : NetworkBehaviour
             }
         }
 
-        if (TimeTool.IsTick(lastUpdateGameTime, lastFrameTickTime, syncsPerSecond))
+        if (TimeTool.IsTick(timeOnLastUpdate, lastFrameTime, syncsPerSecond))
         {
             if (NetworkServer.active)
             {
@@ -145,14 +145,14 @@ public class TimeSynchroniser : NetworkBehaviour
                         double clientTime;
                         lastClientGameTime.TryGetValue(conn.Value, out clientTime);
 
-                        TargetTimeAndOffset(conn.Value, lastUpdateGameTime, (float)(clientTime - lastUpdateGameTime));
+                        TargetTimeAndOffset(conn.Value, timeOnLastUpdate, (float)(clientTime - timeOnLastUpdate));
                     }
                 }
             }
             else
             {
                 // tell server our current time
-                CmdTime(lastUpdateGameTime);
+                CmdTime(timeOnLastUpdate);
             }
 
             OnSentTimeSync();
@@ -266,7 +266,7 @@ public class TimeSynchroniser : NetworkBehaviour
 
     private void RunUpdate(double gameTime)
     {
-        OnUpdate(gameTime, (float)(gameTime - lastUpdateGameTime));
-        lastUpdateGameTime = gameTime;
+        OnUpdate(gameTime, (float)(gameTime - timeOnLastUpdate));
+        timeOnLastUpdate = gameTime;
     }
 }

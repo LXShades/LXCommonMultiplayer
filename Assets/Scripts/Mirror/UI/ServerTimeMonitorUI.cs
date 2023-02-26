@@ -62,7 +62,7 @@ public class ServerTimeMonitorUI : MonoBehaviour
 
             UpdateInfoBox();
 
-            lastServerTime = target.lastUpdateGameTime;
+            lastServerTime = target.timeOnLastUpdate;
             lastLocalTime = Time.timeAsDouble;
         }
     }
@@ -70,7 +70,7 @@ public class ServerTimeMonitorUI : MonoBehaviour
     private void UpdateBalanceLine()
     {
         float parentWidth = (balanceLine.transform.parent as RectTransform).sizeDelta.x; // .rect.width maybe? sizeDelta seems to do whatever it wants
-        float gameSpeed = (float)((target.lastUpdateGameTime - lastServerTime) / (Time.time - lastLocalTime));
+        float gameSpeed = (float)((target.timeOnLastUpdate - lastServerTime) / (Time.time - lastLocalTime));
 
         // Update time
         balanceLine.anchoredPosition = new Vector2((gameSpeed - 1f) * parentWidth / 2f / range, 0f);
@@ -84,10 +84,10 @@ public class ServerTimeMonitorUI : MonoBehaviour
         if (target.timeOfLastServerUpdate > lastAddedServerTickRealtime)
         {
             // Our local predicted time
-            predictedServerTimeCurve.data.Insert(Time.realtimeSinceStartup, (float)(target.lastUpdateGameTime - Time.realtimeSinceStartup));
+            predictedServerTimeCurve.data.Insert(Time.realtimeSinceStartup, (float)(target.timeOnLastUpdate - Time.realtimeSinceStartup));
 
             // Times on server: server time, and our local time from the server's perspective
-            double serverTimeOnGraph = Time.realtimeSinceStartup - (target.lastUpdateGameTime - target.timeOnServer);
+            double serverTimeOnGraph = Time.realtimeSinceStartup - (target.timeOnLastUpdate - target.timeOnServer);
             lastReceivedServerTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer - Time.realtimeSinceStartupAsDouble));
             serverLocalTimeCurve.data.Insert(serverTimeOnGraph, (float)(target.timeOnServer + target.lastAckedClientOffset - Time.realtimeSinceStartupAsDouble));
 
@@ -103,8 +103,8 @@ public class ServerTimeMonitorUI : MonoBehaviour
 
     private void UpdateInfoBox()
     {
-        infoBox.text = $"ServerTime: {target.timeOnServer.ToString("F1")}\nClientTime: {target.lastUpdateGameTime.ToString("F1")}\n" +
-            $"Effective RTT: {((int)((target.lastUpdateGameTime - target.timeOnServer - (Time.timeAsDouble - target.timeOfLastServerUpdate)) * 1000f)).ToString()}ms\n"
+        infoBox.text = $"ServerTime: {target.timeOnServer.ToString("F1")}\nClientTime: {target.timeOnLastUpdate.ToString("F1")}\n" +
+            $"Effective RTT: {((int)((target.timeOnLastUpdate - target.timeOnServer - (Time.timeAsDouble - target.timeOfLastServerUpdate)) * 1000f)).ToString()}ms\n"
             + $"LastServerInputOffset: {((int)(target.lastAckedClientOffset * 1000f)).ToString()}ms";
     }
 }
