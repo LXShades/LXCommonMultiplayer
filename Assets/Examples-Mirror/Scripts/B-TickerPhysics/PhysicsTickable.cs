@@ -14,7 +14,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         PhysicsPlayer.Input GetInputAtTime(double time);
     }
 
-    public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsTickable.Input, PhysicsTickable.State>
+    public class PhysicsTickable : NetworkBehaviour, ITickable<PhysicsTickable.State, PhysicsTickable.Input>
     {
         public struct RbState : ITickerState<RbState>
         {
@@ -108,10 +108,6 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             public Input WithDeltas(Input previousInput) => this;
         }
 
-        public TickerSettings tickerSettings = TickerSettings.Default;
-
-        Ticker<Input, State> ticker = null;
-
         public GameObject physicsObjectPrefab;
         public int numPhysicsObjectsToGenerate = 10;
 
@@ -124,9 +120,6 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
         void Awake()
         {
-            ticker = new Ticker<Input, State>(this);
-            ticker.settings = tickerSettings;
-
             // disable auto physics simulation, we'll do that in Tick
             Physics.autoSimulation = false;
         }
@@ -164,7 +157,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 {
                     foreach (IPhysicsTick physTick in physObj.GetComponents<IPhysicsTick>())
                     {
-                        physTick.PhysicsTick(deltaTime, physTick.GetInputAtTime(ticker.playbackTime));
+                        physTick.PhysicsTick(deltaTime, physTick.GetInputAtTime(tickInfo.time));
                     }
                 }
                 else if (hasAuthority) // server should cleanup invalid objects asap
@@ -220,11 +213,6 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 // propagate changes to the physics system
                 Physics.SyncTransforms();
             }
-        }
-
-        public TickerBase GetTicker()
-        {
-            return ticker;
         }
     }
 }

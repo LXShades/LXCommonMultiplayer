@@ -10,45 +10,45 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
     /// 
     /// Handles all movement and prediction-reconciliation by itself.
     /// </summary>
-    public class Player : NetworkBehaviour, ITickable<Player.PlayerInput, Player.PlayerState>
+    public class Player : NetworkBehaviour, ITickable<Player.State, Player.Input>
     {
-        public struct PlayerState : ITickerState<PlayerState>
+        public struct State : ITickerState<State>
         {
             public Vector3 position;
             public Quaternion rotation;
 
             public void DebugDraw(Color colour) { } // doesn't necessarily need implementing
 
-            public bool Equals(PlayerState other)
+            public bool Equals(State other)
             {
                 return other.position == position && other.rotation == rotation;
             }
         }
 
-        public struct PlayerInput : ITickerInput<PlayerInput>
+        public struct Input : ITickerInput<Input>
         {
             public float horizontal;
             public float vertical;
 
-            public PlayerInput GenerateLocal()
+            public Input GenerateLocal()
             {
-                return new PlayerInput()
+                return new Input()
                 {
-                    horizontal = Input.GetAxisRaw("Horizontal"),
-                    vertical = Input.GetAxisRaw("Vertical")
+                    horizontal = UnityEngine.Input.GetAxisRaw("Horizontal"),
+                    vertical = UnityEngine.Input.GetAxisRaw("Vertical")
                 };
             }
 
-            public PlayerInput WithDeltas(PlayerInput previousInput) => this;
+            public Input WithDeltas(Input previousInput) => this;
 
-            public PlayerInput WithoutDeltas() => this;
+            public Input WithoutDeltas() => this;
         }
 
         public float movementSpeed = 1f;
 
         public int netUpdateRate = 30;
 
-        public TickerSettings tickerSettings = TickerSettings.Default;
+        public TimelineSettings tickerSettings = TimelineSettings.Default;
 
         private Movement movement;
 
@@ -57,12 +57,13 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         private double timeOfLastReceivedServerUpdate;
         private double timeOfLastReceivedClientInput;
 
-        Ticker<PlayerInput, PlayerState> ticker;
+        Timeline timeline;
+        Timeline.Entity<State, Input> timelineEntity;
 
         private void Awake()
         {
-            ticker = new Ticker<PlayerInput, PlayerState>(this);
-            ticker.settings = tickerSettings;
+            timeline = Timeline.CreateSingle(name, this, out timelineEntity);
+            timeline.settings = tickerSettings;
 
             movement = GetComponent<Movement>();
         }
@@ -72,17 +73,17 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             if (isLocalPlayer)
             {
                 // build inputs, send to the ticker
-                PlayerInput nextInput = new PlayerInput().GenerateLocal();
+                Input nextInput = new Input().GenerateLocal();
 
-                ticker.InsertInput(nextInput, Time.time);
+                timelineEntity.InsertInput(nextInput, Time.time);
 
                 // seek to the current Time.time. this may amount to a mixture of reverting/confirming states and ticking forward with delta time
-                ticker.Seek(Time.time);
+                timeline.Seek(Time.time);
 
                 // send our inputs and times to the server
                 if (IsNetUpdate())
                 {
-                    TickerInputPack<PlayerInput> inputPacks = ticker.MakeInputPack(0.5f);
+                    TickerInputPack<Input> inputPacks = timelineEntity.MakeInputPack(0.5f);
 
                     if (!NetworkServer.active) // host player shouldn't send inputs
                         CmdPlayerInput(inputPacks.inputs, inputPacks.times);
@@ -93,7 +94,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 if (NetworkServer.active)
                 {
                     // server receiving client's state - just process the inputs, moving to the latest client time (no speedhack tests)
-                    ticker.Seek(ticker.inputTimelineBase.LatestTime);
+                    timeline.Seek(timelineEntity.inputTrack.LatestTime);
                 }
                 else
                 {
@@ -106,12 +107,12 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                     // both are needed to extrapolate it as expected
                     double extrapolatedTimeOnServer = timeOnServer + Time.timeAsDouble - timeOfLastReceivedServerUpdate;
 
-                    ticker.Seek(extrapolatedTimeOnServer, TickerSeekFlags.IgnoreDeltas);
+                    timeline.Seek(extrapolatedTimeOnServer, TickerSeekFlags.IgnoreDeltas);
                 }
             }
 
             if (NetworkServer.active && IsNetUpdate())
-                RpcPlayerState(ticker.latestConfirmedState, ticker.latestInput, ticker.latestConfirmedStateTime, (float)Math.Min(isLocalPlayer ? Time.timeAsDouble - ticker.latestConfirmedStateTime : Time.timeAsDouble - timeOfLastReceivedClientInput, 0.5f));
+                RpcPlayerState(timelineEntity.stateTrack.Latest, timelineEntity.inputTrack.Latest, timelineEntity.stateTrack.LatestTime, (float)Math.Min(isLocalPlayer ? Time.timeAsDouble - timelineEntity.stateTrack.LatestTime: Time.timeAsDouble - timeOfLastReceivedClientInput, 0.5f));
         }
 
         #region ITickable
@@ -124,7 +125,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         /// * As such, always remember Tick() may be called on past/outdated states.
         /// * You can still use Update for things that don't affect gameplay, such as visual effects.
         /// </summary>
-        public void Tick(float deltaTime, PlayerInput input, TickInfo tickInfo)
+        public void Tick(float deltaTime, Input input, TickInfo tickInfo)
         {
             Vector3 movementDirection = new Vector3(movementSpeed * input.horizontal, 0f, movementSpeed * input.vertical);
 
@@ -137,19 +138,11 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         }
 
         /// <summary>
-        /// Returns the ticker owned by this player
-        /// </summary>
-        public TickerBase GetTicker()
-        {
-            return ticker;
-        }
-
-        /// <summary>
         /// Copy the current state to a PlayerState struct. Called by the ticker. You should store all important Tick-affected values here.
         /// </summary>
-        public PlayerState MakeState()
+        public State MakeState()
         {
-            return new PlayerState()
+            return new State()
             {
                 position = transform.position,
                 rotation = transform.rotation
@@ -160,7 +153,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         /// Restore a previous state. Called by the ticker. You should store all important Tick-affected values here.
         /// Remember that for physics simulations, you may need to call Physics.SyncTransforms() or just turn Physics.autoSyncTransforms on.
         /// </summary>
-        public void ApplyState(PlayerState state)
+        public void ApplyState(State state)
         {
             transform.position = state.position;
             transform.rotation = state.rotation;
@@ -172,12 +165,12 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         /// Sends player inputs to the server. The input pack may contain old inputs in case packets are missed.
         /// </summary>
         [Command(channel = Channels.Unreliable)]
-        private void CmdPlayerInput(PlayerInput[] inputs, double[] times)
+        private void CmdPlayerInput(Input[] inputs, double[] times)
         {
-            double lastLatest = ticker.inputTimeline.LatestTime;
-            ticker.InsertInputPack(new TickerInputPack<PlayerInput>(inputs, times));
+            double lastLatest = timelineEntity.inputTrack.LatestTime;
+            timelineEntity.InsertInputPack(new TickerInputPack<Input>(inputs, times));
 
-            if (ticker.inputTimeline.LatestTime > lastLatest)
+            if (timelineEntity.inputTrack.LatestTime > lastLatest)
                 timeOfLastReceivedClientInput = Time.timeAsDouble;
         }
 
@@ -185,12 +178,12 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         /// Receives player state from the server. When received we immediately reconcile to our local time, replaying Ticks between the server's time and our own.
         /// </summary>
         [ClientRpc(channel = Channels.Unreliable)]
-        private void RpcPlayerState(PlayerState state, PlayerInput input, double time, float serverExtrapolation)
+        private void RpcPlayerState(State state, Input input, double time, float serverExtrapolation)
         {
             if (!NetworkServer.active) // don't affect host player
             {
-                ticker.InsertInput(input, time);
-                ticker.Reconcile(state, time, TickerSeekFlags.DontConfirm);
+                timelineEntity.InsertInput(input, time);
+                timelineEntity.ConfirmStateAt(state, time);
                 timeOnServer = time + serverExtrapolation;
                 timeOfLastReceivedServerUpdate = Time.timeAsDouble;
             }

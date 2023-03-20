@@ -8,7 +8,7 @@ public class SceneBUI : MonoBehaviour
     public Text extrapolationSliderLabel;
     public Toggle autoExtrapolationToggle;
 
-    private TickerController tickerController;
+    private TickController tickerController;
 
     void Awake()
     {
@@ -27,7 +27,7 @@ public class SceneBUI : MonoBehaviour
         }
 
         if (tickerController == null)
-            tickerController = FindObjectOfType<TickerController>(); // needed until server provides the object
+            tickerController = FindObjectOfType<TickController>(); // needed until server provides the object
 
         if (tickerController != null)
         {

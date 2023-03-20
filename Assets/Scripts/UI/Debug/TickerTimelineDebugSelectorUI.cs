@@ -14,7 +14,7 @@ using UnityEngine.UI;
 public class TickerTimelineDebugSelectorUI : MonoBehaviour
 {
     public Dropdown dropdown;
-    public TickerTimelineDebugUI tickerTimeline;
+    public TimelineDebugUI timelineUI;
 
     [Header("Controllable")]
     [Tooltip("Whether the mouse and a play/pause button can be used to play, pause andor seek the selected ticker")]
@@ -22,7 +22,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
     public Button playPauseButton;
     public Text playPauseButtonText;
 
-    private readonly List<TickerBase> selectableTickers = new List<TickerBase>(32);
+    private readonly List<Timeline> selectableTimelines = new List<Timeline>(32);
 
     private void Start()
     {
@@ -41,10 +41,10 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         events.triggers.Add(eventHandler);
 
         // handle when mouse clicks on timeline
-        events = tickerTimeline.gameObject.GetComponent<EventTrigger>();
+        events = timelineUI.gameObject.GetComponent<EventTrigger>();
 
         if (events == null)
-            events = tickerTimeline.gameObject.AddComponent<EventTrigger>();
+            events = timelineUI.gameObject.AddComponent<EventTrigger>();
 
         eventHandler = new EventTrigger.Entry()
         {
@@ -79,20 +79,20 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
         List<Dropdown.OptionData> options = new List<Dropdown.OptionData>();
         dropdown.ClearOptions();
-        selectableTickers.Clear();
+        selectableTimelines.Clear();
 
-        selectableTickers.Add(null);
-        options.Add(new Dropdown.OptionData("<select ticker>"));
+        selectableTimelines.Add(null);
+        options.Add(new Dropdown.OptionData("<select timeline>"));
 
         // add new items
-        foreach (WeakReference<TickerBase> tickerWeak in TickerBase.allTickers)
+        foreach (WeakReference<Timeline> tickerWeak in Timeline.allTimelines)
         {
-            if (tickerWeak.TryGetTarget(out TickerBase ticker))
+            if (tickerWeak.TryGetTarget(out Timeline timeline))
             {
-                options.Add(new Dropdown.OptionData(ticker.targetName));
-                selectableTickers.Add(ticker);
+                options.Add(new Dropdown.OptionData(timeline.name));
+                selectableTimelines.Add(timeline);
 
-                if (tickerTimeline.targetTicker == ticker)
+                if (timelineUI.target == timeline)
                     newSelectedItemIndex = options.Count - 1;
             }
         }
@@ -104,28 +104,28 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
     private void OnDropdownSelectionChanged(int value)
     {
-        if (value > -1 && value < selectableTickers.Count)
+        if (value > -1 && value < selectableTimelines.Count)
         {
-            tickerTimeline.targetTicker = selectableTickers[value];
+            timelineUI.target = selectableTimelines[value];
             UpdatePlayPauseButtonText();
         }
     }
 
     private void OnTimelineDrag(BaseEventData eventData)
     {
-        if (isControllable && tickerTimeline.targetTicker != null && tickerTimeline.targetTicker.isDebugPaused && eventData is PointerEventData pointerEvent)
+        if (isControllable && timelineUI.target != null && timelineUI.target.isDebugPaused && eventData is PointerEventData pointerEvent)
         {
             // scroll target time
             if (pointerEvent.button == PointerEventData.InputButton.Left)
             {
-                double timeDifference = tickerTimeline.timeline.timePerScreenX * pointerEvent.delta.x;
-                double targetTime = tickerTimeline.targetTicker.playbackTime + timeDifference;
+                double timeDifference = timelineUI.graphic.timePerScreenX * pointerEvent.delta.x;
+                double targetTime = timelineUI.target.playbackTime + timeDifference;
 
                 if (timeDifference != 0f)
                 {
-                    tickerTimeline.targetTicker.SetDebugPaused(false); // briefly allow seek
-                    tickerTimeline.targetTicker.Seek(targetTime, TickerSeekFlags.DebugMessages);
-                    tickerTimeline.targetTicker.SetDebugPaused(true); // briefly allow seek
+                    timelineUI.target.SetDebugPaused(false); // briefly allow seek
+                    timelineUI.target.Seek(targetTime, TickerSeekFlags.DebugSequence);
+                    timelineUI.target.SetDebugPaused(true); // briefly allow seek
                 }
             }
         }
@@ -135,14 +135,14 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
             // scroll source time
             if (pointerEvent2.button == PointerEventData.InputButton.Right)
             {
-                double sourceTime = tickerTimeline.timeline.TimeAtScreenX(pointerEvent2.position.x);
-                double targetTime = tickerTimeline.targetTicker.playbackTime;
+                double sourceTime = timelineUI.graphic.TimeAtScreenX(pointerEvent2.position.x);
+                double targetTime = timelineUI.target.playbackTime;
 
-                tickerTimeline.targetTicker.SetDebugPaused(false);
-                tickerTimeline.targetTicker.Seek(sourceTime);
-                tickerTimeline.targetTicker.stateTimelineBase.TrimAfter(sourceTime); // force reconfirmation
-                tickerTimeline.targetTicker.Seek(targetTime);
-                tickerTimeline.targetTicker.SetDebugPaused(true);
+                timelineUI.target.SetDebugPaused(false);
+                timelineUI.target.Seek(sourceTime);
+                timelineUI.target.DebugTrimStatesAfter(sourceTime); // force reconfirmation
+                timelineUI.target.Seek(targetTime);
+                timelineUI.target.SetDebugPaused(true);
             }
         }
     }
@@ -154,16 +154,16 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
     private void OnPlayPauseClicked()
     {
-        if (isControllable && tickerTimeline.targetTicker != null)
-            tickerTimeline.targetTicker.SetDebugPaused(!tickerTimeline.targetTicker.isDebugPaused);
+        if (isControllable && timelineUI.target != null)
+            timelineUI.target.SetDebugPaused(!timelineUI.target.isDebugPaused);
 
         UpdatePlayPauseButtonText();
     }
 
     private void UpdatePlayPauseButtonText()
     {
-        if (playPauseButtonText && tickerTimeline.targetTicker != null)
-            playPauseButtonText.text = tickerTimeline.targetTicker.isDebugPaused ? ">" : "II";
+        if (playPauseButtonText && timelineUI.target != null)
+            playPauseButtonText.text = timelineUI.target.isDebugPaused ? ">" : "II";
     }
 
     private void OnValidate()
@@ -171,8 +171,8 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         if (dropdown == null)
             dropdown = GetComponentInChildren<Dropdown>();
 
-        if (tickerTimeline == null)
-            tickerTimeline = GetComponentInChildren<TickerTimelineDebugUI>();
+        if (timelineUI == null)
+            timelineUI = GetComponentInChildren<TimelineDebugUI>();
 
         if (isControllable && playPauseButton == null)
         {

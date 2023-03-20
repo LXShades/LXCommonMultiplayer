@@ -28,7 +28,7 @@ public interface ITickerInputFunctions<TInput> where TInput : ITickerInput<TInpu
 /// 
 /// This interface should implement MakeState(), ApplyState() and Tick().
 /// </summary>
-public interface ITickable<TInput, TState>
+public interface ITickable<TState, TInput>
 {
     /// <summary>
     /// Ticks the object. In a networked game, you may put most important gameplay things in this function, as though it were an Update function.
@@ -116,7 +116,7 @@ public struct TickerInputPack<TInput>
     /// Makes an InputPack from a given input history
     /// </summary>
     /// <returns></returns>
-    public static TickerInputPack<TInput> MakeFromHistory(TimelineList<TInput> inputTimeline, float sendBufferLength)
+    public static TickerInputPack<TInput> MakeFromHistory(TimelineTrack<TInput> inputTimeline, float sendBufferLength)
     {
         int startIndex = inputTimeline.ClosestIndexBeforeOrEarliest(inputTimeline.LatestTime - sendBufferLength);
 

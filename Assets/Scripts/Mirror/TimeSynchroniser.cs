@@ -86,7 +86,7 @@ public class TimeSynchroniser : NetworkBehaviour
     // realtimeSinceStartupAsDouble of the last time adjustment
     private double timeOfLastTimeAdjustment = 0;
 
-    protected TimelineList<float> clientTimeOffsetHistory = new TimelineList<float>();
+    protected TimelineTrack<float> clientTimeOffsetHistory = new TimelineTrack<float>();
 
     protected Dictionary<NetworkConnectionToClient, double> lastClientGameTime = new Dictionary<NetworkConnectionToClient, double>();
 

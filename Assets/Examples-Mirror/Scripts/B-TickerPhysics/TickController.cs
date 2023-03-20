@@ -4,14 +4,17 @@ using UnityEngine;
 
 namespace UnityMultiplayerEssentials.Examples.Mirror
 {
-    public class TickerController : NetworkBehaviour
+    public class TickController : NetworkBehaviour
     {
-        PhysicsTickable physTickable;
+        private PhysicsTickable physTickable;
 
-        Ticker<PhysicsTickable.Input, PhysicsTickable.State> physTicker;
+        private Timeline physTimeline;
+        private Timeline.Entity<PhysicsTickable.State, PhysicsTickable.Input> physTimelineEntity;
 
         private double timeOnServer;
         private double timeOfLastServerUpdate;
+
+        public TimelineSettings tickerSettings = TimelineSettings.Default;
 
         public bool useAutomaticClientExtrapolation = false;
         public float clientExtrapolation = 0.5f;
@@ -20,14 +23,16 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
         public int updatesPerSecond = 30;
 
-        public double playbackTime => physTicker != null ? physTicker.playbackTime : 0f;
+        public double playbackTime => physTimeline != null ? physTimeline.playbackTime : 0f;
 
-        private TimelineList<double> serverTimeHistory = new TimelineList<double>();
+        private TimelineTrack<double> serverTimeHistory = new TimelineTrack<double>();
 
         private void Start()
         {
             physTickable = FindObjectOfType<PhysicsTickable>();
-            physTicker = physTickable.GetTicker() as Ticker<PhysicsTickable.Input, PhysicsTickable.State>;
+
+            physTimeline = Timeline.CreateSingle("PhysicsTimeline", physTickable, out physTimelineEntity);
+            physTimeline.settings = tickerSettings;
         }
 
         // Update is called once per frame
@@ -35,12 +40,12 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         {
             // seek physics
             if (NetworkServer.active)
-                physTicker.Seek(Time.timeAsDouble);
+                physTimeline.Seek(Time.timeAsDouble);
             else
             {
                 if (!useAutomaticClientExtrapolation)
                 {
-                    physTicker.Seek(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + clientExtrapolation, TickerSeekFlags.IgnoreDeltas);
+                    physTimeline.Seek(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + clientExtrapolation, TickerSeekFlags.IgnoreDeltas);
                 }
                 else
                 {
@@ -64,13 +69,13 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                         }
                     }
 
-                    physTicker.Seek(Time.time + autoCalculatedTimeExtrapolation, TickerSeekFlags.IgnoreDeltas);
+                    physTimeline.Seek(Time.time + autoCalculatedTimeExtrapolation, TickerSeekFlags.IgnoreDeltas);
                 }
             }
 
             // send target ticker's state to clients
             if (NetworkServer.active && TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
-                RpcState(physTicker.latestConfirmedState, physTicker.latestConfirmedStateTime, (float)(Time.timeAsDouble - physTicker.latestConfirmedStateTime));
+                RpcState(physTimelineEntity.stateTrack.Latest, physTimelineEntity.stateTrack.LatestTime, (float)(Time.timeAsDouble - physTimelineEntity.stateTrack.LatestTime));
         }
 
         [ClientRpc(channel = Channels.Unreliable)]
@@ -82,7 +87,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 serverTimeHistory.Insert(Time.timeAsDouble, time + serverExtrapolation);
                 serverTimeHistory.Trim(Time.timeAsDouble - 3d, Time.timeAsDouble + 3d);
 
-                physTicker.Reconcile(state, time, 0/*TickerSeekFlags.DontConfirm*/);
+                physTimelineEntity.ConfirmStateAt(state, time);
                 timeOnServer = time + serverExtrapolation;
                 timeOfLastServerUpdate = Time.time;
             }

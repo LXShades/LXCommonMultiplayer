@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class TimelineListBase
+public class TimelineTrackBase
 {
     /// <summary>
     /// Number of items in the timeline
@@ -99,13 +99,13 @@ public class TimelineListBase
 }
 
 /// <summary>
-/// A list of items arranged along a double floating-point timeline. Items can be searched, inserted, replaced, etc and quickly retrieved from certain times.
+/// A list of items arranged along a double floating-point timeline track. Items can be searched, inserted, replaced, etc and quickly retrieved from certain times.
 /// 
 /// * Items are arranged from latest item (0) to earliest item (Count - 1) order.
 /// * Doubles are used because floats are actually quite limiting as the hours add up. After a few hours the discrepency between Time.deltaTime and (Time.time - lastFrameTime) becomes quite noticeable. Doubles are virtually infinite on a per-second basis.
 /// </summary>
 [Serializable]
-public class TimelineList<T> : TimelineListBase
+public class TimelineTrack<T> : TimelineTrackBase
 {
     [Serializable]
     public struct TimelineItem

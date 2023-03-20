@@ -27,16 +27,17 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
         private Rigidbody rb;
 
+        private TickController tickController;
         private PhysicsTickable physicsTickable;
 
-        private TickerController tickerController;
+        private TickController tickerController;
 
-        private readonly TimelineList<Input> myInputs = new TimelineList<Input>();
+        private readonly TimelineTrack<Input> myInputs = new TimelineTrack<Input>();
 
         // tracks how late/early the server received inputs from the client
         // OnClient is the one received by the client from the server, so it can correct. >0 means the server received the last input on time, <0 means it was late
         // OnServer is the one set on the server whenever it receives new inputs
-        public TimelineList<float> inputTimeOffsetHistoryOnClient { get; private set; } = new TimelineList<float>();
+        public TimelineTrack<float> inputTimeOffsetHistoryOnClient { get; private set; } = new TimelineTrack<float>();
 
         // float because it's generally going to be small
         public float inputTimeOffsetOnServer { get; private set; }
@@ -52,6 +53,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         {
             base.OnStartClient();
 
+            tickController = FindObjectOfType<TickController>();
             physicsTickable = FindObjectOfType<PhysicsTickable>();
             physicsTickable.TrackPhysicsObject(netIdentity, rb);
         }
@@ -60,10 +62,11 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         {
             base.OnStartServer();
 
+            tickController = FindObjectOfType<TickController>();
             physicsTickable = FindObjectOfType<PhysicsTickable>();
             physicsTickable.TrackPhysicsObject(netIdentity, rb);
 
-            tickerController = FindObjectOfType<TickerController>();
+            tickerController = FindObjectOfType<TickController>();
         }
 
         private void Update()
@@ -73,7 +76,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 // add inputs to our input history, then send recent inputs to server
                 if (hasAuthority)
                 {
-                    myInputs.Set(physicsTickable.GetTicker().playbackTime, new Input().GenerateLocal());
+                    myInputs.Set(tickController.playbackTime, new Input().GenerateLocal());
 
                     int numInputsToSend = Mathf.Min(5, myInputs.Count);
                     Input[] inputs = new Input[numInputsToSend];
@@ -129,7 +132,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
         private void TrimInputs()
         {
-            double time = physicsTickable.GetTicker().playbackTime;
+            double time = tickController.playbackTime;
 
             myInputs.Trim(time - 3f, time + 3f);
         }

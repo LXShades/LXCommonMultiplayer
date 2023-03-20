@@ -6,7 +6,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
     /// <summary>
     /// Simple tickable object with a pre-determined set of inputs to cycle through
     /// </summary>
-    public class SimpleSeekObject : MonoBehaviour, ITickable<SimpleSeekObject.Input, SimpleSeekObject.State>
+    public class SimpleSeekObject : MonoBehaviour, ITickable<SimpleSeekObject.State, SimpleSeekObject.Input>
     {
         [System.Serializable]
         public struct Input : ITickerInput<Input>
@@ -29,31 +29,32 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             public bool Equals(State other) => false;
         }
 
-        public TimelineList<Input> inputs;
+        public TimelineTrack<Input> inputs;
 
         public float movementSpeed;
 
-        private Ticker<Input, State> ticker;
+        private Timeline timeline;
+        private Timeline.Entity<State, Input> timelineEntity;
 
         private void Awake()
         {
-            ticker = new Ticker<Input, State>(this);
+            timeline = Timeline.CreateSingle(name, this, out timelineEntity);
 
-            TickerSettings settings = TickerSettings.Default;
+            TimelineSettings settings = TimelineSettings.Default;
             settings.historyLength = 10f;
-            ticker.settings = settings;
+            timeline.settings = settings;
         }
 
         private void Start()
         {
             inputs.Validate();
             for (int i = 0; i < inputs.Count; i++)
-                ticker.InsertInput(inputs[i], inputs.TimeAt(i));
+                timelineEntity.InsertInput(inputs[i], inputs.TimeAt(i));
         }
 
         private void Update()
         {
-            ticker.Seek(Time.time % inputs.LatestTime, TickerSeekFlags.None);
+            timeline.Seek(Time.time % inputs.LatestTime, TickerSeekFlags.None);
         }
 
         public void Tick(float deltaTime, Input input, TickInfo tickInfo)
@@ -73,7 +74,5 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
         {
             transform.position = state.position;
         }
-
-        public TickerBase GetTicker() => ticker;
     }
 }
