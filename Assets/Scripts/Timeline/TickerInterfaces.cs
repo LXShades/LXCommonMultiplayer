@@ -1,25 +1,6 @@
 using System;
 
 /// <summary>
-/// You can cast and use ITickerStateFunctions when you know what TState is but don't know what TInput is
-/// </summary>
-public interface ITickerStateFunctions<TState> where TState : ITickerState<TState>
-{
-    public void ConfirmStateAt(TState state, double time);
-    public void Reconcile(TState pastState, double pastStateTime, TickerSeekFlags seekFlags);
-}
-
-/// <summary>
-/// You can cast and use ITickerInputFunctions when you know what TInput is but don't know what TState is
-/// </summary>
-public interface ITickerInputFunctions<TInput> where TInput : ITickerInput<TInput>
-{
-    public void InsertInput(TInput input, double time);
-    public void InsertInputPack(TickerInputPack<TInput> inputPack);
-    public TickerInputPack<TInput> MakeInputPack(float maxLength);
-}
-
-/// <summary>
 /// Qualifies something as tickable.
 /// 
 /// This class can be ticked, reverted to a previous state, and "Seek" to an earlier _or_ future time in its history
