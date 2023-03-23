@@ -107,7 +107,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                     // both are needed to extrapolate it as expected
                     double extrapolatedTimeOnServer = timeOnServer + Time.timeAsDouble - timeOfLastReceivedServerUpdate;
 
-                    timeline.Seek(extrapolatedTimeOnServer, TickerSeekFlags.IgnoreDeltas);
+                    timeline.Seek(extrapolatedTimeOnServer, TimelineSeekFlags.IgnoreDeltas);
                 }
             }
 

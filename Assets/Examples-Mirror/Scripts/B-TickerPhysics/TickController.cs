@@ -45,7 +45,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             {
                 if (!useAutomaticClientExtrapolation)
                 {
-                    physTimeline.Seek(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + clientExtrapolation, TickerSeekFlags.IgnoreDeltas);
+                    physTimeline.Seek(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + clientExtrapolation, TimelineSeekFlags.IgnoreDeltas);
                 }
                 else
                 {
@@ -69,7 +69,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                         }
                     }
 
-                    physTimeline.Seek(Time.time + autoCalculatedTimeExtrapolation, TickerSeekFlags.IgnoreDeltas);
+                    physTimeline.Seek(Time.time + autoCalculatedTimeExtrapolation, TimelineSeekFlags.IgnoreDeltas);
                 }
             }
 

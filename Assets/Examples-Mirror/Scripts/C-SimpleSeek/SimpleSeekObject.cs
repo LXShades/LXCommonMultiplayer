@@ -54,7 +54,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
         private void Update()
         {
-            timeline.Seek(Time.time % inputs.LatestTime, TickerSeekFlags.None);
+            timeline.Seek(Time.time % inputs.LatestTime, TimelineSeekFlags.None);
         }
 
         public void Tick(float deltaTime, Input input, TickInfo tickInfo)

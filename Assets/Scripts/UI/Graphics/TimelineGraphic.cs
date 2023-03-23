@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.UIElements;
 
 /// <summary>
 /// Draws a timeline with "Ticks" that can be added to it
@@ -13,9 +14,20 @@ public class TimelineGraphic : MaskableGraphic
         public double time;
         public float heightScale;
         public float offset;
+        public float width;
         public Color32 color;
         public string label;
         public int labelLine;
+    }
+
+    public struct Hop
+    {
+        public double startTime;
+        public double endTime;
+        public float width;
+        public float offset;
+        public float height;
+        public Color32 color;
     }
 
     private VertexHelper vh;
@@ -33,7 +45,8 @@ public class TimelineGraphic : MaskableGraphic
     [Header("Labels")]
     public int labelSize = 14;
 
-    private List<Tick> ticks = new List<Tick>(52);
+    private List<Tick> ticks = new List<Tick>(64);
+    private List<Hop> hops = new List<Hop>(64);
 
     private GUIStyle labelStyleLeft;
     private GUIStyle labelStyleRight;
@@ -53,6 +66,7 @@ public class TimelineGraphic : MaskableGraphic
     public void ClearDraw()
     {
         ticks.Clear();
+        hops.Clear();
         SetVerticesDirty();
     }
 
@@ -63,25 +77,43 @@ public class TimelineGraphic : MaskableGraphic
     /// * An optional label can appear on the tick
     /// * labelLine defines the "line number" that the label can appear at, allowing multiple labels to share a spot without overlapping
     /// </summary>
-    public void DrawTick(double time, float heightScale, float offset, Color32 color, string label = "", int labelLine = 0)
+    public void DrawTick(double time, float heightScale, float offset, Color32 color, float width = 1f, string label = "", int labelLine = 0)
     {
         if (time < timeStart || time > timeEnd)
-        {
             return;
-        }
 
         ticks.Add(new Tick()
         {
             time = time,
             heightScale = heightScale,
             offset = offset,
+            width = width,
             color = color,
             label = label,
             labelLine = labelLine
         });
     }
 
-    private void DrawTickInternal(double time, float heightScale, float offset, Color32 color)
+    /// <summary>
+    /// Inserts a hop (curved arrow pointing from one time to another) into the timeline
+    /// </summary>
+    public void DrawHop(double startTime, double endTime, Color32 color, float verticalOffset, float height = 1f, float width = 1f)
+    {
+        if (System.Math.Max(startTime, endTime) < timeStart || System.Math.Min(startTime, endTime) > timeEnd)
+            return;
+
+        hops.Add(new Hop()
+        {
+            startTime = startTime,
+            endTime = endTime,
+            color = color,
+            width = width,
+            height = height,
+            offset = verticalOffset
+        });
+    }
+
+    private void DrawTickInternal(double time, float heightScale, float offset, Color32 color, float width)
     {
         Vector2 centre = new Vector2((float)(rectTransform.rect.xMin + (time - timeStart) / (timeEnd - timeStart) * rectTransform.rect.width), rectTransform.rect.center.y);
 
@@ -90,7 +122,7 @@ public class TimelineGraphic : MaskableGraphic
 
         DrawQuadInternal(
             centre + new Vector2(0f, tickHeight / 2 * (-heightScale - offset)),
-            centre + new Vector2(1f, tickHeight / 2 * (heightScale - offset)),
+            centre + new Vector2(width, tickHeight / 2 * (heightScale - offset)),
             color);
     }
 
@@ -118,6 +150,47 @@ public class TimelineGraphic : MaskableGraphic
         vh.AddTriangle(root + 1, root + 3, root + 0);
     }
 
+    private void DrawLineInternal(Vector2 start, Vector2 end, Color32 color, float width)
+    {
+        UIVertex vert = new UIVertex();
+        vert.color = color;
+        vert.uv0 = new Vector2(0f, 1f); // note: don't bother supporting UVs for this one it's 10pm and we don't even expect to texture these
+
+        width *= 0.5f; // because we both add and subtract
+
+        Vector2 forward = (start - end).normalized;
+        Vector3 right = new Vector3(forward.y, -forward.x, 0f) * width;
+        int root = vh.currentVertCount;
+
+        vert.position = new Vector3(start.x, start.y, 0f) + right; vh.AddVert(vert);
+        vert.position = new Vector3(start.x, start.y, 0f) - right; vh.AddVert(vert);
+        vert.position = new Vector3(end.x, end.y, 0f) - right; vh.AddVert(vert);
+        vert.position = new Vector3(end.x, end.y, 0f) + right; vh.AddVert(vert);
+
+        vh.AddTriangle(root + 0, root + 1, root + 2);
+        vh.AddTriangle(root + 0, root + 2, root + 3);
+    }
+
+    private void DrawHopInternal(Hop hop)
+    {
+        Vector2 start = new Vector2((float)(rectTransform.rect.xMin + (hop.startTime - timeStart) / (timeEnd - timeStart) * rectTransform.rect.width), rectTransform.rect.center.y + hop.offset * tickHeight);
+        Vector2 end = new Vector2((float)(rectTransform.rect.xMin + (hop.endTime - timeStart) / (timeEnd - timeStart) * rectTransform.rect.width), rectTransform.rect.center.y + hop.offset * tickHeight);
+        Vector2 up = Vector2.up * (tickHeight * hop.height);
+        Vector2 horizontalWidth = new Vector2(0, hop.width / 2);
+        Vector2 verticalWidth = new Vector2(hop.width / 2, 0);
+
+        // draw short bits going up to long bit
+        DrawQuadInternal(start + verticalWidth, start + up - verticalWidth, hop.color);
+        DrawQuadInternal(end - verticalWidth, end + up + verticalWidth, hop.color);
+
+        // draw long bit
+        DrawQuadInternal(start + up - horizontalWidth, end + up + horizontalWidth, hop.color);
+
+        // and the pointy bits
+        DrawLineInternal(end, new Vector2(end.x - up.y / 4f, end.y + up.y / 4f), hop.color, hop.width);
+        DrawLineInternal(end, new Vector2(end.x + up.y / 4f, end.y + up.y / 4f), hop.color, hop.width);
+    }
+
     // Handles main UI
     protected override void OnPopulateMesh(VertexHelper vh)
     {
@@ -137,9 +210,11 @@ public class TimelineGraphic : MaskableGraphic
 
         // draw ticks
         foreach (Tick tick in ticks)
-        {
-            DrawTickInternal(tick.time, tick.heightScale, tick.offset, tick.color);
-        }
+            DrawTickInternal(tick.time, tick.heightScale, tick.offset, tick.color, tick.width);
+
+        // draw hops
+        foreach (Hop hop in hops)
+            DrawHopInternal(hop);
     }
 
     // Handles labels

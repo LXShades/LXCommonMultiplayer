@@ -11,7 +11,7 @@ using static PlasticPipe.Server.MonitorStats;
 public delegate void TimelineEvent(TickInfo tickInfo);
 
 [Flags]
-public enum TickerSeekFlags
+public enum TimelineSeekFlags
 {
     None = 0,
 
@@ -44,7 +44,7 @@ public enum TickerSeekFlags
     DebugSequence = 8,
 };
 
-public enum TickerTickRateConstraint
+public enum TimelineTickRateConstraint
 {
     /// <summary>
     /// A new input is ignored if it shares the same quantised chunk of time (for example a fixed 0.05 interval from 0) as the last.
@@ -66,10 +66,10 @@ public struct SeekOp
 {
     public enum Type
     {
-        DetermineTimes,
-        ApplyState,
-        Tick,
-        DeltaTooBig
+        DetermineStartState, // source: playback time target: start state time
+        ApplyState, // target: time at state applied
+        Tick, // source: tick start time target: tick end time
+        DeltaTooBig // todo
     }
 
     public Timeline.EntityBase entity;
@@ -91,7 +91,7 @@ public class SeekOpSequence : List<SeekOp>
             {
                 case SeekOp.Type.ApplyState: sb.AppendLine($"ApplyState({op.entity.name}, {op.targetTime})"); break;
                 case SeekOp.Type.Tick: sb.AppendLine($"Tick({op.entity.name}, {op.sourceTime} -> {op.targetTime}) dt={(op.targetTime - op.sourceTime).ToString("F2")}, curInput={op.nextInput} prevInput={op.lastInput}"); break;
-                case SeekOp.Type.DetermineTimes: sb.AppendLine($"TimeRange: {op.sourceTime:F2}->{op.targetTime:F2}");  break;
+                case SeekOp.Type.DetermineStartState: sb.AppendLine($"DetermineStartState: rewind {op.sourceTime:F2}->{op.targetTime:F2}");  break;
             }
         }
 
@@ -117,7 +117,7 @@ public struct TimelineSettings
     [Tooltip("The maximum input rate in hz. If <=0, the input rate is unlimited. This should be restricted sensibly so that clients do not send too many inputs and save CPU.")]
     public int maxTickRate;
     [Tooltip("Defines how the input and confirmed state rate will be constrained")]
-    public TickerTickRateConstraint maxTickRateConstraint;
+    public TimelineTickRateConstraint maxTickRateConstraint;
     public int fixedTickRate; // TODO
 
     [Header("Reconciling")]
@@ -152,7 +152,7 @@ public struct TimelineSettings
         maxSeekIterations = 15,
         maxTickRate = 60,
         fixedTickRate = 60,
-        maxTickRateConstraint = TickerTickRateConstraint.QuantizedTime,
+        maxTickRateConstraint = TimelineTickRateConstraint.QuantizedTime,
         alwaysReconcile = false,
         historyLength = 1f,
         debugLogReconciles = false,
@@ -203,7 +203,7 @@ public struct TickInfo
     /// </summary>
     public bool isConfirmingForward => !isReplaying && isConfirming;
 
-    public TickerSeekFlags seekFlags;
+    public TimelineSeekFlags seekFlags;
 
     public static TickInfo Default = new TickInfo()
     {
@@ -211,9 +211,15 @@ public struct TickInfo
     };
 }
 
-
 /// <summary>
-/// The TickerBase allows you to use a Ticker even if you don't know TState or TInput.
+/// A Timeline allows you to run "ticks" based on inputs, storing the resulting "states" along the way, and rewind to any point in the game using this strategy.
+/// 
+/// * Timelines contain multiple Entities (e.g. game objects) each containing a state track and an input track (e.g. that player's state and that player's input). When adding an entity, that entity will be controlled by its ITickable implementation
+/// * You can scrub through the timeline using the Seek function. There may be constraints applied to preserve memory/CPU usage, see TimelineSettings.
+/// * You can overwrite a state in the object's history using ConfirmStateAt, and those changes will be propagated to later states using the recorded inputs.
+/// * Recorded inputs and states are in the Timeline.Entity members (inputTrack, stateTrack) with time-data pairs.
+/// * Time can be in any format you like, recommended to be based on seconds. Times are internally stored as a double to suit a practically infinite spectrum. Time deltas, however, use floats for efficiency.
+/// * See "settings" for a bunch of overrideables, such as limits on delta time and more.
 /// </summary>
 public class Timeline
 {
@@ -355,8 +361,8 @@ public class Timeline
             int closestPriorInputIndex = inputTrack.ClosestIndexBeforeInclusive(time);
 
             if (owner.settings.maxTickRate <= 0 || closestPriorInputIndex == -1
-                || (owner.settings.maxTickRateConstraint == TickerTickRateConstraint.Variable && time * owner.settings.maxTickRate - inputTrack.TimeAt(closestPriorInputIndex) * owner.settings.maxTickRate >= 0.999f)
-                || (owner.settings.maxTickRateConstraint == TickerTickRateConstraint.QuantizedTime && TimeTool.Quantize(time, owner.settings.maxTickRate) != TimeTool.Quantize(inputTrack.TimeAt(closestPriorInputIndex), owner.settings.maxTickRate)))
+                || (owner.settings.maxTickRateConstraint == TimelineTickRateConstraint.Variable && time * owner.settings.maxTickRate - inputTrack.TimeAt(closestPriorInputIndex) * owner.settings.maxTickRate >= 0.999f)
+                || (owner.settings.maxTickRateConstraint == TimelineTickRateConstraint.QuantizedTime && TimeTool.Quantize(time, owner.settings.maxTickRate) != TimeTool.Quantize(inputTrack.TimeAt(closestPriorInputIndex), owner.settings.maxTickRate)))
             {
                 // Add current player input to input history
                 inputTrack.Set(time, input);
@@ -541,6 +547,11 @@ public class Timeline
     /// </summary>
     public bool isDebugPaused { get; protected set; }
 
+    /// <summary>
+    /// Records the sequence of operations performed in the last Seek. Only updates when TimelineSeekFlags.DebugSequence is used during a seek. Used by debug tools such as TimelineDebugUI.
+    /// </summary>
+    public SeekOpSequence lastSeekDebugSequence { get; protected set; } = new SeekOpSequence();
+
 
     /// <summary>
     /// Flagged if entities need sorting for the next tick. Tick handles.
@@ -595,40 +606,37 @@ public class Timeline
         return entity;
     }
 
-
     /// <summary>
     /// Seeks to the given time. Ticks going forward beyond the latest confirmed state will call Tick on the target, with the closest available inputs.
     /// New states up to that point may be confirmed into the timeline, unless DontConfirm is used.
     ///  
     /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
     /// </summary>
-    public void Seek(double targetTime, TickerSeekFlags flags = TickerSeekFlags.None) => Seek(targetTime, flags, out _);
-
-    /// <summary>
-    /// Seeks to the given time. Ticks going forward beyond the latest confirmed state will call Tick on the target, with the closest available inputs.
-    /// New states up to that point may be confirmed into the timeline, unless DontConfirm is used.
-    ///  
-    /// If something goes wrong and the result is inaccurate - such as the seek limit being reached - Seek is still guaranteed to set playbackTime to the targetTime to avoid locking the object.
-    /// </summary>
-    public void Seek(double targetTime, TickerSeekFlags flags, out SeekOpSequence debugSequence)
+    public void Seek(double targetTime, TimelineSeekFlags flags = TimelineSeekFlags.None)
     {
-        debugSequence = (flags & TickerSeekFlags.DebugSequence) != 0 ? new SeekOpSequence() : null;
-
-        if (_entities.Count <= 0)
+        if (_entities.Count <= 0 || isDebugPaused)
             return;
 
         // Ensure entities are sorted before we run any ticks
         if (needsToSortEntities)
             SortEntities();
 
-        double startTime = float.MaxValue;
+        double startTime = targetTime;
 
         // Find the starting time of the seek so we can move them all together. This should be the latest state (!?) commonly available in all state tracks, prior to targetTime
         foreach (EntityBase entity in _entities)
-            startTime = Math.Min(entity.stateTrackBase.LatestTime, startTime);
+        {
+            int priorStateIdx = entity.stateTrackBase.ClosestIndexBeforeInclusive(startTime);
+            if (priorStateIdx != -1)
+                startTime = Math.Min(entity.stateTrackBase.TimeAt(priorStateIdx), startTime);
+        }
 
         startTime = TimeTool.Quantize(startTime, settings.fixedTickRate);
-        debugSequence?.AddOp(null, SeekOp.Type.DetermineTimes, startTime, targetTime);
+
+        SeekOpSequence debugSequence = (flags & TimelineSeekFlags.DebugSequence) != 0 ? lastSeekDebugSequence : null;
+
+        debugSequence?.Clear();
+        debugSequence?.AddOp(null, SeekOp.Type.DetermineStartState, playbackTime, startTime);
 
         // Send all tickers back to the closest confirmed time available to them before startTime
         foreach (EntityBase entity in _entities)
@@ -742,7 +750,7 @@ public class Timeline
     /// <summary>
     /// Seeks forward by the given deltaTime, if possible
     /// </summary>
-    public void SeekBy(float deltaTime, TickerSeekFlags flags = TickerSeekFlags.None) => Seek(playbackTime + deltaTime, flags);
+    public void SeekBy(float deltaTime, TimelineSeekFlags flags = TimelineSeekFlags.None) => Seek(playbackTime + deltaTime, flags);
 
     /// <summary>
     /// Enables or disables debug pause. When paused, the Seek() function may run, but will always tick to the time it was originally.
@@ -906,13 +914,3 @@ public class Timeline
         allTimelines.RemoveAll(a => a == null);
     }
 }
-
-/// <summary>
-/// A Ticker allows you to run "ticks" based on inputs, storing the resulting "states" along the way.
-/// 
-/// * You can scrub through an object's history using the Seek function. 
-/// * You can overwrite a state in the object's history using ConfirmStateAt, and those changes will be propagated to later states using the recorded inputs.
-/// * Recorded inputs and states are in the Timeline members (inputTrack, stateTrack) with time-data pairs.
-/// * Time can be in any format you like, recommended to be based on seconds. Times are internally stored as a double to suit a practically infinite spectrum. Deltas, however, use floats for efficiency as they will typically be much smaller.
-/// * See "settings" for a bunch of overrideables, such as limits on delta time and more.
-/// </summary>

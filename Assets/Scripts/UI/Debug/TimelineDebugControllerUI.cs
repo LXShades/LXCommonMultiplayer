@@ -11,16 +11,22 @@ using UnityEngine.UI;
 /// * If isControllable is enabled, the target ticker may be played, paused, and seeked.
 /// </summary>
 [RequireComponent(typeof(Event))]
-public class TickerTimelineDebugSelectorUI : MonoBehaviour
+public class TimelineDebugControllerUI : MonoBehaviour
 {
     public Dropdown dropdown;
-    public TimelineDebugUI timelineUI;
+    public TimelineDebugViewerUI timelineUI;
 
     [Header("Controllable")]
     [Tooltip("Whether the mouse and a play/pause button can be used to play, pause andor seek the selected ticker")]
     public bool isControllable = false;
     public Button playPauseButton;
     public Text playPauseButtonText;
+    public Button zoomInButton;
+    public Button zoomOutButton;
+
+    [Header("Advanced")]
+    public int currentZoomLevel = 0;
+    public float[] zoomLevelDisplayPeriods = new float[1] { 5f };
 
     private readonly List<Timeline> selectableTimelines = new List<Timeline>(32);
 
@@ -61,10 +67,18 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
         if (playPauseButton)
             playPauseButton.onClick.AddListener(OnPlayPauseClicked);
 
+        if (zoomInButton)
+            zoomInButton.onClick.AddListener(() => OnZoomClicked(1));
+        if (zoomOutButton)
+            zoomOutButton.onClick.AddListener(() => OnZoomClicked(-1));
+
         // give dropdown initial values
         RepopulateDropdown();
         // initial play/pause text
         UpdatePlayPauseButtonText();
+
+        // initial zoom
+        timelineUI.displayPeriod = zoomLevelDisplayPeriods[Mathf.Clamp(currentZoomLevel, 0, zoomLevelDisplayPeriods.Length - 1)];
     }
 
     private void OnEnable()
@@ -124,7 +138,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
                 if (timeDifference != 0f)
                 {
                     timelineUI.target.SetDebugPaused(false); // briefly allow seek
-                    timelineUI.target.Seek(targetTime, TickerSeekFlags.DebugSequence);
+                    timelineUI.target.Seek(targetTime, TimelineSeekFlags.DebugSequence);
                     timelineUI.target.SetDebugPaused(true); // briefly allow seek
                 }
             }
@@ -139,9 +153,9 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
                 double targetTime = timelineUI.target.playbackTime;
 
                 timelineUI.target.SetDebugPaused(false);
-                timelineUI.target.Seek(sourceTime);
+                timelineUI.target.Seek(sourceTime, TimelineSeekFlags.DebugSequence);
                 timelineUI.target.DebugTrimStatesAfter(sourceTime); // force reconfirmation
-                timelineUI.target.Seek(targetTime);
+                timelineUI.target.Seek(targetTime, TimelineSeekFlags.DebugSequence);
                 timelineUI.target.SetDebugPaused(true);
             }
         }
@@ -159,6 +173,16 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
 
         UpdatePlayPauseButtonText();
     }
+    private void OnZoomClicked(int delta)
+    {
+        currentZoomLevel = Mathf.Clamp(currentZoomLevel + delta, 0, zoomLevelDisplayPeriods.Length - 1);
+        RefreshZoomOnTimeline();
+    }
+
+    private void RefreshZoomOnTimeline()
+    {
+        timelineUI.SetDisplayPeriod(zoomLevelDisplayPeriods[currentZoomLevel]);
+    }
 
     private void UpdatePlayPauseButtonText()
     {
@@ -172,7 +196,7 @@ public class TickerTimelineDebugSelectorUI : MonoBehaviour
             dropdown = GetComponentInChildren<Dropdown>();
 
         if (timelineUI == null)
-            timelineUI = GetComponentInChildren<TimelineDebugUI>();
+            timelineUI = GetComponentInChildren<TimelineDebugViewerUI>();
 
         if (isControllable && playPauseButton == null)
         {

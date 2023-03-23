@@ -5,18 +5,31 @@ using UnityEngine;
 /// Displays a debug timeline for the targetTicker
 /// </summary>
 [RequireComponent(typeof(CanvasRenderer))]
-public class TimelineDebugUI : MonoBehaviour
+public class TimelineDebugViewerUI : MonoBehaviour
 {
     public Timeline target { get; set; }
 
     [Header("Display")]
-    public float timelineDisplayPeriod = 5f;
+    public float displayPeriod = 5f;
+    public float displayPeriodSmoothTime = 0.25f;
 
-    public bool showServerTime = false;
+    private float targetDisplayPeriod;
+    private float displayPeriodLerpProgress = 0f;
+
+    public bool showAuthTime = false;
     public Color32 playbackTimeColor = Color.green;
-    public Color32 confirmedTimeColor = Color.blue;
+    public float playbackTimeThickness = 3f;
+
+    public float inputHeight = 1f;
+    public float inputOffset = -1f;
+    public float stateHeight = 1f;
+    public float stateOffset = 0f;
+
     public Color32 stateColor = Color.cyan;
     public Color32 inputColor = Color.yellow;
+
+    public Color32 initialHopColor = Color.red;
+    public Color32 tickHopColor = Color.magenta;
 
     [Header("Hiearchy")]
     public UnityEngine.UI.Text targetNameText = null;
@@ -26,6 +39,7 @@ public class TimelineDebugUI : MonoBehaviour
     private void Start()
     {
         graphic = GetComponent<TimelineGraphic>();
+        targetDisplayPeriod = displayPeriod;
     }
 
     // Update is called once per frame
@@ -33,14 +47,20 @@ public class TimelineDebugUI : MonoBehaviour
     {
         if (target != null)
         {
+            displayPeriodLerpProgress = Mathf.Min(displayPeriodLerpProgress + Time.deltaTime / displayPeriodSmoothTime, 1f);
+
             double latestConfirmedStateTime = target.GetTimeOfLatestConfirmedState();
-            graphic.timeStart = (int)(Math.Max(target.playbackTime, latestConfirmedStateTime) / timelineDisplayPeriod) * timelineDisplayPeriod;
-            graphic.timeEnd = graphic.timeStart + timelineDisplayPeriod;
+            graphic.timeStart = Mathf.Lerp(
+                (int)(Math.Max(target.playbackTime, latestConfirmedStateTime) / displayPeriod) * displayPeriod,
+                (int)(Math.Max(target.playbackTime, latestConfirmedStateTime) / targetDisplayPeriod) * targetDisplayPeriod,
+                displayPeriodLerpProgress * 2);
+            graphic.timeEnd = graphic.timeStart + Mathf.Lerp(displayPeriod, targetDisplayPeriod, displayPeriodLerpProgress * 2 - 1);
 
             graphic.ClearDraw();
 
-            graphic.DrawTick(target.playbackTime, 1.5f, 0.5f, playbackTimeColor, "PT", 0);
-            graphic.DrawTick(latestConfirmedStateTime, 1.5f, 0.5f, confirmedTimeColor, "CT", 1);
+            // Draw ticks
+            graphic.DrawTick(target.playbackTime, 1.5f, 0f, playbackTimeColor, playbackTimeThickness, "Plybck", 0);
+            graphic.DrawTick(latestConfirmedStateTime, 1.5f, 0f, stateColor, 1f, "State", 1);
 
             foreach (Timeline.EntityBase entity in target.entities)
             {
@@ -48,9 +68,18 @@ public class TimelineDebugUI : MonoBehaviour
                 TimelineTrackBase stateTrack = entity.stateTrackBase;
 
                 for (int i = 0, e = inputTrack.Count; i < e; i++)
-                    graphic.DrawTick(inputTrack.TimeAt(i), 1f, -1f, inputColor);
+                    graphic.DrawTick(inputTrack.TimeAt(i), inputHeight, inputOffset, inputColor);
                 for (int i = 0, e = stateTrack.Count; i < e; i++)
-                    graphic.DrawTick(stateTrack.TimeAt(i), 0.5f, 0f, stateColor);
+                    graphic.DrawTick(stateTrack.TimeAt(i), stateHeight, stateOffset, stateColor);
+            }
+
+            // Draw sequence events
+            foreach (var seekOp in target.lastSeekDebugSequence)
+            {
+                if (seekOp.type == SeekOp.Type.DetermineStartState)
+                    graphic.DrawHop(seekOp.sourceTime, seekOp.targetTime, initialHopColor, 1f, 2f);
+                else if (seekOp.type == SeekOp.Type.Tick)
+                    graphic.DrawHop(seekOp.sourceTime, seekOp.targetTime, tickHopColor, 1f, 0.5f);
             }
 
             if (targetNameText)
@@ -60,6 +89,13 @@ public class TimelineDebugUI : MonoBehaviour
         {
             graphic.ClearDraw();
         }
+    }
+
+    public void SetDisplayPeriod(float targetDisplayPeriod)
+    {
+        displayPeriod = Mathf.Lerp(displayPeriod, targetDisplayPeriod, displayPeriodLerpProgress / displayPeriodSmoothTime);
+        this.targetDisplayPeriod = targetDisplayPeriod;
+        displayPeriodLerpProgress = 0f;
     }
 
     private GUIStyle hoverBoxStyle
