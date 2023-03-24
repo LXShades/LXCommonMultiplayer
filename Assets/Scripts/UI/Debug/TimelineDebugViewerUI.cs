@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -7,9 +9,18 @@ using UnityEngine;
 [RequireComponent(typeof(CanvasRenderer))]
 public class TimelineDebugViewerUI : MonoBehaviour
 {
+    private struct EntityUI
+    {
+        public GameObject gameObject;
+        public Timeline.EntityBase entity;
+        public UnityEngine.UI.Text entityName;
+        public TimelineGraphic timelineUI;
+    }
+
     public Timeline target { get; set; }
 
     [Header("Display")]
+    public TimelineGraphic graphic;
     public float displayPeriod = 5f;
     public float displayPeriodSmoothTime = 0.25f;
 
@@ -31,14 +42,14 @@ public class TimelineDebugViewerUI : MonoBehaviour
     public Color32 initialHopColor = Color.red;
     public Color32 tickHopColor = Color.magenta;
 
-    [Header("Hiearchy")]
-    public UnityEngine.UI.Text targetNameText = null;
+    [Header("Entities")]
+    public Transform entityUIContainer;
+    public GameObject entityUIPrefab;
 
-    public TimelineGraphic graphic { get; private set; }
+    private readonly Dictionary<Timeline.EntityBase, EntityUI> activeEntityTimelines = new Dictionary<Timeline.EntityBase, EntityUI>();
 
     private void Start()
     {
-        graphic = GetComponent<TimelineGraphic>();
         targetDisplayPeriod = displayPeriod;
     }
 
@@ -47,6 +58,8 @@ public class TimelineDebugViewerUI : MonoBehaviour
     {
         if (target != null)
         {
+            RefreshEntityUIList();
+
             displayPeriodLerpProgress = Mathf.Min(displayPeriodLerpProgress + Time.deltaTime / displayPeriodSmoothTime, 1f);
 
             double latestConfirmedStateTime = target.GetTimeOfLatestConfirmedState();
@@ -71,6 +84,21 @@ public class TimelineDebugViewerUI : MonoBehaviour
                     graphic.DrawTick(inputTrack.TimeAt(i), inputHeight, inputOffset, inputColor);
                 for (int i = 0, e = stateTrack.Count; i < e; i++)
                     graphic.DrawTick(stateTrack.TimeAt(i), stateHeight, stateOffset, stateColor);
+
+                if (activeEntityTimelines.TryGetValue(entity, out EntityUI entityUI))
+                {
+                    entityUI.timelineUI.ClearDraw();
+                    entityUI.timelineUI.timeStart = graphic.timeStart;
+                    entityUI.timelineUI.timeEnd = graphic.timeEnd;
+
+                    for (int i = 0, e = inputTrack.Count; i < e; i++)
+                        entityUI.timelineUI.DrawTick(inputTrack.TimeAt(i), inputHeight, inputOffset, inputColor);
+                    for (int i = 0, e = stateTrack.Count; i < e; i++)
+                        entityUI.timelineUI.DrawTick(stateTrack.TimeAt(i), stateHeight, stateOffset, stateColor);
+
+                    if (entityUI.entityName.text != entity.name)
+                        entityUI.entityName.text = entity.name;
+                }
             }
 
             // Draw sequence events
@@ -81,13 +109,47 @@ public class TimelineDebugViewerUI : MonoBehaviour
                 else if (seekOp.type == SeekOp.Type.Tick)
                     graphic.DrawHop(seekOp.sourceTime, seekOp.targetTime, tickHopColor, 1f, 0.5f);
             }
-
-            if (targetNameText)
-                targetNameText.text = target.name;
         }
         else
         {
             graphic.ClearDraw();
+        }
+    }
+
+    private HashSet<Timeline.EntityBase> tempEntitiesToDelete = new HashSet<Timeline.EntityBase>();
+
+    private void RefreshEntityUIList()
+    {
+        tempEntitiesToDelete.Clear();
+
+        // remove ones that don't exist now, or all of them if this is not a good time to render them
+        bool shouldForceDelete = !entityUIContainer.gameObject.activeInHierarchy || target == null;
+        foreach (KeyValuePair<Timeline.EntityBase, EntityUI> entityTimeline in activeEntityTimelines)
+        {
+            if (shouldForceDelete || !target.entities.Contains(entityTimeline.Value.entity))
+            {
+                tempEntitiesToDelete.Add(entityTimeline.Value.entity);
+                Destroy(entityTimeline.Value.gameObject);
+            }
+        }
+
+        foreach (var toDelete in tempEntitiesToDelete)
+            activeEntityTimelines.Remove(toDelete);
+
+        // add ones that exist in the timeline but not in the UI
+        foreach (Timeline.EntityBase entity in target.entities)
+        {
+            if (!activeEntityTimelines.ContainsKey(entity))
+            {
+                var entityTimelineRoot = Instantiate(entityUIPrefab, entityUIContainer);
+                activeEntityTimelines.Add(entity, new EntityUI()
+                {
+                    gameObject = entityTimelineRoot,
+                    entityName = entityTimelineRoot.GetComponentInChildren<UnityEngine.UI.Text>(),
+                    timelineUI = entityTimelineRoot.GetComponentInChildren<TimelineGraphic>(),
+                    entity = entity,
+                });
+            }
         }
     }
 

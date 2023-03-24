@@ -15,6 +15,7 @@ public class TimelineDebugControllerUI : MonoBehaviour
 {
     public Dropdown dropdown;
     public TimelineDebugViewerUI timelineUI;
+    public GameObject popOutArea;
 
     [Header("Controllable")]
     [Tooltip("Whether the mouse and a play/pause button can be used to play, pause andor seek the selected ticker")]
@@ -23,6 +24,7 @@ public class TimelineDebugControllerUI : MonoBehaviour
     public Text playPauseButtonText;
     public Button zoomInButton;
     public Button zoomOutButton;
+    public Button popOutButton;
 
     [Header("Advanced")]
     public int currentZoomLevel = 0;
@@ -71,6 +73,8 @@ public class TimelineDebugControllerUI : MonoBehaviour
             zoomInButton.onClick.AddListener(() => OnZoomClicked(1));
         if (zoomOutButton)
             zoomOutButton.onClick.AddListener(() => OnZoomClicked(-1));
+        if (popOutButton)
+            popOutButton.onClick.AddListener(OnPopOutClicked);
 
         // give dropdown initial values
         RepopulateDropdown();
@@ -177,6 +181,12 @@ public class TimelineDebugControllerUI : MonoBehaviour
     {
         currentZoomLevel = Mathf.Clamp(currentZoomLevel + delta, 0, zoomLevelDisplayPeriods.Length - 1);
         RefreshZoomOnTimeline();
+    }
+
+    private void OnPopOutClicked()
+    {
+        if (popOutArea)
+            popOutArea.SetActive(!popOutArea.activeSelf);
     }
 
     private void RefreshZoomOnTimeline()

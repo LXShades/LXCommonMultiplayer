@@ -43,31 +43,37 @@ public class TimelineGraphic : MaskableGraphic
     public float tickHeight = 20;
 
     [Header("Labels")]
-    public int labelSize = 14;
+    public Text timeStartLabel;
+    public Text timeEndLabel;
+    private double timeStartLabelValue;
+    private double timeEndLabelValue;
 
     private List<Tick> ticks = new List<Tick>(64);
     private List<Hop> hops = new List<Hop>(64);
 
-    private GUIStyle labelStyleLeft;
-    private GUIStyle labelStyleRight;
-    private GUIStyle labelStyleCentre;
-
     public double timePerScreenX => (timeEnd - timeStart) / rectTransform.rect.width / rectTransform.lossyScale.x;
 
+    /// <summary>
+    /// Returns the time at the given screen X
+    /// </summary>
     public double TimeAtScreenX(float screenX)
     {
         Vector3 relativePosition = rectTransform.InverseTransformPoint(new Vector3(screenX, 0, 0)) - new Vector3(rectTransform.rect.min.x, 0, 0);
         return timeStart + relativePosition.x * (timeEnd - timeStart) / rectTransform.rect.width;
     }
 
-    /// <summary>
-    /// Prepares the timeline for drawing
-    /// </summary>
-    public void ClearDraw()
+    private void Update()
     {
-        ticks.Clear();
-        hops.Clear();
-        SetVerticesDirty();
+        if (timeStart != timeStartLabelValue)
+        {
+            timeStartLabelValue = timeStart;
+            timeStartLabel.text = timeStart.ToString("F1");
+        }
+        if (timeEnd != timeEndLabelValue)
+        {
+            timeEndLabelValue = timeEnd;
+            timeEndLabel.text = timeEnd.ToString("F1");
+        }
     }
 
     /// <summary>
@@ -191,6 +197,16 @@ public class TimelineGraphic : MaskableGraphic
         DrawLineInternal(end, new Vector2(end.x + up.y / 4f, end.y + up.y / 4f), hop.color, hop.width);
     }
 
+    /// <summary>
+    /// Prepares the timeline for drawing
+    /// </summary>
+    public void ClearDraw()
+    {
+        ticks.Clear();
+        hops.Clear();
+        SetVerticesDirty();
+    }
+
     // Handles main UI
     protected override void OnPopulateMesh(VertexHelper vh)
     {
@@ -215,57 +231,5 @@ public class TimelineGraphic : MaskableGraphic
         // draw hops
         foreach (Hop hop in hops)
             DrawHopInternal(hop);
-    }
-
-    // Handles labels
-    private void OnGUI()
-    {
-        //if (labelStyleCentre == null)
-        {
-            InitStyles();
-        }
-
-        // get screen coords
-        Vector3 topLeft = rectTransform.TransformPoint(rectTransform.rect.xMin, rectTransform.rect.yMin, 0f);
-        Vector3 bottomRight = rectTransform.TransformPoint(rectTransform.rect.xMax, rectTransform.rect.yMax, 0f);
-
-        topLeft.y = Screen.height - topLeft.y;
-        bottomRight.y = Screen.height - bottomRight.y;
-
-        Rect pixelRect = new Rect(topLeft, bottomRight - topLeft);
-
-        // draw beginning/end time
-        GUI.contentColor = timelineColour;
-        GUI.Label(new Rect(topLeft.x, pixelRect.center.y, 0, 0), timeStart.ToString("F2"), labelStyleRight);
-        GUI.Label(new Rect(bottomRight.x, pixelRect.center.y, 0, 0), timeEnd.ToString("F2"), labelStyleLeft);
-
-        // draw tick labels
-        foreach (Tick tick in ticks)
-        {
-            if (!string.IsNullOrEmpty(tick.label))
-            {
-                GUI.contentColor = tick.color;
-                GUI.Label(new Rect((float)(pixelRect.xMin + pixelRect.width * (tick.time - timeStart) / (timeEnd - timeStart)), pixelRect.center.y + tickHeight / 2f * tick.heightScale + labelSize * 3 / 4 + tick.labelLine * (labelSize + 2), 0, 0), tick.label, labelStyleCentre);
-            }
-        }
-    }
-
-    // Initialises GUI styles
-    private void InitStyles()
-    {
-        labelStyleLeft = new GUIStyle();
-        labelStyleLeft.normal.textColor = Color.white;
-        labelStyleLeft.alignment = TextAnchor.MiddleLeft;
-        labelStyleLeft.fontSize = labelSize;
-
-        labelStyleCentre = new GUIStyle();
-        labelStyleCentre.normal.textColor = Color.white;
-        labelStyleCentre.alignment = TextAnchor.MiddleCenter;
-        labelStyleCentre.fontSize = labelSize;
-
-        labelStyleRight = new GUIStyle();
-        labelStyleRight.normal.textColor = Color.white;
-        labelStyleRight.alignment = TextAnchor.MiddleRight;
-        labelStyleRight.fontSize = labelSize;
     }
 }
