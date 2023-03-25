@@ -87,7 +87,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 serverTimeHistory.Insert(Time.timeAsDouble, time + serverExtrapolation);
                 serverTimeHistory.Trim(Time.timeAsDouble - 3d, Time.timeAsDouble + 3d);
 
-                physTimelineEntity.ConfirmStateAt(state, time);
+                physTimelineEntity.StoreStateAt(state, time);
                 timeOnServer = time + serverExtrapolation;
                 timeOfLastServerUpdate = Time.time;
             }

@@ -142,7 +142,7 @@ public class TimelineDebugControllerUI : MonoBehaviour
                 if (timeDifference != 0f)
                 {
                     timelineUI.target.SetDebugPaused(false); // briefly allow seek
-                    timelineUI.target.Seek(targetTime, TimelineSeekFlags.DebugSequence);
+                    timelineUI.target.Seek(targetTime);
                     timelineUI.target.SetDebugPaused(true); // briefly allow seek
                 }
             }
@@ -157,9 +157,9 @@ public class TimelineDebugControllerUI : MonoBehaviour
                 double targetTime = timelineUI.target.playbackTime;
 
                 timelineUI.target.SetDebugPaused(false);
-                timelineUI.target.Seek(sourceTime, TimelineSeekFlags.DebugSequence);
+                timelineUI.target.Seek(sourceTime);
                 timelineUI.target.DebugTrimStatesAfter(sourceTime); // force reconfirmation
-                timelineUI.target.Seek(targetTime, TimelineSeekFlags.DebugSequence);
+                timelineUI.target.Seek(targetTime);
                 timelineUI.target.SetDebugPaused(true);
             }
         }

@@ -104,7 +104,7 @@ public class TimelineDebugViewerUI : MonoBehaviour
             // Draw sequence events
             foreach (var seekOp in target.lastSeekDebugSequence)
             {
-                if (seekOp.type == SeekOp.Type.DetermineStartState)
+                if (seekOp.type == SeekOp.Type.DetermineStartTime)
                     graphic.DrawHop(seekOp.sourceTime, seekOp.targetTime, initialHopColor, 1f, 2f);
                 else if (seekOp.type == SeekOp.Type.Tick)
                     graphic.DrawHop(seekOp.sourceTime, seekOp.targetTime, tickHopColor, 1f, 0.5f);

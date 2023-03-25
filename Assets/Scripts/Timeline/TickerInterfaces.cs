@@ -1,5 +1,9 @@
 using System;
 
+public interface ITickableBase
+{
+}
+
 /// <summary>
 /// Qualifies something as tickable.
 /// 
@@ -9,7 +13,7 @@ using System;
 /// 
 /// This interface should implement MakeState(), ApplyState() and Tick().
 /// </summary>
-public interface ITickable<TState, TInput>
+public interface ITickable<TState, TInput> : ITickableBase
 {
     /// <summary>
     /// Ticks the object. In a networked game, you may put most important gameplay things in this function, as though it were an Update function.

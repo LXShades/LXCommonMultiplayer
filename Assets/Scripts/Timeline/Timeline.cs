@@ -34,9 +34,9 @@ public enum TimelineSeekFlags
     TreatAsReplay = 4,
 
     /// <summary>
-    /// Enables the debug sequence parameter to show the entire tick process
+    /// Disables debug sequence recording, lastSeekDebugSequence will not be updated
     /// </summary>
-    DebugSequence = 8,
+    NoDebugSequence = 8,
 };
 
 public enum TimelineTickRateConstraint
@@ -61,10 +61,12 @@ public struct SeekOp
 {
     public enum Type
     {
-        DetermineStartState, // source: playback time target: start state time
+        DetermineStartTime, // source: playback time target: start state time
         ApplyState, // target: time at state applied
         Tick, // source: tick start time target: tick end time
-        DeltaTooBig // todo
+        DeltaTooBig,
+        NoValidStartState,
+        ReachedMaxIterations
     }
 
     public Timeline.EntityBase entity;
@@ -77,26 +79,43 @@ public struct SeekOp
 
 public class SeekOpSequence : List<SeekOp>
 {
-    public override string ToString()
-    {
-        StringBuilder sb = new StringBuilder(512);
-        foreach (SeekOp op in this)
-        {
-            switch (op.type)
-            {
-                case SeekOp.Type.ApplyState: sb.AppendLine($"ApplyState({op.entity.name}, {op.targetTime})"); break;
-                case SeekOp.Type.Tick: sb.AppendLine($"Tick({op.entity.name}, {op.sourceTime} -> {op.targetTime}) dt={(op.targetTime - op.sourceTime).ToString("F2")}, curInput={op.nextInput} prevInput={op.lastInput}"); break;
-                case SeekOp.Type.DetermineStartState: sb.AppendLine($"DetermineStartState: rewind {op.sourceTime:F2}->{op.targetTime:F2}");  break;
-            }
-        }
-
-        return sb.ToString();
-    }
+    private StringBuilder sb = new StringBuilder();
 
     public void AddOp(Timeline.EntityBase entity, SeekOp.Type type, double sourceTime = 0, double targetTime = 0, int lastInput = -1, int nextInput = -1)
     {
         Add(new SeekOp() { entity = entity, sourceTime = sourceTime, targetTime = targetTime, lastInput = lastInput, nextInput = nextInput });
     }
+
+    public string GenerateLogMessage(bool includeInfo = true, bool includeWarnings = true)
+    {
+        sb.Clear();
+
+        foreach (SeekOp op in this)
+        {
+            if (includeInfo)
+            {
+                switch (op.type)
+                {
+                    case SeekOp.Type.ApplyState: sb.AppendLine($"ApplyState({op.entity.name}, {op.targetTime})"); break;
+                    case SeekOp.Type.Tick: sb.AppendLine($"Tick({op.entity.name}, {op.sourceTime} -> {op.targetTime}) dt={(op.targetTime - op.sourceTime):F2}, curInput={op.nextInput} prevInput={op.lastInput}"); break;
+                    case SeekOp.Type.DetermineStartTime: sb.AppendLine($"DetermineStartTime: rewind {op.sourceTime:F2}->{op.targetTime:F2}"); break;
+                }
+            }
+
+            if (includeWarnings)
+            {
+                switch (op.type)
+                {
+                    case SeekOp.Type.NoValidStartState: sb.AppendLine($"NoValidStartState: Entity {op.entity.name} does not have a valid state to start from. Generating a new one from the current state, and proceeding anyway."); break;
+                    case SeekOp.Type.ReachedMaxIterations: sb.AppendLine($"ReachedMaxIterations: Max iterations reached at {op.targetTime:F2}. Using the latest result we have and confirming anyway."); break;
+                }
+            }
+        }
+        return sb.ToString();
+    }
+
+    public override string ToString() => GenerateLogMessage();
+
 }
 
 [System.Serializable]
@@ -177,7 +196,7 @@ public struct TickInfo
     /// Confirmations may occur multiple times between a single pair of inputs if the gap between them exceeds maxDeltaTime.
     /// This is usually nothing to be worried about, it just means the deltas are split into smaller pieces.
     /// </summary>
-    public bool isConfirming;
+    public bool isWholeTick;
 
     /// <summary>
     /// Whether this tick is approaching a target time greater than the last Seek.
@@ -196,7 +215,7 @@ public struct TickInfo
     /// This creates an awkward scenario where it's not technically a replay, but it is partially replaying, but treating it as a full replay might miss crucial effects.
     /// In those cases, try isConfirmingNew
     /// </summary>
-    public bool isConfirmingForward => !isReplaying && isConfirming;
+    public bool isConfirmingForward => !isReplaying && isWholeTick;
 
     public TimelineSeekFlags seekFlags;
 
@@ -229,6 +248,11 @@ public class Timeline
         /// A name, useful for debugging
         /// </summary>
         public string name;
+
+        /// <summary>
+        /// The target, as a tickable base - usually you want to use the generic Entity target instead
+        /// </summary>
+        public ITickableBase targetBase;
 
         /// <summary>
         /// The lower this value, the earlier this entity will be ticked compared to the others. For reliable synchronisation, aim to set this value to something meaningful
@@ -268,9 +292,9 @@ public class Timeline
         private bool doesStateImplementDebug;
 
         /// <summary>
-        /// Confirms the current state at the given playback time
+        /// Stores the current state at the given playback time
         /// </summary>
-        public virtual void GenericConfirmCurrentState(double time, bool doClearFutureStates, bool doReapplyConfirmedState) { }
+        public virtual void GenericStoreCurrentState(double time, bool doClearFutureStates, bool doReapplyConfirmedState) { }
 
         /// <summary>
         /// Applies the state at the index
@@ -339,12 +363,12 @@ public class Timeline
         public Entity(Timeline owner, string name, ITickable<TState, TInput> target)
         {
             this.name = name;
-            this.target = target;
             this.owner = owner;
+            this.targetBase = this.target = target;
             this.stateTrackBase = this.stateTrack = new TimelineTrack<TState>();
             this.inputTrackBase = this.inputTrack = new TimelineTrack<TInput>();
 
-            ConfirmCurrentState(owner.playbackTime, false);
+            StoreCurrentState(owner.playbackTime, false);
         }
 
         /// <summary>
@@ -394,7 +418,7 @@ public class Timeline
         /// [doValidateFutureStates==true]: Clears future states
         /// [reapplyCurrentState==true]: Applies the state we just confirmed. Usual reason: Lossy compression meaning saved/loaded states aren't identical to actual state
         /// </summary>
-        public TState ConfirmCurrentState(double time, bool doClearFutureStates = true, bool reapplyCurrentState = false)
+        public TState StoreCurrentState(double time, bool doClearFutureStates = true, bool reapplyCurrentState = false)
         {
             TState state = target.MakeState();
             stateTrack.Set(time, state);
@@ -410,9 +434,9 @@ public class Timeline
         /// <summary>
         /// Confirms the current character state but does not return the state (perhaps we don't know the generic type)
         /// </summary>
-        public override void GenericConfirmCurrentState(double time, bool doClearFutureStates, bool doReapplyConfirmedState)
+        public override void GenericStoreCurrentState(double time, bool doClearFutureStates, bool doReapplyConfirmedState)
         {
-            ConfirmCurrentState(time, doClearFutureStates, doReapplyConfirmedState);
+            StoreCurrentState(time, doClearFutureStates, doReapplyConfirmedState);
         }
 
         /// <summary>
@@ -441,14 +465,9 @@ public class Timeline
         /// <summary>
         /// Inserts a state into the history.
         /// 
-        /// If the new state differs from the original confirmed state, states following that time will be invalidated (cleared). Following ticks may replay multiple states.
-        /// 
-        /// CAUTION: If the state differs from the original state at that time:
-        /// * The original state is replaced at that time
-        /// * All future confirmed states are removed (as they will likely be different when seeked again)
-        /// * The next Seek is likely to recalculate the following set of states
+        /// CAUTION: If the new state differs from the original, the states following that time will be cleared. Future Seek calls might regenerate those states.
         /// </summary>
-        public void ConfirmStateAt(TState state, double time, float precision = 0.0001f)
+        public void StoreStateAt(TState state, double time, float precision = 0.0001f)
         {
             if (owner.isDebugPaused)
                 return;
@@ -602,6 +621,14 @@ public class Timeline
     }
 
     /// <summary>
+    /// Removes the entity with the given tickable target
+    /// </summary>
+    public void RemoveEntity(ITickableBase tickable)
+    {
+        _entities.RemoveAll(x => x.targetBase == tickable);
+    }
+
+    /// <summary>
     /// Seeks to the given time. Ticks going forward beyond the latest confirmed state will call Tick on the target, with the closest available inputs.
     /// New states up to that point may be confirmed into the timeline, unless DontConfirm is used.
     ///  
@@ -628,10 +655,10 @@ public class Timeline
 
         startTime = TimeTool.Quantize(startTime, settings.fixedTickRate);
 
-        SeekOpSequence debugSequence = (flags & TimelineSeekFlags.DebugSequence) != 0 ? lastSeekDebugSequence : null;
+        SeekOpSequence debugSequence = (flags & TimelineSeekFlags.NoDebugSequence) != 0 ? null : lastSeekDebugSequence;
 
         debugSequence?.Clear();
-        debugSequence?.AddOp(null, SeekOp.Type.DetermineStartState, playbackTime, startTime);
+        debugSequence?.AddOp(null, SeekOp.Type.DetermineStartTime, playbackTime, startTime);
 
         // Send all tickers back to the closest confirmed time available to them before startTime
         foreach (EntityBase entity in _entities)
@@ -641,14 +668,13 @@ public class Timeline
             if (closestStateToStart != -1)
             {
                 entity.GenericApplyState(closestStateToStart);
-
-                // LF: what happens if the state is earlier than StartTime? This entity gets an older state compared to the others? Or we move the startTime back even further?
             }
             else
             {
-                entity.GenericConfirmCurrentState(startTime, true, true);
-
-                Debug.LogWarning($@"Timeline.Seek(): Entity {entity} did not have a valid state in the history to start at. Ignoring this, generating a new one from the current state, and proceeding.");
+                // LF: what happens if the state is earlier than StartTime? This entity gets an older state compared to the others? Or we move the startTime back even further?
+                // FOR NOW - we just take the current state and add the warning in the sequence
+                entity.GenericStoreCurrentState(startTime, true, true);
+                debugSequence?.AddOp(entity, SeekOp.Type.NoValidStartState);
             }
 
             entity.stateTrackBase.TrimAfter(startTime);
@@ -663,20 +689,20 @@ public class Timeline
         while (currentTime < targetTime && numIterations <= settings.maxSeekIterations)
         {
             double nextTime = Math.Min(TimeTool.Quantize(currentTime + tickrateDelta + 0.00001f, settings.fixedTickRate), targetTime);
-            bool canConfirmNextState = nextTime != targetTime || targetTime == TimeTool.Quantize(targetTime, settings.fixedTickRate);
+            bool canStoreNextState = nextTime != targetTime || targetTime == TimeTool.Quantize(targetTime, settings.fixedTickRate);
 
             // Warn if this is the last iteration we can handle
             if (numIterations == settings.maxSeekIterations && nextTime != targetTime)
             {
-                Debug.LogWarning($@"Timeline.Seek({targetTime.ToString("F1")}) hit max iterations {settings.maxSeekIterations}. Using the latest result we have and confirming anyway.");
+                debugSequence.AddOp(null, SeekOp.Type.ReachedMaxIterations, startTime, currentTime);
                 nextTime = targetTime;
-                canConfirmNextState = true; // todo - otherwise possible freeze when max iterations is reached and that's no good
+                canStoreNextState = true; // todo - otherwise possible freeze when max iterations is reached and that's no good
             }
 
             // Prepare tick info
             TickInfo tickInfo = new TickInfo()
             {
-                isConfirming = canConfirmNextState,
+                isWholeTick = canStoreNextState,
                 isReplaying = nextTime <= lastSeekTargetTime,
                 seekFlags = flags,
                 time = nextTime
@@ -726,8 +752,8 @@ public class Timeline
             {
                 // We confirm states at the end, so that different entities can influence each other without those influences being erased
                 // e.g. character is simulated, then rocks are simulated, rocks impart a force on characters; we want the characters' new force to be reflected in their state
-                if (canConfirmNextState)
-                    entity.GenericConfirmCurrentState(nextTime, false, true);
+                if (canStoreNextState)
+                    entity.GenericStoreCurrentState(nextTime, false, true);
             }
 
             isInTick = false;

@@ -183,7 +183,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             if (!NetworkServer.active) // don't affect host player
             {
                 timelineEntity.InsertInput(input, time);
-                timelineEntity.ConfirmStateAt(state, time);
+                timelineEntity.StoreStateAt(state, time);
                 timeOnServer = time + serverExtrapolation;
                 timeOfLastReceivedServerUpdate = Time.timeAsDouble;
             }
