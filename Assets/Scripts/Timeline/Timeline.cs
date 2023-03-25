@@ -83,7 +83,7 @@ public class SeekOpSequence : List<SeekOp>
 
     public void AddOp(Timeline.EntityBase entity, SeekOp.Type type, double sourceTime = 0, double targetTime = 0, int lastInput = -1, int nextInput = -1)
     {
-        Add(new SeekOp() { entity = entity, sourceTime = sourceTime, targetTime = targetTime, lastInput = lastInput, nextInput = nextInput });
+        Add(new SeekOp() { type = type, entity = entity, sourceTime = sourceTime, targetTime = targetTime, lastInput = lastInput, nextInput = nextInput });
     }
 
     public string GenerateLogMessage(bool includeInfo = true, bool includeWarnings = true)
@@ -211,11 +211,9 @@ public struct TickInfo
     public bool isReplaying;
 
     /// <summary>
-    /// A confirmation may hop back slightly in time if extrapolation is used, but the destination is still forward in time.
-    /// This creates an awkward scenario where it's not technically a replay, but it is partially replaying, but treating it as a full replay might miss crucial effects.
-    /// In those cases, try isConfirmingNew
+    /// Whether this is a whole tick whose destination is further than the time in the previous Seek call.
     /// </summary>
-    public bool isConfirmingForward => !isReplaying && isWholeTick;
+    public bool isWholeForwardTick => !isReplaying && isWholeTick;
 
     public TimelineSeekFlags seekFlags;
 
@@ -544,7 +542,7 @@ public class Timeline
     /// <summary>
     /// The last time that was Seeked to. Similar to playbackTime, BUT it does not change during ConfirmStateAt. This is needed for isForward Usually you shouldn't care about this
     /// </summary>
-    public double lastSeekTargetTime { get; protected set; }
+    public double lastSeekFullTickTimeReached { get; protected set; }
 
     /// <summary>
     /// Whether the ticker is currently ticking in a Seek process
@@ -686,6 +684,7 @@ public class Timeline
         int numIterations = 0;
 
         // Run each proper tick
+        double finalSeekTime = lastSeekFullTickTimeReached;
         while (currentTime < targetTime && numIterations <= settings.maxSeekIterations)
         {
             double nextTime = Math.Min(TimeTool.Quantize(currentTime + tickrateDelta + 0.00001f, settings.fixedTickRate), targetTime);
@@ -703,7 +702,7 @@ public class Timeline
             TickInfo tickInfo = new TickInfo()
             {
                 isWholeTick = canStoreNextState,
-                isReplaying = nextTime <= lastSeekTargetTime,
+                isReplaying = nextTime <= lastSeekFullTickTimeReached,
                 seekFlags = flags,
                 time = nextTime
             };
@@ -719,13 +718,14 @@ public class Timeline
             }
 
             // Run all the tickers for this interval
+            float currentDelta = (float)(nextTime - currentTime);
+
             foreach (EntityBase entity in _entities)
             {
                 // Previous input is quantized to our tickrate, meaning if there are multiple inputs between a single interval in our low tickrate (ie tickrate < input rate), we accept the quantized one only
                 // This is unique to the multi seek. In regular Seek, inputs will define the deltas, this one uses a fixed delta so needs to ensure it uses the inputs closest to those deltas
                 // TODO - quantize all - end the suffering
                 int currentInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(currentTime, settings.fixedTickRate));
-                float currentDelta = (float)(nextTime - currentTime);
                 int prevInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(currentTime - (tickrateDelta - 0.00001f), settings.fixedTickRate));
 
                 debugSequence?.AddOp(entity, SeekOp.Type.Tick, currentTime, nextTime, prevInput, currentInput);
@@ -757,12 +757,17 @@ public class Timeline
             }
 
             isInTick = false;
-            lastSeekTargetTime = nextTime;
 
             currentTime = nextTime;
             playbackTime = currentTime;
             numIterations++;
+
+            if (canStoreNextState)
+                lastSeekFullTickTimeReached = nextTime;
         }
+
+        // This is used to track forward ticks (ticks that should generate e.g. realtime effects)
+        lastSeekFullTickTimeReached = finalSeekTime;
 
         // Run history cleanups
         CleanupHistory();
