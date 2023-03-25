@@ -215,7 +215,7 @@ public struct TickInfo
     /// <summary>
     /// Whether this is a whole tick whose destination is further than the time in the previous Seek call.
     /// </summary>
-    public bool isWholeForwardTick => isForwardTick && isFullTick;
+    public bool isFullForwardTick => isForwardTick && isFullTick;
 
     public TimelineSeekFlags seekFlags;
 
@@ -715,7 +715,7 @@ public class Timeline
             // Invoke events before the tick so that actual tick can become aware of and respond to latest events as quickly as possible
             for (int i = 0; i < eventTrack.Count; i++)
             {
-                if (eventTrack.TimeAt(i) >= playbackTime && eventTrack.TimeAt(i) < nextTime)
+                if (currentTime <= eventTrack.TimeAt(i) && nextTime > eventTrack.TimeAt(i))
                     eventTrack[i]?.Invoke(tickInfo);
             }
 

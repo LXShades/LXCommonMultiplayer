@@ -111,7 +111,7 @@ public class TimelineDebugViewerUI : MonoBehaviour
                         entityUI.timelineUI.DrawTick(stateTrack.TimeAt(i), stateHeight, stateOffset, stateColor);
 
                     if (entityUI.entityName.text != entity.name)
-                        entityUI.entityName.text = entity.name;
+                        entityUI.entityName.text = $"{entity.name} [{entity.tickPriority}]";
                 }
             }
 

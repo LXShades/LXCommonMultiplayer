@@ -1,4 +1,5 @@
 ﻿using Mirror;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -12,6 +13,12 @@ using UnityEngine;
 /// </summary>
 public class GameState : NetworkBehaviour
 {
+    internal struct GameStateComponentAwaiter
+    {
+        public UnityEngine.Object awaiter;
+        public Action<GameStateComponent> onAvailableCallback;
+    }
+
     public delegate void OnGameEndedDelegate(GameState gameState);
 
     /// <summary>
@@ -51,6 +58,8 @@ public class GameState : NetworkBehaviour
 
     [SyncVar]
     private bool _isWinScreen = false;
+
+    internal static Dictionary<Type, List<GameStateComponentAwaiter>> gameStateComponentAwaiters = new Dictionary<Type, List<GameStateComponentAwaiter>>();
 
     public override void OnStartClient()
     {
@@ -146,10 +155,38 @@ public class GameState : NetworkBehaviour
     /// <summary>
     /// Returns a GameState component, if it exists in the current game state
     /// </summary>
-    public static bool Get<TComponent>(out TComponent netGameStateComponent) where TComponent : Component
+    public static bool Get<TComponent>(out TComponent netGameStateComponent) where TComponent : GameStateComponent
     {
         netGameStateComponent = null;
         return singleton != null ? singleton.TryGetComponent<TComponent>(out netGameStateComponent) : false;
+    }
+
+    /// <summary>
+    /// Calls onAvailable when the requested GameState component becomes available, or immediately if it is already
+    /// </summary>
+    public static void GetWhenAvailable<TComponent>(UnityEngine.Object awaiter, Action<TComponent> onAvailable) where TComponent : GameStateComponent
+    {
+        TComponent component;
+        if (Get(out component))
+            onAvailable?.Invoke(component);
+        else
+        {
+            List<GameStateComponentAwaiter> awaiters;
+            if (!gameStateComponentAwaiters.TryGetValue(typeof(TComponent), out awaiters))
+            {
+                awaiters = new List<GameStateComponentAwaiter>(8);
+                gameStateComponentAwaiters[typeof(TComponent)] = awaiters;
+            }
+
+            if (awaiters.Count > 50) // HACK: clean up occasionally, this needs work.
+                awaiters.RemoveAll(x => x.awaiter == null);
+
+            awaiters.Add(new GameStateComponentAwaiter()
+            {
+                awaiter = awaiter,
+                onAvailableCallback = component => onAvailable?.Invoke((TComponent)component)
+            });
+        }
     }
 
     public string GetWinners()
