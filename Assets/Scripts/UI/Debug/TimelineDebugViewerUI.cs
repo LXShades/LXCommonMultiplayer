@@ -23,24 +23,30 @@ public class TimelineDebugViewerUI : MonoBehaviour
     public TimelineGraphic graphic;
     public float displayPeriod = 5f;
     public float displayPeriodSmoothTime = 0.25f;
+    public bool stabiliseView = false;
 
     private float targetDisplayPeriod;
     private float displayPeriodLerpProgress = 0f;
 
+    [Header("Marker Appearances")]
     public bool showAuthTime = false;
+
     public Color32 playbackTimeColor = Color.green;
     public float playbackTimeThickness = 3f;
 
-    public float inputHeight = 1f;
-    public float inputOffset = -1f;
+    public Color32 stateColor = Color.cyan;
     public float stateHeight = 1f;
     public float stateOffset = 0f;
 
-    public Color32 stateColor = Color.cyan;
     public Color32 inputColor = Color.yellow;
+    public float inputHeight = 1f;
+    public float inputOffset = -1f;
 
     public Color32 initialHopColor = Color.red;
-    public Color32 tickHopColor = Color.magenta;
+    public Color32 fullTickHopColor = Color.green;
+    public Color32 forwardTickHopColor = Color.blue;
+    public Color32 fullForwardTickHopColor = Color.yellow;
+    public Color32 partialReplayingTickHopColor = Color.white;
 
     [Header("Entities")]
     public Transform entityUIContainer;
@@ -63,11 +69,19 @@ public class TimelineDebugViewerUI : MonoBehaviour
             displayPeriodLerpProgress = Mathf.Min(displayPeriodLerpProgress + Time.deltaTime / displayPeriodSmoothTime, 1f);
 
             double latestConfirmedStateTime = target.GetTimeOfLatestConfirmedState();
-            graphic.timeStart = Mathf.Lerp(
-                (int)(Math.Max(target.playbackTime, latestConfirmedStateTime) / displayPeriod) * displayPeriod,
-                (int)(Math.Max(target.playbackTime, latestConfirmedStateTime) / targetDisplayPeriod) * targetDisplayPeriod,
-                displayPeriodLerpProgress * 2);
-            graphic.timeEnd = graphic.timeStart + Mathf.Lerp(displayPeriod, targetDisplayPeriod, displayPeriodLerpProgress * 2 - 1);
+            if (stabiliseView)
+            {
+                graphic.timeEnd = target.playbackTime + displayPeriod * 0.1f; // little hardcoded margin for now
+                graphic.timeStart = graphic.timeEnd - displayPeriod;
+            }
+            else
+            {
+                graphic.timeStart = Mathf.Lerp(
+                    (int)(Math.Max(target.playbackTime, latestConfirmedStateTime) / displayPeriod) * displayPeriod,
+                    (int)(Math.Max(target.playbackTime, latestConfirmedStateTime) / targetDisplayPeriod) * targetDisplayPeriod,
+                    displayPeriodLerpProgress * 2);
+                graphic.timeEnd = graphic.timeStart + Mathf.Lerp(displayPeriod, targetDisplayPeriod, displayPeriodLerpProgress * 2 - 1);
+            }
 
             graphic.ClearDraw();
 
@@ -105,9 +119,18 @@ public class TimelineDebugViewerUI : MonoBehaviour
             foreach (var seekOp in target.lastSeekDebugSequence)
             {
                 if (seekOp.type == SeekOp.Type.DetermineStartTime)
-                    graphic.DrawHop(seekOp.sourceTime, seekOp.targetTime, initialHopColor, 1f, 2f);
+                    graphic.DrawHop(seekOp.doubleA, seekOp.doubleB, initialHopColor, 1f, 1f);
                 else if (seekOp.type == SeekOp.Type.Tick)
-                    graphic.DrawHop(seekOp.sourceTime, seekOp.targetTime, tickHopColor, 1f, 0.5f);
+                {
+                    if ((seekOp.flags & SeekOp.Flags.IsFullTick) != 0 && (seekOp.flags & SeekOp.Flags.IsForwardTick) != 0)
+                        graphic.DrawHop(seekOp.doubleA, seekOp.doubleB, fullForwardTickHopColor, 1f, 0.5f, 2);
+                    else if ((seekOp.flags & SeekOp.Flags.IsFullTick) != 0)
+                        graphic.DrawHop(seekOp.doubleA, seekOp.doubleB, fullTickHopColor, 1f, 0.5f);
+                    else if ((seekOp.flags & SeekOp.Flags.IsForwardTick) != 0)
+                        graphic.DrawHop(seekOp.doubleA, seekOp.doubleB, forwardTickHopColor, 1f, 0.5f);
+                    else
+                        graphic.DrawHop(seekOp.doubleA, seekOp.doubleB, partialReplayingTickHopColor, 1f, 0.5f);
+                }
             }
         }
         else
@@ -183,16 +206,21 @@ public class TimelineDebugViewerUI : MonoBehaviour
             string lastInputInfo = "TODO";// target.GetInputInfoAtTime(time);
             string lastStateInfo = "TODO";// target.GetStateInfoAtTime(time);
 
-            Rect infoBoxRect = new Rect(new Vector3(Input.mousePosition.x, Screen.height - Input.mousePosition.y), new Vector2(400f, 300f));
-            string textToDisplay = $"Time: {time.ToString("F2")}s\nInput:\n{lastInputInfo}\nState:\n{lastStateInfo}";
-            Vector2 size = hoverBoxStyle.CalcSize(new GUIContent(textToDisplay));
-
-            infoBoxRect.size = size;
+            string textToDisplay = $"Playback: {target.playbackTime.ToString("F2")}\nHovered: {time.ToString("F2")}s\nInput:\n{lastInputInfo}\nState:\n{lastStateInfo}";
+            Vector2 size = new Vector2(400f, hoverBoxStyle.CalcHeight(new GUIContent(textToDisplay), 400f));
+            Rect infoBoxRect = new Rect(new Vector3(Input.mousePosition.x, Screen.height - Input.mousePosition.y), size);
 
             if (infoBoxRect.xMax > Screen.width)
                 infoBoxRect.x = Screen.width - infoBoxRect.width;
             if (infoBoxRect.yMax > Screen.height)
-                infoBoxRect.yMax = Screen.height - infoBoxRect.height;
+            {
+                var ok = Screen.height - Input.mousePosition.y - infoBoxRect.height;
+                infoBoxRect.y = ok;
+            }
+            if (infoBoxRect.y < 0)
+                infoBoxRect.y = 0;
+            if (infoBoxRect.x < 0)
+                infoBoxRect.x = 0;
 
             GUI.Box(infoBoxRect, textToDisplay, hoverBoxStyle);
         }

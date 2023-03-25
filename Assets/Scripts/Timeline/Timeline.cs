@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using static Timeline;
 
 public delegate void TimelineEvent(TickInfo tickInfo);
 
@@ -69,21 +70,36 @@ public struct SeekOp
         ReachedMaxIterations
     }
 
+    [Flags]
+    public enum Flags
+    {
+        IsFullTick = 1,
+        IsForwardTick = 2
+    }
+
+    public static SeekOp DetermineStartTime(double previousPlaybackTime, double startingStateTime) => new SeekOp { type = Type.DetermineStartTime, doubleA = previousPlaybackTime, doubleB = startingStateTime };
+    public static SeekOp ApplyState(Timeline.EntityBase entity, double time) => new SeekOp { type = Type.ApplyState, entity = entity, doubleA = time };
+    public static SeekOp Tick(Timeline.EntityBase entity, double prevTime, double nextTime, int prevInput, int nextInput, Flags flags) => new SeekOp { type = Type.Tick, entity = entity, doubleA = prevTime, doubleB = nextTime, intA = prevInput, intB = nextInput, flags = flags };
+    public static SeekOp DeltaTooBig(double currentTime, double nextTime) => new SeekOp { type = Type.DeltaTooBig, doubleA = currentTime, doubleB = nextTime };
+    public static SeekOp NoValidStartState(Timeline.EntityBase entity) => new SeekOp { type = Type.NoValidStartState, entity = entity };
+    public static SeekOp ReachedMaxIterations(int numIterations) => new SeekOp { type = Type.ReachedMaxIterations, intA = numIterations };
+
     public Timeline.EntityBase entity;
     public Type type;
-    public double sourceTime;
-    public double targetTime;
-    public int lastInput;
-    public int nextInput;
+    public double doubleA;
+    public double doubleB;
+    public int intA;
+    public int intB;
+    public Flags flags;
 }
 
 public class SeekOpSequence : List<SeekOp>
 {
     private StringBuilder sb = new StringBuilder();
 
-    public void AddOp(Timeline.EntityBase entity, SeekOp.Type type, double sourceTime = 0, double targetTime = 0, int lastInput = -1, int nextInput = -1)
+    public void AddOp(SeekOp seekOp)
     {
-        Add(new SeekOp() { type = type, entity = entity, sourceTime = sourceTime, targetTime = targetTime, lastInput = lastInput, nextInput = nextInput });
+        Add(seekOp);
     }
 
     public string GenerateLogMessage(bool includeInfo = true, bool includeWarnings = true)
@@ -96,9 +112,9 @@ public class SeekOpSequence : List<SeekOp>
             {
                 switch (op.type)
                 {
-                    case SeekOp.Type.ApplyState: sb.AppendLine($"ApplyState({op.entity.name}, {op.targetTime})"); break;
-                    case SeekOp.Type.Tick: sb.AppendLine($"Tick({op.entity.name}, {op.sourceTime} -> {op.targetTime}) dt={(op.targetTime - op.sourceTime):F2}, curInput={op.nextInput} prevInput={op.lastInput}"); break;
-                    case SeekOp.Type.DetermineStartTime: sb.AppendLine($"DetermineStartTime: rewind {op.sourceTime:F2}->{op.targetTime:F2}"); break;
+                    case SeekOp.Type.ApplyState: sb.AppendLine($"ApplyState({op.entity.name}, {op.doubleB})"); break;
+                    case SeekOp.Type.Tick: sb.AppendLine($"Tick({op.entity.name}, {op.doubleA} -> {op.doubleB}) dt={(op.doubleB - op.doubleA):F2}, curInput={op.intB} prevInput={op.intA} isFull={(op.flags & SeekOp.Flags.IsFullTick) != 0} isForward={(op.flags & SeekOp.Flags.IsForwardTick) != 0}"); break;
+                    case SeekOp.Type.DetermineStartTime: sb.AppendLine($"DetermineStartTime: rewind {op.doubleA:F2}->{op.doubleB:F2}"); break;
                 }
             }
 
@@ -107,7 +123,8 @@ public class SeekOpSequence : List<SeekOp>
                 switch (op.type)
                 {
                     case SeekOp.Type.NoValidStartState: sb.AppendLine($"NoValidStartState: Entity {op.entity.name} does not have a valid state to start from. Generating a new one from the current state, and proceeding anyway."); break;
-                    case SeekOp.Type.ReachedMaxIterations: sb.AppendLine($"ReachedMaxIterations: Max iterations reached at {op.targetTime:F2}. Using the latest result we have and confirming anyway."); break;
+                    case SeekOp.Type.ReachedMaxIterations: sb.AppendLine($"ReachedMaxIterations: Max iterations reached at {op.intA:F2}. Using the latest result we have and confirming anyway."); break;
+                    case SeekOp.Type.DeltaTooBig: sb.AppendLine($"DeltaTooBig: {op.doubleA:F2}->{op.doubleB:F2} too big dt={op.doubleB - op.doubleA:F2}"); break;
                 }
             }
         }
@@ -186,40 +203,25 @@ public struct TickInfo
     public double time;
 
     /// <summary>
-    /// Whether this tick is part of a confirmation. A "confirmation" happens when:
-    /// * There is a known input both before and after the tick period (inclusive)
-    /// * OR the target time from the known input exceeds maxDeltaTime (a confirmation happens in this case)
-    /// * AND seekFlags does not contain TickerSeekFlags.DontConfirm.
-    /// 
-    /// Confirmations exist so that inputs can have variable delta times, and they make sure both client/server get the same deltas and results.
-    /// 
-    /// Confirmations may occur multiple times between a single pair of inputs if the gap between them exceeds maxDeltaTime.
-    /// This is usually nothing to be worried about, it just means the deltas are split into smaller pieces.
+    /// Whether this tick is full (not partial). A partial tick can occur at the end of a Seek sequence when it has not gone far enough to cross the tick boundary at the fixed tickrate.
     /// </summary>
-    public bool isWholeTick;
+    public bool isFullTick;
 
     /// <summary>
-    /// Whether this tick is approaching a target time greater than the last Seek.
-    /// This is confusing so here's an example of why it's needed:
-    /// * A player is ticking at time=5
-    /// * Player receives a state confirmation in the past at time 4.5. playbackTime has been set to 4.5.
-    /// * Next frame, the player is ticking at time=5.5. However, playbackTime is still 4.5, and we don't want to replay sound and visual effects between 4.5 and 5.0.
-    /// 
-    /// In the above scenario, isReplaying will be true between 4.5 and 5.0, and false from 5.0 beyond
-    /// tl;dr isReplaying = currentTime > destinationTimeAtPreviousSeek
+    /// Whether this tick has a target time greater than the last Seek. This is useful for "realtime" stuff like sound effects
     /// </summary>
-    public bool isReplaying;
+    public bool isForwardTick;
 
     /// <summary>
     /// Whether this is a whole tick whose destination is further than the time in the previous Seek call.
     /// </summary>
-    public bool isWholeForwardTick => !isReplaying && isWholeTick;
+    public bool isWholeForwardTick => isForwardTick && isFullTick;
 
     public TimelineSeekFlags seekFlags;
 
     public static TickInfo Default = new TickInfo()
     {
-        isReplaying = false
+        isForwardTick = true
     };
 }
 
@@ -656,7 +658,7 @@ public class Timeline
         SeekOpSequence debugSequence = (flags & TimelineSeekFlags.NoDebugSequence) != 0 ? null : lastSeekDebugSequence;
 
         debugSequence?.Clear();
-        debugSequence?.AddOp(null, SeekOp.Type.DetermineStartTime, playbackTime, startTime);
+        debugSequence?.AddOp(SeekOp.DetermineStartTime(playbackTime, startTime));
 
         // Send all tickers back to the closest confirmed time available to them before startTime
         foreach (EntityBase entity in _entities)
@@ -672,7 +674,7 @@ public class Timeline
                 // LF: what happens if the state is earlier than StartTime? This entity gets an older state compared to the others? Or we move the startTime back even further?
                 // FOR NOW - we just take the current state and add the warning in the sequence
                 entity.GenericStoreCurrentState(startTime, true, true);
-                debugSequence?.AddOp(entity, SeekOp.Type.NoValidStartState);
+                debugSequence?.AddOp(SeekOp.NoValidStartState(entity));
             }
 
             entity.stateTrackBase.TrimAfter(startTime);
@@ -682,9 +684,9 @@ public class Timeline
         double currentTime = startTime;
         float tickrateDelta = 1f / settings.fixedTickRate; // subtract a tiny amount so it doesn't overlap into previous quantized thing (PAIN)
         int numIterations = 0;
+        double latestFullTickEndTime = 0;
 
         // Run each proper tick
-        double finalSeekTime = lastSeekFullTickTimeReached;
         while (currentTime < targetTime && numIterations <= settings.maxSeekIterations)
         {
             double nextTime = Math.Min(TimeTool.Quantize(currentTime + tickrateDelta + 0.00001f, settings.fixedTickRate), targetTime);
@@ -693,7 +695,7 @@ public class Timeline
             // Warn if this is the last iteration we can handle
             if (numIterations == settings.maxSeekIterations && nextTime != targetTime)
             {
-                debugSequence.AddOp(null, SeekOp.Type.ReachedMaxIterations, startTime, currentTime);
+                debugSequence.AddOp(SeekOp.ReachedMaxIterations(numIterations));
                 nextTime = targetTime;
                 canStoreNextState = true; // todo - otherwise possible freeze when max iterations is reached and that's no good
             }
@@ -701,8 +703,8 @@ public class Timeline
             // Prepare tick info
             TickInfo tickInfo = new TickInfo()
             {
-                isWholeTick = canStoreNextState,
-                isReplaying = nextTime <= lastSeekFullTickTimeReached,
+                isFullTick = canStoreNextState,
+                isForwardTick = nextTime > lastSeekFullTickTimeReached,
                 seekFlags = flags,
                 time = nextTime
             };
@@ -719,6 +721,14 @@ public class Timeline
 
             // Run all the tickers for this interval
             float currentDelta = (float)(nextTime - currentTime);
+            SeekOp.Flags seekOpFlags = (canStoreNextState ? SeekOp.Flags.IsFullTick : 0) | (tickInfo.isForwardTick ? SeekOp.Flags.IsForwardTick : 0);
+
+            if (currentDelta > settings.maxDeltaTime)
+            {
+                // Does this happen anymore? Probably doesn't/shouldn't
+                debugSequence?.AddOp(SeekOp.DeltaTooBig(currentTime, nextTime));
+                currentDelta = settings.maxDeltaTime;
+            }
 
             foreach (EntityBase entity in _entities)
             {
@@ -728,13 +738,7 @@ public class Timeline
                 int currentInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(currentTime, settings.fixedTickRate));
                 int prevInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(currentTime - (tickrateDelta - 0.00001f), settings.fixedTickRate));
 
-                debugSequence?.AddOp(entity, SeekOp.Type.Tick, currentTime, nextTime, prevInput, currentInput);
-
-                if (currentDelta > settings.maxDeltaTime)
-                {
-                    debugSequence?.AddOp(entity, SeekOp.Type.DeltaTooBig, currentTime, currentDelta, prevInput, currentInput);
-                    currentDelta = settings.maxDeltaTime;
-                }
+                debugSequence?.AddOp(SeekOp.Tick(entity, currentTime, nextTime, prevInput, currentInput, seekOpFlags));
 
                 try
                 {
@@ -763,11 +767,12 @@ public class Timeline
             numIterations++;
 
             if (canStoreNextState)
-                lastSeekFullTickTimeReached = nextTime;
+                latestFullTickEndTime = nextTime;
         }
 
-        // This is used to track forward ticks (ticks that should generate e.g. realtime effects)
-        lastSeekFullTickTimeReached = finalSeekTime;
+        // Update this at the end (a previous oversight put it at the end of the while loop, but that meant it affected following tickInfo structures)
+        if (latestFullTickEndTime > 0)
+            lastSeekFullTickTimeReached = latestFullTickEndTime;
 
         // Run history cleanups
         CleanupHistory();

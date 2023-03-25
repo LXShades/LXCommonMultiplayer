@@ -25,6 +25,7 @@ public class TimelineDebugControllerUI : MonoBehaviour
     public Button zoomInButton;
     public Button zoomOutButton;
     public Button popOutButton;
+    public Toggle stabiliseViewToggle;
 
     [Header("Advanced")]
     public int currentZoomLevel = 0;
@@ -75,6 +76,11 @@ public class TimelineDebugControllerUI : MonoBehaviour
             zoomOutButton.onClick.AddListener(() => OnZoomClicked(-1));
         if (popOutButton)
             popOutButton.onClick.AddListener(OnPopOutClicked);
+        if (stabiliseViewToggle)
+        {
+            stabiliseViewToggle.isOn = timelineUI.stabiliseView;
+            stabiliseViewToggle.onValueChanged.AddListener(OnFollowTimeToggled);
+        }
 
         // give dropdown initial values
         RepopulateDropdown();
@@ -150,17 +156,11 @@ public class TimelineDebugControllerUI : MonoBehaviour
 
         if (eventData is PointerEventData pointerEvent2)
         {
-            // scroll source time
+            // clear states after
             if (pointerEvent2.button == PointerEventData.InputButton.Right)
             {
                 double sourceTime = timelineUI.graphic.TimeAtScreenX(pointerEvent2.position.x);
-                double targetTime = timelineUI.target.playbackTime;
-
-                timelineUI.target.SetDebugPaused(false);
-                timelineUI.target.Seek(sourceTime);
-                timelineUI.target.DebugTrimStatesAfter(sourceTime); // force reconfirmation
-                timelineUI.target.Seek(targetTime);
-                timelineUI.target.SetDebugPaused(true);
+                timelineUI.target.DebugTrimStatesAfter(sourceTime);
             }
         }
     }
@@ -187,6 +187,11 @@ public class TimelineDebugControllerUI : MonoBehaviour
     {
         if (popOutArea)
             popOutArea.SetActive(!popOutArea.activeSelf);
+    }
+
+    private void OnFollowTimeToggled(bool value)
+    {
+        timelineUI.stabiliseView = value;
     }
 
     private void RefreshZoomOnTimeline()
