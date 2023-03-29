@@ -232,7 +232,7 @@ public class TimelineTrack<T> : TimelineTrackBase
     public bool TryGetPointsAtTime(double time, out int previousIndex, out int nextIndex, out float blend)
     {
         // edge case - if it's exactly the latest
-        if (items.Count == 1 && items[0].time == time)
+        if (items.Count > 0 && items[0].time == time)
         {
             previousIndex = nextIndex = 0;
             blend = 0f;
