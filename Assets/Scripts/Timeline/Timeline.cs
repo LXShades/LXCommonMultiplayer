@@ -196,6 +196,16 @@ public struct TimelineSettings
 
 public struct TickInfo
 {
+    public static TickInfo Default = new TickInfo()
+    {
+        isForwardTick = true
+    };
+
+    /// <summary>
+    /// The timeline performing this tick
+    /// </summary>
+    public Timeline timeline;
+
     /// <summary>
     /// The time of this tick. This is evaluated after deltaTime (so eg first frame with deltaTime=0.5, time is 0.5). Therefore this is not guaranteed to start at 0.
     /// If deltaTime is clamped (due to too many iterations or missing data), time is still the intended target time which may be further ahead than previousTime+deltaTime
@@ -217,12 +227,10 @@ public struct TickInfo
     /// </summary>
     public bool isFullForwardTick => isForwardTick && isFullTick;
 
+    /// <summary>
+    /// The seek flags being used the seek driving this tick
+    /// </summary>
     public TimelineSeekFlags seekFlags;
-
-    public static TickInfo Default = new TickInfo()
-    {
-        isForwardTick = true
-    };
 }
 
 /// <summary>

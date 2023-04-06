@@ -39,7 +39,7 @@ public class NetPlayer : NetworkBehaviour
     public static Dictionary<int, NetPlayer> playerById = new Dictionary<int, NetPlayer>();
 
     /// <summary>
-    /// ALWAYS NULL CHECK EACH PLAYER! List of all players currently known in the game. May contain null gaps and order is not guaranteed
+    /// List of all players currently known in the game. NOT ASSOCIATED WITH PLAYER IDS.
     /// </summary>
     public static List<NetPlayer> players = new List<NetPlayer>();
 
@@ -223,6 +223,11 @@ public class NetPlayer : NetworkBehaviour
             }
         }
         return null;
+    }
+
+    public static NetPlayer FindPlayerForID(int playerId)
+    {
+        return playerById.TryGetValue(playerId, out NetPlayer player) ? player : null;
     }
 
     private static int FindNewPlayerId()
