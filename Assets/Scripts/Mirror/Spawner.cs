@@ -2,6 +2,9 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 /// <summary>
 /// Spawner is a helper class for spawning GameObjects, predictively or otherwise, through a single code path
@@ -53,6 +56,8 @@ public class Spawner : MonoBehaviour
     private readonly Dictionary<Guid, GameObject> prefabByGuid = new Dictionary<Guid, GameObject>();
 
     public List<GameObject> spawnablePrefabs = new List<GameObject>();
+    public bool autoSearchPrefabsOnValidate;
+    public bool warnIfSlowSearch = true;
 
     public string[] prefabSearchFolders = new string[] { "Assets/Prefabs" };
     public string[] prefabExcludeFolders = new string[] { "" };
@@ -279,6 +284,96 @@ public class Spawner : MonoBehaviour
     {
         return new SpawnPrediction() { startId = (ushort)((singleton.localPlayerId << 8) | singleton.nextClientPredictionId) };
     }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (autoSearchPrefabsOnValidate)
+        {
+            Editor_SearchAssetsAndRepopulatePrefabs();
+        }
+    }
+
+    public void Editor_SearchAssetsAndRepopulatePrefabs()
+    {
+        string[] prefabs = AssetDatabase.FindAssets($"t:prefab");
+        bool isSpawnerDirty = false;
+        System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        foreach (string prefabGuid in prefabs)
+        {
+            string prefabPath = AssetDatabase.GUIDToAssetPath(prefabGuid);
+            string prefabPathLower = prefabPath.ToLower();
+            bool isInCorrectFolder = prefabSearchFolders.Length == 0;
+
+            // Include file if it's in the search folder
+            foreach (string searchFolder in prefabSearchFolders)
+            {
+                if (prefabPathLower.StartsWith(searchFolder.ToLower()))
+                {
+                    isInCorrectFolder = true;
+                    break;
+                }
+            }
+
+            // But exclude it if it's it's also in the exclude folder
+            if (isInCorrectFolder)
+            {
+                foreach (string excludeFolder in prefabExcludeFolders)
+                {
+                    if (prefabPathLower.StartsWith(excludeFolder.ToLower()))
+                    {
+                        isInCorrectFolder = false;
+                        break;
+                    }
+                }
+            }
+
+            if (isInCorrectFolder)
+            {
+                GameObject prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+
+                if (prefabAsset)
+                {
+                    if (prefabAsset.GetComponent<NetworkIdentity>() != null)
+                    {
+                        if (!spawnablePrefabs.Contains(prefabAsset))
+                        {
+                            if (!isSpawnerDirty)
+                            {
+                                isSpawnerDirty = true;
+                                Undo.RecordObject(this, "Scan spawner prefabs");
+                            }
+
+                            spawnablePrefabs.Add(prefabAsset);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isSpawnerDirty)
+        {
+            EditorUtility.SetDirty(this);
+        }
+
+        long timeTaken = stopwatch.ElapsedMilliseconds;
+        if (warnIfSlowSearch && timeTaken > 500)
+        {
+            Debug.LogWarning($"[UnityMultiplayerEssentials] Spawner took {timeTaken} to find prefabs.{(autoSearchPrefabsOnValidate ? " Consider disabling auto search to avoid recaching on startup" : "")}");
+        }
+    }
+
+    public void Editor_Clear()
+    {
+        if (spawnablePrefabs.Count > 0)
+        {
+            Undo.RecordObject(this, "Clear spawner prefabs");
+            spawnablePrefabs.Clear();
+            EditorUtility.SetDirty(this);
+        }
+    }
+#endif
 }
 
 public interface ISpawnCallbacks

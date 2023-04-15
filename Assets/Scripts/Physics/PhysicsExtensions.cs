@@ -6,6 +6,7 @@ public static class PhysicsExtensions
 
     private static RaycastHit[] hitBuffer = new RaycastHit[kMaxHits];
     private static Collider[] overlapBuffer = new Collider[kMaxHits];
+    private static Collider[] overlapBufferB = new Collider[kMaxHits];
 
     private static int[] collidingLayerMaskPerLayer = new int[32];
     private static bool[] hasCollidingLayerMaskPerLayer = new bool[32];
@@ -83,21 +84,7 @@ public static class PhysicsExtensions
     /// </summary>
     public static bool HasOverlap(Collider collider, QueryTriggerInteraction triggerInteraction, in Parameters parameters)
     {
-        int numOverlaps = 0;
-        Transform transform = collider.transform;
-        switch (collider)
-        {
-            // todo: support collider include/exclude layers? (pain)
-            case BoxCollider asBox:
-                numOverlaps = Physics.OverlapBoxNonAlloc(transform.TransformPoint(asBox.center), VectorExtensions.Multiplied(asBox.size, transform.lossyScale) * 0.5f, overlapBuffer, transform.rotation, GetCollidingLayerMaskForLayer(collider.gameObject.layer), triggerInteraction);
-                break;
-            default:
-                // note: if it's not supported, doesn't mean it's not possible, just means I haven't had to use it yet
-                Debug.LogError($"[PhysicsExtensions.OverlapCollider] Unsupported collider type {collider.GetType()}, sorry!");
-                return false;
-        }
-
-        return GetFilteredResult(overlapBuffer, numOverlaps, in parameters, collider);
+        return Overlap(collider, triggerInteraction, in parameters, overlapBufferB) > 0;
     }
 
     public static int GetCollidingLayerMaskForLayer(int layer)
