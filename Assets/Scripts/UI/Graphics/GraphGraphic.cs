@@ -33,7 +33,7 @@ public class GraphGraphic : ExtendedGraphic
         return outCurve;
     }
 
-    public void ClearTimeAfter(float time)
+    public void ClearTimeAfter(double time)
     {
         foreach (GraphCurve curve in curves)
             curve.data.TrimAfter(time);

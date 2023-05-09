@@ -404,7 +404,7 @@ public class Movement : MonoBehaviour
                                         hitsOut[p] = hitsOut[p - 1];
 
                                     hitsOut[0].normal = hitDirection;
-                                    hitsOut[0].collider = collider;
+                                    hitsOut[0].collider = nearbyColliderBuffer[i];
                                     hitsOut[0].hasPoint = false;
                                 }
 

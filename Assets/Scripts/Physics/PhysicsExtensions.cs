@@ -73,7 +73,7 @@ public static class PhysicsExtensions
         for (int i = 0; i < numOverlaps && numCollidersOut < overlapsOut.Length; i++)
         {
             Collider overlap = overlapBuffer[i];
-            if (overlap != parameters.ignoreObject && overlap != collider)
+            if (overlap != parameters.ignoreObject && overlap.gameObject != collider.gameObject)
                 overlapsOut[numCollidersOut++] = overlap;
         }
         return numCollidersOut;
