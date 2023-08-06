@@ -43,6 +43,44 @@ public static class VectorExtensions
         vec.x = value.x;
         vec.z = value.z;
     }
+    
+    /// <summary>
+    /// Returns the vector with its horizontal (x,z) components clamped to the given max magnitude
+    /// </summary>
+    public static Vector3 ClampedHorizontally(ref this Vector3 vec, float magnitude)
+    {
+        Vector2 horizontal = new Vector2(vec.x, vec.z);
+        float originalMagnitude = horizontal.magnitude;
+
+        if (originalMagnitude > magnitude)
+        {
+            horizontal *= magnitude / originalMagnitude;
+            return new Vector3(horizontal.x, vec.y, horizontal.y);
+        }
+        else
+        {
+            return vec;
+        }
+    }
+
+    /// <summary>
+    /// Reduces the horizontal magnitude of the vector by the given amount (friction)
+    /// </summary>
+    public static Vector3 ReducedHorizontally(ref this Vector3 vec, float reductionAmount)
+    {
+        Vector2 horizontalVec = new Vector2(vec.x, vec.z);
+        float horizontalMagnitude = horizontalVec.magnitude;
+
+        if (horizontalMagnitude > reductionAmount)
+        {
+            horizontalVec -= horizontalVec * (reductionAmount / horizontalMagnitude);
+            return new Vector3(horizontalVec.x, vec.y, horizontalVec.y);
+        }
+        else
+        {
+            return new Vector3(0f, vec.y, 0f);
+        }
+    }
 
     /// <summary>
     /// Returns how far along the axis the vector goes. The axis does not need to be normalized

@@ -332,7 +332,17 @@ public class PlaytestTools : MonoBehaviour
                 BuildOptions buildOptions = BuildOptions.Development
                     | (buildType == BuildType.ScriptsOnly ? BuildOptions.BuildScriptsOnly : 0);
 
-                UnityEditor.Build.Reporting.BuildReport buildReport = BuildPipeline.BuildPlayer(levels.ToArray(), buildName, playtestBuildTarget, buildOptions);
+                // HACK: some versions of Unity under some circumstances will completely ignore the target build folder and causes it to error, this is a sneaky bypass
+                string originalUserBuildFolder = EditorUserBuildSettings.GetBuildLocation(playtestBuildTarget);
+                EditorUserBuildSettings.SetBuildLocation(playtestBuildTarget, playtestBuildPath);
+                UnityEditor.Build.Reporting.BuildReport buildReport = BuildPipeline.BuildPlayer(new BuildPlayerOptions()
+                {
+                    scenes = levels.ToArray(),
+                    locationPathName = buildName,
+                    options = buildOptions,
+                    target = playtestBuildTarget
+                });
+                EditorUserBuildSettings.SetBuildLocation(playtestBuildTarget, originalUserBuildFolder);
 
                 EditorSceneManager.OpenScene(originalScene);
 

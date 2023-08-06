@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -288,6 +289,8 @@ public class Spawner : MonoBehaviour
 #if UNITY_EDITOR
     private void OnValidate()
     {
+        return; // TODO - throws "cannot call SendMessage in OnValidate" by LoadAssetAtPath...
+
         if (autoSearchPrefabsOnValidate)
         {
             Editor_SearchAssetsAndRepopulatePrefabs();
@@ -299,6 +302,9 @@ public class Spawner : MonoBehaviour
         string[] prefabs = AssetDatabase.FindAssets($"t:prefab");
         bool isSpawnerDirty = false;
         System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        if (Array.IndexOf(prefabExcludeFolders, "") != -1)
+            prefabExcludeFolders = prefabExcludeFolders.Where(x => !string.IsNullOrEmpty(x)).ToArray(); // remove erroneous/confusing exclude entries
 
         foreach (string prefabGuid in prefabs)
         {
