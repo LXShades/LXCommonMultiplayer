@@ -88,6 +88,7 @@ public class PlaytestTools : MonoBehaviour
     {
         "connect self.bat", "start \"\" \"[buildExecutable]\" -connect 127.0.0.1",
         "host scene 1.bat", "start \"\" \"[buildExecutable]\" -host -scene 1",
+        "server scene 1.bat", "start \"\" \"[buildExecutable]\" -server -scene 1",
     };
 
     public const string kMultiplayerMenu = "Multiplayer/Playtest/";
