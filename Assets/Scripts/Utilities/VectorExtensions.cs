@@ -36,6 +36,21 @@ public static class VectorExtensions
     }
 
     /// <summary>
+    /// Returns the vector with the X component changed. Great for temporarily modifying a single component of a property e.g transform.position = transform.position.WithX(0f);
+    /// </summary>
+    public static Vector3 WithX(in this Vector3 vec, float x) => new Vector3(x, vec.y, vec.z);
+
+    /// <summary>
+    /// Returns the vector with the Y component changed. Great for temporarily modifying a single component of a property e.g transform.position = transform.position.WithY(0f);
+    /// </summary>
+    public static Vector3 WithY(in this Vector3 vec, float y) => new Vector3(vec.x, y, vec.z);
+
+    /// <summary>
+    /// Returns the vector with the Z component changed. Great for temporarily modifying a single component of a property e.g transform.position = transform.position.WithZ(0f);
+    /// </summary>
+    public static Vector3 WithZ(in this Vector3 vec, float z) => new Vector3(vec.x, vec.y, z);
+
+    /// <summary>
     /// Sets the horizontal component of the vector only
     /// </summary>
     public static void SetHorizontal(ref this Vector3 vec, Vector3 value)
