@@ -123,7 +123,7 @@ public static class DebugDraw
     }
 
     /// <summary>
-    /// Draws a line between start and end in world coordinates
+    /// Draws a line between start and end
     /// </summary>
     public static void DrawLine(Vector3 start, Vector3 end, Style style)
     {
@@ -134,6 +134,51 @@ public static class DebugDraw
         output.points.Add(start);
         output.points.Add(end);
     }
+
+    /// <summary>
+    /// Draws a box between the given min and max
+    /// </summary>
+    public static void DrawBox(Vector3 min, Vector3 max, Style style)
+    {
+        RequestDrawThisFrame();
+
+        DebugShape output = GetNewShape(style);
+
+        // top square
+        output.points.Add(max);
+        output.points.Add(new Vector3(max.x, max.y, min.z));
+        output.points.Add(new Vector3(max.x, max.y, min.z));
+        output.points.Add(new Vector3(min.x, max.y, min.z));
+        output.points.Add(new Vector3(min.x, max.y, min.z));
+        output.points.Add(new Vector3(min.x, max.y, max.z));
+        output.points.Add(new Vector3(min.x, max.y, max.z));
+        output.points.Add(max);
+
+        // bottom square
+        output.points.Add(new Vector3(max.x, min.y, max.z));
+        output.points.Add(new Vector3(max.x, min.y, min.z));
+        output.points.Add(new Vector3(max.x, min.y, min.z));
+        output.points.Add(new Vector3(min.x, min.y, min.z));
+        output.points.Add(min);
+        output.points.Add(new Vector3(min.x, min.y, max.z));
+        output.points.Add(new Vector3(min.x, min.y, max.z));
+        output.points.Add(new Vector3(max.x, min.y, max.z));
+
+        // pillars
+        output.points.Add(new Vector3(max.x, max.y, max.z));
+        output.points.Add(new Vector3(max.x, min.y, max.z));
+        output.points.Add(new Vector3(max.x, max.y, min.z));
+        output.points.Add(new Vector3(max.x, min.y, min.z));
+        output.points.Add(new Vector3(min.x, max.y, min.z));
+        output.points.Add(new Vector3(min.x, min.y, min.z));
+        output.points.Add(new Vector3(min.x, max.y, max.z));
+        output.points.Add(new Vector3(min.x, min.y, max.z));
+    }
+
+    /// <summary>
+    /// Draws a bounds struct
+    /// </summary>
+    public static void DrawBounds(Bounds bounds, Style style) => DrawBox(bounds.min, bounds.max, style);
 
     /// <summary>
     /// Draws a horizontally flat grid between start and end
@@ -155,7 +200,7 @@ public static class DebugDraw
     }
 
     /// <summary>
-    /// Draws an arrow between start and end in world coordinates
+    /// Draws an arrow between start and end
     /// </summary>
     public static void DrawArrow(Vector3 start, Vector3 end, Style style)
     {
