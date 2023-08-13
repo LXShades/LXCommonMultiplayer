@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 /// <summary>
@@ -6,10 +8,73 @@ using UnityEngine;
 /// </summary>
 public static class DebugDraw
 {
+    /// <summary>
+    /// DrawStyles. You can use them conventionally or use a preset e.g. DrawStyle.Default and modify it e.g. DrawStyle.Default.Color(Color.red)
+    /// 
+    /// DrawStyles implicitly 
+    /// </summary>
+    public struct Style
+    {
+        /// <summary>
+        /// Thickness of the line in approx pixels-ish. Only works if the ThickLineShader is available.
+        /// </summary>
+        public float thickness { get; private set; }
+        /// <summary>
+        /// Color of the line
+        /// </summary>
+        public Color color { get; private set; }
+        /// <summary>
+        /// If above 0, the line may persist for a while
+        /// </summary>
+        public float duration { get; private set; }
+
+        public static Style DefaultWhite = new Style()
+        {
+            color = UnityEngine.Color.white,
+            thickness = 3f,
+            duration = 0,
+        };
+
+        public static Style Inherit = new Style()
+        {
+            color = new Color(0, 0, 0, 0),
+            thickness = -1,
+            duration = -1
+        };
+
+        public static Style Thick = new Style()
+        {
+            color = new Color(0, 0, 0, 0),
+            thickness = 5f,
+            duration = -1
+        };
+
+        public static Style Persistent = new Style()
+        {
+            color = new Color(0, 0, 0, 0),
+            thickness = -1,
+            duration = 5f
+        };
+
+        public static implicit operator Style(Color colorIn) => Style.Inherit.Color(colorIn);
+
+        public Style Thickness(float thicknessIn) => new Style() { thickness = thicknessIn, color = color, duration = duration };
+        public Style Color(Color colorIn) => new Style() { thickness = thickness, color = colorIn, duration = duration };
+        public Style Duration(float durationIn) => new Style() { thickness = thickness, color = color, duration = durationIn };
+
+        public Style Merge(Style next) => new Style()
+        {
+            duration = next.duration == -1 ? this.duration : next.duration,
+            thickness = next.thickness == -1 ? this.thickness : next.thickness,
+            color = next.color.a == 0 ? this.color : next.color
+        };
+    }
+
     private class DebugShape
     {
         public List<Vector3> points = new List<Vector3>();
-        public Color color = Color.white;
+        public Style style;
+        public float creationTime;
     }
 
     private static Material lineMaterial
@@ -38,31 +103,46 @@ public static class DebugDraw
 
     private static List<DebugShape> currentDebugShapes = new List<DebugShape>();
     private static List<DebugShape> previousDebugShapes = new List<DebugShape>();
+    private static List<DebugShape> preserveDebugShapes = new List<DebugShape>();
     private static List<DebugShape> debugShapePool = new List<DebugShape>();
 
     private static bool hasBufferedPausedShapes = false;
 
-    public static float lineThickness = 2f;
+    private static double lastRenderFullTime = -1; // hack to detect when _all_ cameras have finished rendering in multi-camera setup
+
+    /// <summary>
+    /// Default style. When merged with another style via a PushStyle or temprorily with a draw call, some properties can be overridden
+    /// </summary>
+    private static List<Style> styleStack = new List<Style>(8) { Style.DefaultWhite };
+
+    [Obsolete("Prefer PushStyle/PopStyle")]
+    public static float lineThickness
+    {
+        get => styleStack[styleStack.Count - 1].thickness;
+        set => styleStack[styleStack.Count - 1] = styleStack[styleStack.Count - 1].Thickness(value);
+    }
 
     /// <summary>
     /// Draws a line between start and end in world coordinates
     /// </summary>
-    public static void DrawLine(Vector3 start, Vector3 end, Color color)
+    public static void DrawLine(Vector3 start, Vector3 end, Style style)
     {
-        DebugShape output = GetNewShape(color);
+        RequestDrawThisFrame();
+
+        DebugShape output = GetNewShape(style);
 
         output.points.Add(start);
         output.points.Add(end);
-
-        RequestDrawThisFrame();
     }
 
     /// <summary>
     /// Draws a horizontally flat grid between start and end
     /// </summary>
-    public static void DrawHorizontalGrid(Vector3 start, Vector3 end, float y, Color color, int numDivisions)
+    public static void DrawHorizontalGrid(Vector3 start, Vector3 end, float y, Style style, int numDivisions)
     {
-        DebugShape output = GetNewShape(color);
+        RequestDrawThisFrame();
+
+        DebugShape output = GetNewShape(style);
 
         Vector3 startToEnd = end - start;
         for (int i = 0; i <= numDivisions; i++)
@@ -72,16 +152,16 @@ public static class DebugDraw
             output.points.Add(new Vector3(start.x, y, start.z + startToEnd.z * i / numDivisions));
             output.points.Add(new Vector3(end.x, y, start.z + startToEnd.z * i / numDivisions));
         }
-
-        RequestDrawThisFrame();
     }
 
     /// <summary>
     /// Draws an arrow between start and end in world coordinates
     /// </summary>
-    public static void DrawArrow(Vector3 start, Vector3 end, Color color)
+    public static void DrawArrow(Vector3 start, Vector3 end, Style style)
     {
-        DebugShape output = GetNewShape(color);
+        RequestDrawThisFrame();
+
+        DebugShape output = GetNewShape(style);
 
         float length = Vector3.Distance(start, end);
         float arrowHeadRatio = 0.2f;
@@ -103,16 +183,17 @@ public static class DebugDraw
         output.points.Add(arrowSection - localRight * arrowWidth);
         output.points.Add(end);
 
-        RequestDrawThisFrame();
     }
 
     /// <summary>
     /// Draws a cross at the specified position
     /// </summary>
-    public static void DrawCross(Vector3 position, float crossSize, Color color)
+    public static void DrawCross(Vector3 position, float crossSize, Style style)
     {
+        RequestDrawThisFrame();
+
         float halfSize = crossSize * 0.5f;
-        DebugShape output = GetNewShape(color);
+        DebugShape output = GetNewShape(style);
 
         output.points.Add(position + new Vector3(halfSize, 0f, 0f));
         output.points.Add(position - new Vector3(halfSize, 0f, 0f));
@@ -120,18 +201,18 @@ public static class DebugDraw
         output.points.Add(position - new Vector3(0f, halfSize, 0f));
         output.points.Add(position + new Vector3(0f, 0f, halfSize));
         output.points.Add(position - new Vector3(0f, 0f, halfSize));
-
-        RequestDrawThisFrame();
     }
 
     /// <summary>
     /// Draws a sphere of the given world position and radius
     /// </summary>
-    public static void DrawSphere(Vector3 position, float radius, Color color, int numLongitudeSegments = 4, int numCircleSegments = 16)
+    public static void DrawSphere(Vector3 position, float radius, Style style, int numLongitudeSegments = 4, int numCircleSegments = 16)
     {
+        RequestDrawThisFrame();
+
         float radsPerLongitude = kRadsInCircle / numLongitudeSegments;
         float radsPerCircleSegment = kRadsInCircle / numCircleSegments;
-        DebugShape output = GetNewShape(color);
+        DebugShape output = GetNewShape(style);
 
         // longitude circles
         for (float longitude = 0f; longitude < kRadsInCircle; longitude += radsPerLongitude)
@@ -161,16 +242,16 @@ public static class DebugDraw
 
             last2 = next;
         }
-
-        RequestDrawThisFrame();
     }
 
     /// <summary>
     /// Draws a top-down circle of the given world position and radius
     /// </summary>
-    public static void DrawCircle(Vector3 position, float radius, Color color, int numSegments = 16)
+    public static void DrawCircle(Vector3 position, float radius, Style style, int numSegments = 16)
     {
-        DebugShape output = GetNewShape(color);
+        RequestDrawThisFrame();
+
+        DebugShape output = GetNewShape(style);
         float radsPerLongitude = kRadsInCircle / numSegments;
         Vector3 last = position + new Vector3(0f, 0f, radius);
 
@@ -181,16 +262,16 @@ public static class DebugDraw
             output.points.Add(next);
             last = next;
         }
-
-        RequestDrawThisFrame();
     }
 
     /// <summary>
     /// Draws an up-oriented circle of the given world position and radius
     /// </summary>
-    public static void DrawCircle(Vector3 position, float radius, Color color, Vector3 up, int numSegments = 16)
+    public static void DrawCircle(Vector3 position, float radius, Style style, Vector3 up, int numSegments = 16)
     {
-        DebugShape output = GetNewShape(color);
+        RequestDrawThisFrame();
+
+        DebugShape output = GetNewShape(style);
         float radsPerLongitude = kRadsInCircle / numSegments;
         Vector3 right = Mathf.Abs(Vector3.Dot(up, Vector3.up)) < 0.99f ? Vector3.Cross(up, Vector3.up): Vector3.right;
         Vector3 forward = Vector3.Cross(right, up);
@@ -203,16 +284,16 @@ public static class DebugDraw
             output.points.Add(next);
             last = next;
         }
-
-        RequestDrawThisFrame();
     }
 
     /// <summary>
     /// Draws a capsule of the given world start/end points and radius
     /// </summary>
-    public static void DrawCapsule(Vector3 start, Vector3 end, float radius, Color color, int numLongitudeSegments = 4, int numTipSegments = 8)
+    public static void DrawCapsule(Vector3 start, Vector3 end, float radius, Style style, int numLongitudeSegments = 4, int numTipSegments = 8)
     {
-        DebugShape output = GetNewShape(color);
+        RequestDrawThisFrame();
+
+        DebugShape output = GetNewShape(style);
 
         Vector3 localUp = (end - start).normalized;
         Vector3 localRight = localUp.y > -0.99f && localUp.y < 0.99f ? Vector3.Cross(Vector3.up, localUp).normalized : Vector3.right;
@@ -252,22 +333,68 @@ public static class DebugDraw
                 lastEndSeg = nextEndSeg;
             }
         }
-
-        RequestDrawThisFrame();
     }
 
-    public static void DrawCapsuleFromCentres(Vector3 start, Vector3 end, float radius, Color color, int numLongitudeSegments = 4, int numTipSegments = 8)
+    public static void DrawCapsuleFromCentres(Vector3 start, Vector3 end, float radius, Style style, int numLongitudeSegments = 4, int numTipSegments = 8)
     {
         Vector3 startToEnd = (end - start).normalized;
-        DrawCapsule(start - startToEnd * radius, end + startToEnd * radius, radius, color, numLongitudeSegments, numTipSegments);
+        DrawCapsule(start - startToEnd * radius, end + startToEnd * radius, radius, style, numLongitudeSegments, numTipSegments);
     }
 
-    public static void DrawCharacterController(CharacterController controller, Color color)
+    /// <summary>
+    /// Draws a collider at its current position
+    /// </summary>
+    public static void DrawCollider(Collider collider, Style style)
+    {
+        DrawCollider(collider.transform.position, collider, style);
+    }
+
+    /// <summary>
+    /// Draws a collider at an overridden position
+    /// </summary>
+    public static void DrawCollider(Vector3 position, Collider collider, Style style)
+    {
+        Vector3 lossyScale = collider.transform.lossyScale;
+        switch (collider)
+        {
+            case CapsuleCollider capsule:
+            {
+                float halfHeight = capsule.height * 0.5f;
+                Vector3 tipOffset = capsule.transform.TransformVector(capsule.direction == 0 ? new Vector3(halfHeight, 0f, 0f) : (capsule.direction == 1 ? new Vector3(0f, halfHeight, 0f) : new Vector3(0f, 0f, halfHeight)));
+                DrawCapsule(position - tipOffset, position + tipOffset, capsule.radius, style);
+                break;
+            }
+            case CharacterController controller:
+            {
+                float halfHeight = Mathf.Min(controller.radius, controller.height * 0.5f);
+                Vector3 tipOffset = controller.transform.TransformVector(new Vector3(0f, halfHeight, 0f));
+                DrawCapsule(position - tipOffset, position + tipOffset, controller.radius, style);
+                break;
+            }
+            case SphereCollider sphere:
+                DrawSphere(sphere.transform.position, Math.Max(Math.Max(lossyScale.x, lossyScale.y), lossyScale.z), style);
+                break;
+        }
+    }
+    public static void DrawCharacterController(CharacterController controller, Style style)
     {
         Vector3 scale = controller.transform.lossyScale;
         float controllerRadius = controller.radius * Mathf.Max(scale.x, scale.z), controllerHeight = controller.height * scale.y;
         Vector3 center = controller.transform.TransformPoint(controller.center.x, controller.center.y, controller.center.z);
-        DrawCapsule(center + Vector3.up * (controllerHeight * 0.5f), center - Vector3.up * (controllerHeight * 0.5f), controllerRadius, color);
+        DrawCapsule(center + Vector3.up * (controllerHeight * 0.5f), center - Vector3.up * (controllerHeight * 0.5f), controllerRadius, style);
+    }
+
+    public static void PushStyle(Style style)
+    {
+        styleStack.Add(styleStack[styleStack.Count - 1].Merge(style));
+    }
+
+    public static void PopStyle(Style style)
+    {
+        if (styleStack.Count > 1)
+            styleStack.RemoveAt(styleStack.Count - 1);
+        else
+            Debug.LogError("DebugDraw.PopStyle(): style stack is empty, Pop called too many times compared to Push. Ignoring.");
     }
 
     private static void RequestDrawThisFrame()
@@ -275,13 +402,19 @@ public static class DebugDraw
         Camera.onPostRender -= OnFinalRenderDebugShapes;
         Camera.onPostRender += OnFinalRenderDebugShapes;
 
+        if (Time.unscaledTimeAsDouble != lastRenderFullTime)
+        {
+            lastRenderFullTime = Time.unscaledTimeAsDouble;
+            SwapShapeBuffers();
+        }
+
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.pauseStateChanged -= OnPauseStateChanged;
         UnityEditor.EditorApplication.pauseStateChanged += OnPauseStateChanged;
 #endif
     }
 
-    private static DebugShape GetNewShape(Color color)
+    private static DebugShape GetNewShape(Style styleIn)
     {
         if (hasBufferedPausedShapes)
         {
@@ -302,7 +435,8 @@ public static class DebugDraw
             currentDebugShapes.Add(output);
 
             output.points.Clear();
-            output.color = color;
+            output.style = styleStack[styleStack.Count - 1].Merge(styleIn);
+            output.creationTime = Time.time;
 
             return output;
         }
@@ -314,8 +448,64 @@ public static class DebugDraw
         }
     }
 
+    private static void SwapShapeBuffers()
+    {
+        // Clear old shape buffer now
+#if UNITY_EDITOR
+        if (!UnityEditor.EditorApplication.isPaused)
+        {
+#endif
+            preserveDebugShapes.Clear();
+
+            float currentTime = Time.time;
+            for (int i = currentDebugShapes.Count - 1; i >= 0; i--)
+            {
+                if (currentDebugShapes[i].style.duration > 0)
+                {
+                    if (currentTime - currentDebugShapes[i].creationTime <= currentDebugShapes[i].style.duration)
+                    {
+                        preserveDebugShapes.Add(currentDebugShapes[i]);
+                        currentDebugShapes.RemoveAt(i);
+                    }
+                }
+            }
+
+            debugShapePool.AddRange(previousDebugShapes);
+            previousDebugShapes.Clear();
+
+            previousDebugShapes.AddRange(currentDebugShapes);
+            currentDebugShapes.Clear();
+
+            currentDebugShapes.AddRange(preserveDebugShapes);
+
+            styleStack.Clear();
+            styleStack.Add(Style.DefaultWhite);
+#if UNITY_EDITOR
+        }
+        else
+        {
+            // todo: check this still works
+            // this can happen in the event of a step
+            hasBufferedPausedShapes = true;
+        }
+#endif
+    }
+
     private static void OnFinalRenderDebugShapes(Camera cam)
     {
+        if (Time.unscaledTimeAsDouble != lastRenderFullTime)
+        {
+            lastRenderFullTime = Time.unscaledTimeAsDouble;
+
+            SwapShapeBuffers();
+
+            if (currentDebugShapes.Count == 0) // persistent shapes might still exist and we'll want to keep this callback going if so
+            {
+                Camera.onPostRender -= OnFinalRenderDebugShapes;
+                return;
+            }
+        }
+
         lineMaterial.SetFloat("_LineThickness", lineThickness);
         lineMaterial.SetPass(0);
 
@@ -326,7 +516,8 @@ public static class DebugDraw
 
         foreach (DebugShape shape in currentDebugShapes)
         {
-            GL.Color(shape.color);
+            GL.Color(shape.style.color);
+            GL.TexCoord(new Vector3(shape.style.thickness, 0f, 0f));
 
             for (int i = 0, e = shape.points.Count / 2 * 2; i < e; i++)
             {
@@ -337,25 +528,7 @@ public static class DebugDraw
         GL.End();
         GL.PopMatrix();
 
-#if UNITY_EDITOR
-        if (!UnityEditor.EditorApplication.isPaused)
-        {
-#endif
-            debugShapePool.AddRange(previousDebugShapes);
-            previousDebugShapes.Clear();
-
-            previousDebugShapes.AddRange(currentDebugShapes);
-            currentDebugShapes.Clear();
-
-            Camera.onPostRender -= OnFinalRenderDebugShapes;
-#if UNITY_EDITOR
-        }
-        else
-        {
-            // this can happen in the event of a step
-            hasBufferedPausedShapes = true;
-        }
-#endif
+        lastRenderFullTime = Time.unscaledTimeAsDouble;
     }
 
 #if UNITY_EDITOR

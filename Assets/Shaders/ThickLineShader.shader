@@ -26,12 +26,14 @@ Shader "Unlit/UnityMultiplayerEssentials/ThickLineShader"
             {
                 float4 vertex : POSITION;
                 fixed4 color : COLOR;
+                fixed thickness : TEXCOORD0;
             };
 
             struct v2g
             {
                 float4 vertex : POSITION;
                 fixed4 color : COLOR;
+                fixed thickness : TEXCOORD0;
                 UNITY_FOG_COORDS(1)
             };
 
@@ -50,23 +52,15 @@ Shader "Unlit/UnityMultiplayerEssentials/ThickLineShader"
                 v2g o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.color = v.color;
+                o.thickness = v.thickness;
                 UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
-            }
-
-            fixed4 frag (g2f i) : SV_Target
-            {
-                // sample the texture
-                fixed4 col = i.color;
-                // apply fog
-                UNITY_APPLY_FOG(i.fogCoord, col);
-                return col;
             }
 
             [maxvertexcount(6)]
             void geom(line v2g input[2], inout TriangleStream<g2f> triStream)
             {
-                float4 side = normalize(float4(input[1].vertex.y - input[0].vertex.y, input[0].vertex.x - input[1].vertex.x, 0, 0)) * (input[0].vertex.w / _ScreenParams.x * _LineThickness);
+                float4 side = normalize(float4(input[1].vertex.y - input[0].vertex.y, input[0].vertex.x - input[1].vertex.x, 0, 0)) * (input[0].vertex.w / _ScreenParams.x * _LineThickness * input[0].thickness);
                 g2f output;
                 float4 topLeft = input[0].vertex - side, topRight = input[0].vertex + side, bottomLeft = input[1].vertex - side, bottomRight = input[1].vertex + side;
 
@@ -99,6 +93,15 @@ Shader "Unlit/UnityMultiplayerEssentials/ThickLineShader"
                 output.vertex = topRight;
                 UNITY_TRANSFER_FOG(output, output.vertex);
                 triStream.Append(output);
+            }
+
+            fixed4 frag (g2f i) : SV_Target
+            {
+                // sample the texture
+                fixed4 col = i.color;
+                // apply fog
+                UNITY_APPLY_FOG(i.fogCoord, col);
+                return col;
             }
             ENDCG
         }
