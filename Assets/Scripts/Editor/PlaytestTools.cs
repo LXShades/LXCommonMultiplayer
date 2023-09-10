@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
@@ -11,6 +12,8 @@ using UnityAssembly = UnityEditor.Compilation.Assembly;
 [InitializeOnLoad]
 public class PlaytestTools : MonoBehaviour
 {
+    public delegate void PreBuildFunction(ref BuildPlayerOptions buildPlayerOptions);
+
     private struct AsmDefInfo
     {
         public string[] includePlatforms;
@@ -24,7 +27,7 @@ public class PlaytestTools : MonoBehaviour
         Client = 2
     }
 
-    private enum BuildType
+    public enum BuildType
     {
         AllScenes = 0,
         CurrentScene = 1,
@@ -32,17 +35,25 @@ public class PlaytestTools : MonoBehaviour
         AutoCompile = 3
     }
 
+    /// <summary>
+    /// Number of players in the playtest
+    /// </summary>
     public static int numTestPlayers
     {
         get => Mathf.Clamp(EditorPrefs.GetInt("playtestNumTestPlayers"), 1, 4);
         set => EditorPrefs.SetInt("playtestNumTestPlayers", value);
     }
 
-    private static BuildType buildType
+    public static BuildType buildType
     {
         get => (BuildType)EditorPrefs.GetInt("playtestBuildType", (int)BuildType.AllScenes);
         set => EditorPrefs.SetInt("playtestBuildType", (int)value);
     }
+
+    /// <summary>
+    /// Called before the build is made
+    /// </summary>
+    public static PreBuildFunction onPreBuild;
 
     private static bool isWin64
     {
@@ -75,8 +86,6 @@ public class PlaytestTools : MonoBehaviour
     }
 
     private static BuildTarget playtestBuildTarget => isWin64 ? BuildTarget.StandaloneWindows64 : BuildTarget.StandaloneWindows;
-
-    private static string playtestBuildTargetAsString => isWin64 ? "WindowsStandalone64" : "WindowsStandalone32"; // must be compatible with AssemblyDefinition info
 
     private static string[] pendingAssembliesForCompile
     {
@@ -294,55 +303,28 @@ public class PlaytestTools : MonoBehaviour
         }
         else*/
         {
-            // Add the open scene to the list if it's not already in there
-            List<string> levels = new List<string>();
-            string activeScenePath = EditorSceneManager.GetActiveScene().path;
-
-            if (buildType == BuildType.CurrentScene)
-            {
-                if (EditorBuildSettings.scenes.Length > 0)
-                    levels.Add(EditorBuildSettings.scenes[0].path); // add the Boot scene
-
-                levels.Add(activeScenePath);
-            }
-            else
-            {
-                bool addOpenScene = true;
-                for (int i = 0; i < EditorBuildSettings.scenes.Length; i++)
-                {
-                    if (EditorBuildSettings.scenes[i].enabled)
-                    {
-                        levels.Add(EditorBuildSettings.scenes[i].path);
-
-                        if (EditorBuildSettings.scenes[i].path == activeScenePath)
-                            addOpenScene = false;
-                    }
-                }
-
-                // we haven't added this scene in the build settings, but we probably want to test it!
-                if (addOpenScene)
-                    levels.Add(activeScenePath);
-            }
-
             // Build and run the player, preserving the open scene
             string originalScene = EditorSceneManager.GetActiveScene().path;
 
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             {
                 string buildName = $"{playtestBuildPath}/{Application.productName}.exe";
-                BuildOptions buildOptions = BuildOptions.Development
-                    | (buildType == BuildType.ScriptsOnly ? BuildOptions.BuildScriptsOnly : 0);
+                BuildOptions buildFlags = BuildOptions.Development | (buildType == BuildType.ScriptsOnly ? BuildOptions.BuildScriptsOnly : 0);
+                BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions()
+                {
+                    scenes = MakeSceneListForBuild(),
+                    locationPathName = buildName,
+                    options = buildFlags,
+                    target = playtestBuildTarget
+                };
+
+                // If the project overrides onPreBuild, run it first and let any changes be applied
+                onPreBuild?.Invoke(ref buildPlayerOptions);
 
                 // HACK: some versions of Unity under some circumstances will completely ignore the target build folder and causes it to error, this is a sneaky bypass
                 string originalUserBuildFolder = EditorUserBuildSettings.GetBuildLocation(playtestBuildTarget);
                 EditorUserBuildSettings.SetBuildLocation(playtestBuildTarget, playtestBuildPath);
-                UnityEditor.Build.Reporting.BuildReport buildReport = BuildPipeline.BuildPlayer(new BuildPlayerOptions()
-                {
-                    scenes = levels.ToArray(),
-                    locationPathName = buildName,
-                    options = buildOptions,
-                    target = playtestBuildTarget
-                });
+                UnityEditor.Build.Reporting.BuildReport buildReport = BuildPipeline.BuildPlayer(buildPlayerOptions);
                 EditorUserBuildSettings.SetBuildLocation(playtestBuildTarget, originalUserBuildFolder);
 
                 EditorSceneManager.OpenScene(originalScene);
@@ -369,6 +351,39 @@ public class PlaytestTools : MonoBehaviour
                 return false;
             }
         }
+    }
+
+    private static string[] MakeSceneListForBuild()
+    {
+        List<string> levels = new List<string>();
+        string activeScenePath = EditorSceneManager.GetActiveScene().path;
+
+        if (buildType == BuildType.CurrentScene)
+        {
+            if (EditorBuildSettings.scenes.Length > 0)
+                levels.Add(EditorBuildSettings.scenes[0].path); // add the Boot scene
+
+            levels.Add(activeScenePath);
+        }
+        else
+        {
+            bool alreadyHasCurrentScene = false;
+            for (int i = 0; i < EditorBuildSettings.scenes.Length; i++)
+            {
+                if (EditorBuildSettings.scenes[i].enabled)
+                {
+                    levels.Add(EditorBuildSettings.scenes[i].path);
+
+                    if (EditorBuildSettings.scenes[i].path == activeScenePath)
+                        alreadyHasCurrentScene = true;
+                }
+            }
+
+            if (!alreadyHasCurrentScene)
+                levels.Add(activeScenePath);
+        }
+
+        return levels.ToArray();
     }
 
     [MenuItem(kMultiplayerMenu+"Build && Run", priority = kMultiplayerPrio+1)]
