@@ -33,6 +33,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
             physTimeline = Timeline.CreateSingle("PhysicsTimeline", physTickable, out physTimelineEntity);
             physTimeline.settings = tickerSettings;
+            physTimelineEntity.seekFlags = EntitySeekFlags.NoInputDeltas;
         }
 
         // Update is called once per frame
@@ -45,7 +46,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             {
                 if (!useAutomaticClientExtrapolation)
                 {
-                    physTimeline.Seek(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + clientExtrapolation, TimelineSeekFlags.IgnoreDeltas);
+                    physTimeline.Seek(timeOnServer + Time.timeAsDouble - timeOfLastServerUpdate + clientExtrapolation, TimelineSeekFlags.None);
                 }
                 else
                 {
@@ -69,7 +70,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                         }
                     }
 
-                    physTimeline.Seek(Time.time + autoCalculatedTimeExtrapolation, TimelineSeekFlags.IgnoreDeltas);
+                    physTimeline.Seek(Time.time + autoCalculatedTimeExtrapolation, TimelineSeekFlags.None);
                 }
             }
 

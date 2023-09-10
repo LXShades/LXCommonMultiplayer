@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using static Timeline;
 
 /// <summary>
 /// Displays a debug timeline for the targetTicker
@@ -9,14 +10,6 @@ using UnityEngine;
 [RequireComponent(typeof(CanvasRenderer))]
 public class TimelineDebugViewerUI : MonoBehaviour
 {
-    private struct EntityUI
-    {
-        public GameObject gameObject;
-        public Timeline.EntityBase entity;
-        public UnityEngine.UI.Text entityName;
-        public TimelineGraphic timelineUI;
-    }
-
     public Timeline target { get; set; }
 
     [Header("Display")]
@@ -52,7 +45,7 @@ public class TimelineDebugViewerUI : MonoBehaviour
     public Transform entityUIContainer;
     public GameObject entityUIPrefab;
 
-    private readonly Dictionary<Timeline.EntityBase, EntityUI> activeEntityTimelines = new Dictionary<Timeline.EntityBase, EntityUI>();
+    private readonly Dictionary<Timeline.EntityBase, TimelineEntityDebugViewerUI> activeEntityTimelines = new Dictionary<Timeline.EntityBase, TimelineEntityDebugViewerUI>();
 
     private void Start()
     {
@@ -99,7 +92,7 @@ public class TimelineDebugViewerUI : MonoBehaviour
                 for (int i = 0, e = stateTrack.Count; i < e; i++)
                     graphic.DrawTick(stateTrack.TimeAt(i), stateHeight, stateOffset, stateColor);
 
-                if (activeEntityTimelines.TryGetValue(entity, out EntityUI entityUI))
+                if (activeEntityTimelines.TryGetValue(entity, out TimelineEntityDebugViewerUI entityUI))
                 {
                     entityUI.timelineUI.ClearDraw();
                     entityUI.timelineUI.timeStart = graphic.timeStart;
@@ -147,7 +140,7 @@ public class TimelineDebugViewerUI : MonoBehaviour
 
         // remove ones that don't exist now, or all of them if this is not a good time to render them
         bool shouldForceDelete = !entityUIContainer.gameObject.activeInHierarchy || target == null;
-        foreach (KeyValuePair<Timeline.EntityBase, EntityUI> entityTimeline in activeEntityTimelines)
+        foreach (KeyValuePair<Timeline.EntityBase, TimelineEntityDebugViewerUI> entityTimeline in activeEntityTimelines)
         {
             if (shouldForceDelete || !target.entities.Contains(entityTimeline.Value.entity))
             {
@@ -164,14 +157,13 @@ public class TimelineDebugViewerUI : MonoBehaviour
         {
             if (!activeEntityTimelines.ContainsKey(entity))
             {
-                var entityTimelineRoot = Instantiate(entityUIPrefab, entityUIContainer);
-                activeEntityTimelines.Add(entity, new EntityUI()
-                {
-                    gameObject = entityTimelineRoot,
-                    entityName = entityTimelineRoot.GetComponentInChildren<UnityEngine.UI.Text>(),
-                    timelineUI = entityTimelineRoot.GetComponentInChildren<TimelineGraphic>(),
-                    entity = entity,
-                });
+                GameObject entityTimelineRoot = Instantiate(entityUIPrefab, entityUIContainer);
+                TimelineEntityDebugViewerUI entityViewer = entityTimelineRoot.GetComponent<TimelineEntityDebugViewerUI>();
+
+                entityViewer.timeline = target;
+                entityViewer.entity = entity;
+
+                activeEntityTimelines.Add(entity, entityViewer);
             }
         }
     }
@@ -181,48 +173,5 @@ public class TimelineDebugViewerUI : MonoBehaviour
         displayPeriod = Mathf.Lerp(displayPeriod, targetDisplayPeriod, displayPeriodLerpProgress / displayPeriodSmoothTime);
         this.targetDisplayPeriod = targetDisplayPeriod;
         displayPeriodLerpProgress = 0f;
-    }
-
-    private GUIStyle hoverBoxStyle
-    {
-        get
-        {
-            if (_hoverBoxStyle == null)
-            {
-                _hoverBoxStyle = new GUIStyle(GUI.skin.box);
-                _hoverBoxStyle.alignment = TextAnchor.UpperLeft;
-                _hoverBoxStyle.wordWrap = true;
-            }
-            return _hoverBoxStyle;
-        }
-    }
-    private GUIStyle _hoverBoxStyle;
-
-    private void OnGUI()
-    {
-        if (graphic.rectTransform.rect.Contains(graphic.rectTransform.InverseTransformPoint(Input.mousePosition)) && target != null)
-        {
-            double time = graphic.TimeAtScreenX(Input.mousePosition.x);
-            string lastInputInfo = "TODO";// target.GetInputInfoAtTime(time);
-            string lastStateInfo = "TODO";// target.GetStateInfoAtTime(time);
-
-            string textToDisplay = $"Playback: {target.playbackTime.ToString("F2")}\nHovered: {time.ToString("F2")}s\nInput:\n{lastInputInfo}\nState:\n{lastStateInfo}";
-            Vector2 size = new Vector2(400f, hoverBoxStyle.CalcHeight(new GUIContent(textToDisplay), 400f));
-            Rect infoBoxRect = new Rect(new Vector3(Input.mousePosition.x, Screen.height - Input.mousePosition.y), size);
-
-            if (infoBoxRect.xMax > Screen.width)
-                infoBoxRect.x = Screen.width - infoBoxRect.width;
-            if (infoBoxRect.yMax > Screen.height)
-            {
-                var ok = Screen.height - Input.mousePosition.y - infoBoxRect.height;
-                infoBoxRect.y = ok;
-            }
-            if (infoBoxRect.y < 0)
-                infoBoxRect.y = 0;
-            if (infoBoxRect.x < 0)
-                infoBoxRect.x = 0;
-
-            GUI.Box(infoBoxRect, textToDisplay, hoverBoxStyle);
-        }
     }
 }

@@ -50,7 +50,8 @@ public interface ITickerInput<TOwner>
 {
     /// <summary>
     /// Returns an input with optional deltas compared to the previous input. e.g. btnJumpPressed, btnJumpReleased
-    /// When WithDeltas is called on the owner with the owner as the parameter, that can be considered WithoutDeltas.
+    /// 
+    /// When deltas are disabled (e.g. via EntitySeekFlags), WithDeltas is called on with itself as a parameter and is considered "no deltas".
     /// </summary>
     public TOwner WithDeltas(TOwner previousInput);
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Policy;
 using System.Text;
 using UnityEngine;
 using static Timeline;
@@ -7,7 +8,7 @@ using static Timeline;
 public delegate void TimelineEvent(TickInfo tickInfo);
 
 [Flags]
-public enum TimelineSeekFlags
+public enum EntitySeekFlags
 {
     None = 0,
 
@@ -18,7 +19,7 @@ public enum TimelineSeekFlags
     /// However, they are unaware that jump was actually first pressed at T=0.5, and the state they received for T=1 has already jumped
     /// On the server, T=1 had no jump delta as T=0.5 already did that. On the client, T=1 is thought to have the jump delta despite being untrue, leading to inconsistency.
     /// </summary>
-    IgnoreDeltas = 1,
+    NoInputDeltas = 1,
 
     /// <summary>
     /// Specifies that states should not be confirmed during the seek--the state is allowed to diverge from the input feed's deltas
@@ -33,12 +34,18 @@ public enum TimelineSeekFlags
     /// Use when you e.g. want to modify and replay a piece of the timeline, but don't want sounds, visual effects etc to play. Because it's not playing in realtime, it's just internally replaying a new version of things that already happened.
     /// </summary>
     TreatAsReplay = 4,
+};
+
+[Flags]
+public enum TimelineSeekFlags
+{
+    None = 0,
 
     /// <summary>
     /// Disables debug sequence recording, lastSeekDebugSequence will not be updated
     /// </summary>
-    NoDebugSequence = 8,
-};
+    NoDebugSequence = 1
+}
 
 public enum TimelineTickRateConstraint
 {
@@ -228,9 +235,9 @@ public struct TickInfo
     public bool isFullForwardTick => isForwardTick && isFullTick;
 
     /// <summary>
-    /// The seek flags being used the seek driving this tick
+    /// The seek flags being used by the entity during this tick
     /// </summary>
-    public TimelineSeekFlags seekFlags;
+    public EntitySeekFlags seekFlags;
 }
 
 /// <summary>
@@ -275,6 +282,11 @@ public class Timeline
             }
         }
         private int _tickPriority;
+
+        /// <summary>
+        /// The seek settings for this entity
+        /// </summary>
+        public EntitySeekFlags seekFlags;
 
         /// <summary>
         /// The states for this entity, for rewinding/reverting. Entity has the specialised reference to this.
@@ -459,13 +471,25 @@ public class Timeline
         {
             TInput inputToUse = default;
 
-            if (currentInputIndex >= 0 && currentInputIndex < inputTrack.Count)
+            if ((seekFlags & EntitySeekFlags.NoInputDeltas) == 0)
             {
-                if (previousInputIndex >= 0 && previousInputIndex < inputTrack.Count)
-                    inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[previousInputIndex]);
-                else
-                    inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[currentInputIndex]);
+                // Deltas are enabled
+                if (currentInputIndex >= 0 && currentInputIndex < inputTrack.Count)
+                {
+                    if (previousInputIndex >= 0 && previousInputIndex < inputTrack.Count)
+                        inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[previousInputIndex]);
+                    else
+                        inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[currentInputIndex]);
+                }
             }
+            else
+            {
+                // Deltas are disabled, use self-delta to remove deltas
+                inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[currentInputIndex]);
+            }
+
+            if ((seekFlags & EntitySeekFlags.TreatAsReplay) != 0)
+                tickInfo.isForwardTick = false;
 
             target.Tick(deltaTime, inputToUse, tickInfo);
         }
@@ -713,7 +737,7 @@ public class Timeline
             {
                 isFullTick = canStoreNextState,
                 isForwardTick = nextTime > lastSeekFullTickTimeReached,
-                seekFlags = flags,
+                seekFlags = EntitySeekFlags.None,
                 time = nextTime
             };
 

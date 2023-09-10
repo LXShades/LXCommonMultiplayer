@@ -75,6 +75,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 // build inputs, send to the ticker
                 Input nextInput = new Input().GenerateLocal();
 
+                timelineEntity.seekFlags = EntitySeekFlags.None;
                 timelineEntity.InsertInput(nextInput, Time.time);
 
                 // seek to the current Time.time. this may amount to a mixture of reverting/confirming states and ticking forward with delta time
@@ -91,6 +92,8 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             }
             else
             {
+                timelineEntity.seekFlags = EntitySeekFlags.NoInputDeltas; // We don't know all the inputs of non-local characters, so we don't assume we know their input deltas
+
                 if (NetworkServer.active)
                 {
                     // server receiving client's state - just process the inputs, moving to the latest client time (no speedhack tests)
@@ -107,7 +110,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                     // both are needed to extrapolate it as expected
                     double extrapolatedTimeOnServer = timeOnServer + Time.timeAsDouble - timeOfLastReceivedServerUpdate;
 
-                    timeline.Seek(extrapolatedTimeOnServer, TimelineSeekFlags.IgnoreDeltas);
+                    timeline.Seek(extrapolatedTimeOnServer, TimelineSeekFlags.None);
                 }
             }
 
