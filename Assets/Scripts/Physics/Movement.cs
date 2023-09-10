@@ -280,7 +280,7 @@ public class Movement : MonoBehaviour
 
                 if (hitBufferSize > 0)
                 {
-                    int numToShift = numHitsTotal < hitBufferSize ? numHitsTotal : hitBufferSize;
+                    int numToShift = numHitsTotal < hitBufferSize ? numHitsTotal : hitBufferSize - 1;
                     for (int p = numToShift; p >= 1; p--)
                         hitsOut[p] = hitsOut[p - 1];
 
