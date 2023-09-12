@@ -471,21 +471,28 @@ public class Timeline
         {
             TInput inputToUse = default;
 
-            if ((seekFlags & EntitySeekFlags.NoInputDeltas) == 0)
+            if (inputTrack.Count > 0)
             {
-                // Deltas are enabled
-                if (currentInputIndex >= 0 && currentInputIndex < inputTrack.Count)
+                if ((seekFlags & EntitySeekFlags.NoInputDeltas) == 0)
                 {
-                    if (previousInputIndex >= 0 && previousInputIndex < inputTrack.Count)
-                        inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[previousInputIndex]);
-                    else
-                        inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[currentInputIndex]);
+                    // Deltas are enabled
+                    if (currentInputIndex >= 0 && currentInputIndex < inputTrack.Count)
+                    {
+                        if (previousInputIndex >= 0 && previousInputIndex < inputTrack.Count)
+                            inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[previousInputIndex]);
+                        else
+                            inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[currentInputIndex]);
+                    }
+                }
+                else
+                {
+                    // Deltas are disabled, use self-delta to remove deltas
+                    inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[currentInputIndex]);
                 }
             }
             else
             {
-                // Deltas are disabled, use self-delta to remove deltas
-                inputToUse = inputTrack[currentInputIndex].WithDeltas(inputTrack[currentInputIndex]);
+                inputToUse = default;
             }
 
             if ((seekFlags & EntitySeekFlags.TreatAsReplay) != 0)
