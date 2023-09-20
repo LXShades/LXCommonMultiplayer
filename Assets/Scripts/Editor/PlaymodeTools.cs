@@ -14,26 +14,28 @@ public static class PlaymodeTools
 {
     private enum PlayModeCommands
     {
-        Disabled,
+        NoneWithoutBoot,
+        NoneWithBoot,
         Host,
-        Connect,
-        Custom
+        Connect
     }
 
     private static PlayModeCommands playModeCommandType
     {
-        get => (PlayModeCommands)EditorPrefs.GetInt("_playModeCommands", (int)PlayModeCommands.Disabled);
+        get => (PlayModeCommands)EditorPrefs.GetInt("_playModeCommands", (int)PlayModeCommands.NoneWithBoot);
         set => EditorPrefs.SetInt("_playModeCommands", (int)value);
     }
 
-    private static string playModeCommandLine
+    public static string playModeAdditionalCommandLine
     {
-        get => SessionState.GetString("_playModeCommandLineParms", "");
-        set => SessionState.SetString("_playModeCommandLineParms", value);
+        get => EditorPrefs.GetString("_playModeCommandLineParms", "");
+        set => EditorPrefs.SetString("_playModeCommandLineParms", value);
     }
 
     public const string kPlaymodeMenu = "Multiplayer/Playmode/";
-    public const int kPlaymodePrio = PlaytestTools.kBuildTypePrio + 10;
+    public const int kNoPlaymodePrio = PlaytestTools.kBuildTypePrio + 20;
+    public const int kPlaymodePrio = kNoPlaymodePrio + 20;
+    public const int kCustomCommandLinePrio = kPlaymodePrio + 20;
 
     [InitializeOnLoadMethod]
     private static void OnEditorInit()
@@ -70,7 +72,7 @@ public static class PlaymodeTools
     private static void ReassignBootScene()
     {
         // before starting, make sure the boot scene loads first
-        if (playModeCommandType != PlayModeCommands.Disabled && EditorBuildSettings.scenes.Length > 0)
+        if (playModeCommandType != PlayModeCommands.NoneWithoutBoot && EditorBuildSettings.scenes.Length > 0)
         {
             SceneAsset bootScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[0].path);
 
@@ -119,29 +121,44 @@ public static class PlaymodeTools
                 case PlayModeCommands.Connect:
                     CommandLine.editorCommands = $"-connect 127.0.0.1";
                     break;
-                case PlayModeCommands.Custom:
-                    CommandLine.editorCommands = playModeCommandLine;
-                    break;
-                case PlayModeCommands.Disabled:
+                case PlayModeCommands.NoneWithBoot:
+                case PlayModeCommands.NoneWithoutBoot:
                     CommandLine.editorCommands = "";
                     break;
             }
 
-            Debug.Log($"Running PlayMode command line: {CommandLine.editorCommands}");
+            if (!string.IsNullOrEmpty(playModeAdditionalCommandLine))
+                CommandLine.editorCommands += $" {playModeAdditionalCommandLine}";
+
+            Debug.Log($"Running PlayMode with command line: {CommandLine.editorCommands}");
         }
     }
 
-    [MenuItem(kPlaymodeMenu + "None", false, kPlaymodePrio)]
-    static void DontUseCommands()
+    [MenuItem(kPlaymodeMenu + "None (no change)", false, kNoPlaymodePrio)]
+    static void NoneNoBoot()
     {
-        playModeCommandType = PlayModeCommands.Disabled;
+        playModeCommandType = PlayModeCommands.NoneWithoutBoot;
         ReassignBootScene();
     }
 
-    [MenuItem(kPlaymodeMenu + "None", validate = true)]
-    static bool DontUseCommandsValidate()
+    [MenuItem(kPlaymodeMenu + "None (no change)", validate = true)]
+    static bool NoneNoBootValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "None", playModeCommandType == PlayModeCommands.Disabled);
+        Menu.SetChecked(kPlaymodeMenu + "None (don't force Boot scene)", playModeCommandType == PlayModeCommands.NoneWithoutBoot);
+        return true;
+    }
+
+    [MenuItem(kPlaymodeMenu + "None (use Boot)", false, kPlaymodePrio)]
+    static void NoneWithBoot()
+    {
+        playModeCommandType = PlayModeCommands.NoneWithBoot;
+        ReassignBootScene();
+    }
+
+    [MenuItem(kPlaymodeMenu + "None (use Boot)", validate = true)]
+    static bool NoneWithBootValidate()
+    {
+        Menu.SetChecked(kPlaymodeMenu + "None (use Boot)", playModeCommandType == PlayModeCommands.NoneWithoutBoot);
         return true;
     }
 
@@ -174,22 +191,21 @@ public static class PlaymodeTools
         return true;
     }
 
-    [MenuItem(kPlaymodeMenu + "Custom command line...", false, kPlaymodePrio+3)]
+    [MenuItem(kPlaymodeMenu + "Additional command line params...", false, kCustomCommandLinePrio)]
     static void SetCustomCommands()
     {
         DefaultCommandLineBox window = DefaultCommandLineBox.CreateInstance<DefaultCommandLineBox>();
         window.position = new Rect(Screen.width / 2, Screen.height / 2, 250, 150);
-        window.tempCommands = playModeCommandLine;
-        playModeCommandType = PlayModeCommands.Custom;
+        window.tempCommands = playModeAdditionalCommandLine;
         window.ShowUtility();
         UpdateEditorCommands();
         ReassignBootScene();
     }
 
-    [MenuItem(kPlaymodeMenu + "Custom command line...", validate = true)]
+    [MenuItem(kPlaymodeMenu + "Additional command line params...", validate = true)]
     static bool SetCustomCommandsValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "Custom command line...", playModeCommandType == PlayModeCommands.Custom);
+        Menu.SetChecked(kPlaymodeMenu + "Additional command line params...", !string.IsNullOrEmpty(playModeAdditionalCommandLine));
         return true;
     }
 
@@ -213,7 +229,7 @@ public static class PlaymodeTools
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Done"))
             {
-                PlaymodeTools.playModeCommandLine = tempCommands;
+                PlaymodeTools.playModeAdditionalCommandLine = tempCommands;
                 PlaymodeTools.UpdateEditorCommands();
                 Close();
             }

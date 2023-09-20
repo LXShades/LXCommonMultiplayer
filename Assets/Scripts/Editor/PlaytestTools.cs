@@ -1,3 +1,4 @@
+using Castle.Core.Internal;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -108,13 +109,14 @@ public class PlaytestTools : MonoBehaviour
     public const string kBuildPlatformMenu = "Multiplayer/Build Platform/";
     public const string kFinalBuildMenu = "Multiplayer/Final Build/";
 
-    public const int kMultiplayerPrio = 10;
-    public const int kPlayerCountPrio = 30;
-    public const int kEditorRolePrio = 50;
-    public const int kServerTypePrio = 70;
-    public const int kBuildTypePrio = 90;
-    public const int kBuildPlatformPrio = 200;
-    public const int kFinalBuildPrio = 300;
+    // I dont like this, Unity why
+    public const int kPlaytestPrio = 0;
+    public const int kPlayerCountPrio = kPlaytestPrio + 20;
+    public const int kEditorRolePrio = kPlayerCountPrio + 20;
+    public const int kServerTypePrio = kEditorRolePrio + 20;
+    public const int kBuildTypePrio = kServerTypePrio + 20;
+    public const int kBuildPlatformPrio = PlaymodeTools.kCustomCommandLinePrio + 100;
+    public const int kFinalBuildPrio = kBuildPlatformPrio + 100;
 
 
     [InitializeOnLoadMethod]
@@ -241,7 +243,7 @@ public class PlaytestTools : MonoBehaviour
         }
     }
 
-    [MenuItem(kMultiplayerMenu+"Build", priority = kMultiplayerPrio)]
+    [MenuItem(kMultiplayerMenu+"Build", priority = kPlaytestPrio)]
     public static bool Build()
     {
         // Big TODO here
@@ -386,7 +388,7 @@ public class PlaytestTools : MonoBehaviour
         return levels.ToArray();
     }
 
-    [MenuItem(kMultiplayerMenu+"Build && Run", priority = kMultiplayerPrio+1)]
+    [MenuItem(kMultiplayerMenu+"Build && Run", priority = kPlaytestPrio+1)]
     public static void BuildAndRun()
     {
         if (Build())
@@ -394,7 +396,7 @@ public class PlaytestTools : MonoBehaviour
     }
 
 
-    [MenuItem(kMultiplayerMenu+"Run", priority = kMultiplayerPrio+2)]
+    [MenuItem(kMultiplayerMenu+"Run", priority = kPlaytestPrio+2)]
     public static void Run()
     {
         int playerIndex = 0;
@@ -406,6 +408,9 @@ public class PlaytestTools : MonoBehaviour
         // add headless params to the server if applicable if valid
         serverParams = serverIsHeadless && !serverIsHost && editorRole != EditorRole.Server ? 
             serverParams + " -batchmode -nographics -console" : serverParams;
+        if (!string.IsNullOrEmpty(PlaymodeTools.playModeAdditionalCommandLine))
+            serverParams += $" {PlaymodeTools.playModeAdditionalCommandLine}";
+
         int numExistingPlayers = 0;
 
         if (serverIsHost)
@@ -427,6 +432,8 @@ public class PlaytestTools : MonoBehaviour
                 numExistingPlayers = serverIsHost ? 1 : 0;
                 break;
             case EditorRole.Standalone:
+                CommandLine.editorCommands = "";
+
                 numGraphicalWindows = !serverIsHeadless && !serverIsHost ? effectiveNumTestPlayers + 1 : effectiveNumTestPlayers;
                 numExistingPlayers = serverIsHost ? 1 : 0;
                 RunBuild($"{serverParams} {sceneParams} {MakeDimensionParam(CalculateWindowDimensionsForPlayer(serverIsHeadless && !serverIsHost ? playerIndex : playerIndex++, numGraphicalWindows))}");
@@ -439,7 +446,12 @@ public class PlaytestTools : MonoBehaviour
 
         // Start the editor if applicable
         if (editorRole != EditorRole.Standalone)
+        {
+            if (!string.IsNullOrEmpty(PlaymodeTools.playModeAdditionalCommandLine))
+                CommandLine.editorCommands += $" {PlaymodeTools.playModeAdditionalCommandLine}";
+
             EditorApplication.isPlaying = true;
+        }
     }
 
     [MenuItem(kEditorRoleMenu + "Standalone Only", priority = kEditorRolePrio)]

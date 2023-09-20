@@ -155,6 +155,11 @@ public class GameState : NetworkBehaviour
     /// <summary>
     /// Returns a GameState component, if it exists in the current game state
     /// </summary>
+    public static TComponent Get<TComponent>() where TComponent : GameStateComponent => singleton ? singleton.GetComponent<TComponent>() : null;
+
+    /// <summary>
+    /// Returns a GameState component, if it exists in the current game state
+    /// </summary>
     public static bool Get<TComponent>(out TComponent netGameStateComponent) where TComponent : GameStateComponent
     {
         netGameStateComponent = null;
