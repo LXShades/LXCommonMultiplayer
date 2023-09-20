@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 
 /// <summary>
-/// Extended What-You-See-is-What-You-Get 3D debug draw functions supporting various shapes, without Gizmos or editor required
+/// Extended simple 3D debug draw functions supporting various shapes, without Gizmos or editor required
 /// </summary>
 public static class DebugDraw
 {
@@ -98,6 +98,8 @@ public static class DebugDraw
         }
     }
     private static Material _lineMaterial;
+
+    private static bool isPendingRedraw = false;
 
     const float kRadsInCircle = Mathf.PI * 2f;
 
@@ -444,19 +446,23 @@ public static class DebugDraw
 
     private static void RequestDrawThisFrame()
     {
-        Camera.onPostRender -= OnFinalRenderDebugShapes;
-        Camera.onPostRender += OnFinalRenderDebugShapes;
-
-        if (Time.unscaledTimeAsDouble != lastRenderFullTime)
+        if (!isPendingRedraw)
         {
-            lastRenderFullTime = Time.unscaledTimeAsDouble;
-            SwapShapeBuffers();
-        }
+            Camera.onPostRender -= OnFinalRenderDebugShapes;
+            Camera.onPostRender += OnFinalRenderDebugShapes;
+
+            if (Time.unscaledTimeAsDouble != lastRenderFullTime)
+            {
+                lastRenderFullTime = Time.unscaledTimeAsDouble;
+                SwapShapeBuffers();
+            }
 
 #if UNITY_EDITOR
-        UnityEditor.EditorApplication.pauseStateChanged -= OnPauseStateChanged;
-        UnityEditor.EditorApplication.pauseStateChanged += OnPauseStateChanged;
+            UnityEditor.EditorApplication.pauseStateChanged -= OnPauseStateChanged;
+            UnityEditor.EditorApplication.pauseStateChanged += OnPauseStateChanged;
 #endif
+            isPendingRedraw = true;
+        }
     }
 
     private static DebugShape GetNewShape(Style styleIn)
@@ -547,6 +553,7 @@ public static class DebugDraw
             if (currentDebugShapes.Count == 0) // persistent shapes might still exist and we'll want to keep this callback going if so
             {
                 Camera.onPostRender -= OnFinalRenderDebugShapes;
+                isPendingRedraw = false;
                 return;
             }
         }
