@@ -362,20 +362,23 @@ public class CharacterMovement : Movement
 
             mesh.GetNormals(normalBuffer);
 
-            for (int i = 0; i < mesh.subMeshCount; i++)
+            if (normalBuffer.Count > 0)
             {
-                int start = mesh.GetSubMesh(i).indexStart;
-                int count = mesh.GetSubMesh(i).indexCount;
-
-                if (index >= start && index < start + count)
+                for (int i = 0; i < mesh.subMeshCount; i++)
                 {
-                    mesh.GetIndices(triangleBuffer, i);
+                    int start = mesh.GetSubMesh(i).indexStart;
+                    int count = mesh.GetSubMesh(i).indexCount;
 
-                    Vector3 smoothNormal = normalBuffer[triangleBuffer[index - start]] * hit.barycentricCoordinate.x +
-                        normalBuffer[triangleBuffer[index - start + 1]] * hit.barycentricCoordinate.y +
-                        normalBuffer[triangleBuffer[index - start + 2]] * hit.barycentricCoordinate.z;
+                    if (index >= start && index < start + count)
+                    {
+                        mesh.GetIndices(triangleBuffer, i);
 
-                    return meshCollider.transform.TransformDirection(smoothNormal).normalized;
+                        Vector3 smoothNormal = normalBuffer[triangleBuffer[index - start]] * hit.barycentricCoordinate.x +
+                            normalBuffer[triangleBuffer[index - start + 1]] * hit.barycentricCoordinate.y +
+                            normalBuffer[triangleBuffer[index - start + 2]] * hit.barycentricCoordinate.z;
+
+                        return meshCollider.transform.TransformDirection(smoothNormal).normalized;
+                    }
                 }
             }
         }
