@@ -1,15 +1,23 @@
 ﻿using Mirror;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
-/// * The main networked state of the game - essentially a networked game manager. Might include time in match, game/map restart flow, etc.
+/// * A persistent networked state of the game - essentially a networked game manager. Might include time in a match, game/map restart flow, etc.
 /// 
-/// * Each game mode can be a different GameState prefab. It can contain multiple optional GameStateComponents.
-/// * * You could expect each game mode to have a different composition of reusable GameStateComponents such as timers, point counts, tournament podiums, etc.
+/// * Each game mode (e.g. Match, CTF, ...) could exist as a different GameState prefab. It can contain multiple optional GameStateComponents.
+/// * * GameStateComponents are designed to be reused. Many game modes can share similar features, but don't need to share a monster base class.
+/// * * GameStateComponents could include a timer, a point counts, team tracking, winning conditions, etc.
+/// * * Different parts of the game (such as the timer HUD) can check for the existence of a GameStateComponent (e.g. GameStateTimerComponent) to decide its behaviour
 /// 
-/// * Can be inherited. Spawned upon host, spawned on clients when available.
+/// * There is a "primary" GameState (default) along with additional secondary GameStates.
+/// * * The primary GameState gets destroyed and replaced whenever you call ServerChangeGameState
+/// * * Secondary GameStates allow for more or less persistent GameStates, such as networked server settings that won't change regardless of game mode
+/// * * Secondary GameStates can also get replaced via ServerChangeGameState, if the original one is passed to the function.
+/// 
+/// * Can be inherited. Spawned upon server start, spawned on clients when available.
 /// </summary>
 public class GameState : NetworkBehaviour
 {
@@ -22,9 +30,15 @@ public class GameState : NetworkBehaviour
     public delegate void OnGameEndedDelegate(GameState gameState);
 
     /// <summary>
-    /// Single instance of the ServerState. You may want to make an inherited version
+    /// The primary GameState. This is the "default" game state that gets changed and replaced by default.
+    /// NOTE: this is only valid on the server
     /// </summary>
-    public static GameState singleton { get; private set; }
+    public static GameState primary { get; private set; }
+
+    /// <summary>
+    /// All GameStates including primary and secondary. When created, these can also be changed and replaced if specified in the ServerChangeGameState overload.
+    /// </summary>
+    private static List<GameState> all { get; set; } = new List<GameState>();
 
     /// <summary>
     /// How long the win screen lasts in seconds
@@ -65,7 +79,6 @@ public class GameState : NetworkBehaviour
     {
         base.OnStartClient();
 
-        singleton = this;
         DontDestroyOnLoad(gameObject);
     }
 
@@ -73,34 +86,29 @@ public class GameState : NetworkBehaviour
     {
         base.OnStartServer();
 
-        singleton = this;
         DontDestroyOnLoad(gameObject);
     }
 
     private void Awake()
     {
-        if (singleton != null)
+        foreach (GameStateComponent gsComponent in GetComponents<GameStateComponent>())
         {
-            Destroy(gameObject);
-            Debug.LogWarning($"[{gameObject.name}.Awake()] There is already a NetGameState running");
-            return;
-        }
-
-        foreach (GameStateComponent matchComponent in GetComponents<GameStateComponent>())
-        {
-            components.Add(matchComponent);
-            matchComponent.OnAwake();
+            components.Add(gsComponent);
+            gsComponent.OnAwake();
         }
 
         timeTilRestart = winScreenDuration;
-
-        singleton = this;
     }
 
     private void Start()
     {
         foreach (GameStateComponent component in components)
             component.OnStart();
+    }
+
+    private void OnDestroy()
+    {
+        all.Remove(this);
     }
 
     private void Update()
@@ -132,38 +140,110 @@ public class GameState : NetworkBehaviour
     }
 
     /// <summary>
-    /// Changes the game state to another game state prefab
+    /// Changes the specified game state to another game state prefab.
+    /// 
+    /// If originalInstance is null, a new GameState is created without destruction of any others.
+    /// If originalInstance is any other GameState, that GameState will be replaced by the new one.
     /// </summary>
-    public static void ServerChangeGameState(GameObject newGameStatePrefab)
+    public static GameState ServerChangeGameState(GameState previousGameStateInstance, GameState newGameStatePrefab, bool isPrimary)
     {
+        if (previousGameStateInstance != null && !all.Contains(previousGameStateInstance))
+        {
+            Debug.LogError($"[{nameof(GameState)}.{nameof(ServerChangeGameState)}] supplied instance {previousGameStateInstance} does not exist");
+            return null;
+        }
+
         if (!NetworkServer.active)
         {
             Debug.LogError($"[{nameof(GameState)}.{nameof(ServerChangeGameState)}] cannot be called on client");
-            return;
+            return null;
         }
 
-        if (singleton != null)
+        if (!newGameStatePrefab)
         {
-            Destroy(singleton.gameObject);
-            singleton = null;
+            Debug.LogError($"[{nameof(GameState)}.{nameof(ServerChangeGameState)}] GameStatePrefab is null");
+            return null;
         }
 
-        GameObject newState = Instantiate(newGameStatePrefab);
-        NetworkServer.Spawn(newState);
+        bool wasPrimaryGamestate = previousGameStateInstance != null && primary == previousGameStateInstance;
+
+        if (previousGameStateInstance)
+            Destroy(previousGameStateInstance.gameObject);
+        all.RemoveAll(x => x == null);
+
+        GameState newGameState = Instantiate(newGameStatePrefab);
+        NetworkServer.Spawn(newGameState.gameObject);
+        all.Add(newGameState);
+
+        if (wasPrimaryGamestate || isPrimary)
+            primary = newGameState;
+
+        return newGameState;
     }
 
     /// <summary>
-    /// Returns a GameState component, if it exists in the current game state
+    /// Changes the primary game state to another game state prefab
     /// </summary>
-    public static TComponent Get<TComponent>() where TComponent : GameStateComponent => singleton ? singleton.GetComponent<TComponent>() : null;
+    public static GameState ServerChangeGameState(GameState newGameStatePrefab)
+    {
+        return ServerChangeGameState(primary, newGameStatePrefab, true);
+    }
+
+    /// <summary>
+    /// Destroys all existing game states
+    /// </summary>
+    public static void ServerDestroyAllGameStates()
+    {
+        foreach (var gameState in all)
+        {
+            if (gameState)
+            {
+                NetworkServer.UnSpawn(gameState.gameObject);
+                Destroy(gameState.gameObject);
+            }
+        }
+
+        all.Clear();
+    }
+
+    public static void SetPrimary(GameState primaryGameState)
+    {
+        primary = primaryGameState;
+    }
+
+    /// <summary>
+    /// Returns a GameState component, if it exists, from one of the current game states (primary is searched first)
+    /// </summary>
+    public static TComponent Get<TComponent>() where TComponent : GameStateComponent
+    {
+        if (primary && primary.TryGetComponent<TComponent>(out TComponent primaryComponent))
+        {
+            // found the component on the primary gamestate
+            return primaryComponent;
+        }
+        else
+        {
+            // search the rest
+            foreach (var secondary in all)
+            {
+                if (secondary != primary)
+                {
+                    if (secondary.TryGetComponent<TComponent>(out TComponent secondaryComponent))
+                        return secondaryComponent;
+                }
+            }
+
+            return null;
+        }
+    }
 
     /// <summary>
     /// Returns a GameState component, if it exists in the current game state
     /// </summary>
     public static bool Get<TComponent>(out TComponent netGameStateComponent) where TComponent : GameStateComponent
     {
-        netGameStateComponent = null;
-        return singleton != null ? singleton.TryGetComponent<TComponent>(out netGameStateComponent) : false;
+        netGameStateComponent = Get<TComponent>();
+        return netGameStateComponent != null;
     }
 
     /// <summary>
@@ -224,6 +304,16 @@ public class GameState : NetworkBehaviour
             timeTilRestart = winScreenDuration;
             onGameEnded?.Invoke(this);
         }
+    }
+
+    /// <summary>
+    /// Ends the win screen if it's ongoing
+    /// </summary>
+    [Server]
+    public void ServerEndWinScreen()
+    {
+        if (IsWinScreen)
+            timeTilRestart = 0.001f;
     }
 
     [ClientRpc(channel = Channels.Unreliable)]

@@ -2,6 +2,7 @@
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 
 public class NetMan : NetworkManager
 {
@@ -12,9 +13,15 @@ public class NetMan : NetworkManager
 
     [Header("Multiplayer Essentials Extensions")]
     /// <summary>
-    /// Auto-created networked object that can hold server/game state and settings
+    /// The primary GameState, a persistent storing information and state about the game, usually based on the game mode
     /// </summary>
-    public GameState gameStatePrefab;
+    [FormerlySerializedAs("gameStatePrefab")]
+    public GameState initialGameState;
+
+    /// <summary>
+    /// Initial secondary GameStates, auto-created networked objects that can hold server/game state and settings. The first one is treated as the Primary game state.
+    /// </summary>
+    public GameState[] initialSecondaryGameStates = System.Array.Empty<GameState>();
 
     /// <summary>
     /// Logs when connecting, disconnecting, etc
@@ -209,10 +216,19 @@ public class NetMan : NetworkManager
     {
         base.OnStartServer();
 
-        if (gameStatePrefab != null)
+        if (initialGameState)
+            GameState.ServerChangeGameState(null, initialGameState, true);
+
+        foreach (GameState gameStatePrefab in initialSecondaryGameStates)
         {
-            GameObject serverState = Instantiate(gameStatePrefab).gameObject;
-            NetworkServer.Spawn(serverState);
+            if (gameStatePrefab != null)
+            {
+                GameState.ServerChangeGameState(null, gameStatePrefab, false);
+            }
+            else
+            {
+                Debug.LogError($"[NetMan] A GameState Prefab is null! Continuing anyway", gameObject);
+            }
         }
 
         onServerStarted?.Invoke();
@@ -223,11 +239,7 @@ public class NetMan : NetworkManager
 
     public override void OnStopServer()
     {
-        if (GameState.singleton != null)
-        {
-            NetworkServer.UnSpawn(GameState.singleton.gameObject);
-            Destroy(GameState.singleton.gameObject);
-        }
+        GameState.ServerDestroyAllGameStates();
 
         base.OnStopServer();
 
@@ -237,11 +249,7 @@ public class NetMan : NetworkManager
 
     public override void OnStopHost()
     {
-        if (GameState.singleton != null)
-        {
-            NetworkServer.UnSpawn(GameState.singleton.gameObject);
-            Destroy(GameState.singleton.gameObject);
-        }
+        GameState.ServerDestroyAllGameStates();
 
         base.OnStopHost();
 
