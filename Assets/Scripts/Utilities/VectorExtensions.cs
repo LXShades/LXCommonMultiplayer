@@ -221,8 +221,6 @@ public static class VectorExtensions
             // we slide down the wall a bit, but still being pushed away by the point of collision
             return VectorExtensions.SphereAvoidPointAlongNormalUnclamped(nextSpherePosition, sphereRadius + wallPadding, cornerPosition, wallNormal);
         }
-
-        return nextSpherePosition;
     }
 
     /// <summary>

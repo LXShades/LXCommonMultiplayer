@@ -158,7 +158,7 @@ public static class PlaymodeTools
     [MenuItem(kPlaymodeMenu + "None (use Boot)", validate = true)]
     static bool NoneWithBootValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "None (use Boot)", playModeCommandType == PlayModeCommands.NoneWithoutBoot);
+        Menu.SetChecked(kPlaymodeMenu + "None (use Boot)", playModeCommandType == PlayModeCommands.NoneWithBoot);
         return true;
     }
 

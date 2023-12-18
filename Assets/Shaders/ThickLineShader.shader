@@ -60,7 +60,7 @@ Shader "Unlit/UnityMultiplayerEssentials/ThickLineShader"
             [maxvertexcount(6)]
             void geom(line v2g input[2], inout TriangleStream<g2f> triStream)
             {
-                float4 side = normalize(float4(input[1].vertex.y - input[0].vertex.y, input[0].vertex.x - input[1].vertex.x, 0, 0)) * (input[0].vertex.w / _ScreenParams.x * _LineThickness * input[0].thickness);
+                float4 side = normalize(float4(input[1].vertex.y - input[0].vertex.y, input[0].vertex.x - input[1].vertex.x, 0, 0)) * (min(input[0].vertex.w, input[1].vertex.w) / _ScreenParams.x * _LineThickness * input[0].thickness);
                 g2f output;
                 float4 topLeft = input[0].vertex - side, topRight = input[0].vertex + side, bottomLeft = input[1].vertex - side, bottomRight = input[1].vertex + side;
 
