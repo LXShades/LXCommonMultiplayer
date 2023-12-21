@@ -32,6 +32,12 @@ public static class PlaymodeTools
         set => EditorPrefs.SetString("_playModeCommandLineParms", value);
     }
 
+    public static string playModeStartScene
+    {
+        get => EditorPrefs.GetString("_playModeStartScene", "");
+        set => EditorPrefs.SetString("_playModeStartScene", value);
+    }
+
     public const string kPlaymodeMenu = "Multiplayer/Playmode/";
     public const int kNoPlaymodePrio = PlaytestTools.kBuildTypePrio + 20;
     public const int kPlaymodePrio = kNoPlaymodePrio + 20;
@@ -96,7 +102,7 @@ public static class PlaymodeTools
             CommandLine.editorCommands = "";
         if (change == PlayModeStateChange.ExitingEditMode)
         {
-            UpdateEditorCommands();
+            playModeStartScene = EditorSceneManager.GetActiveScene().path;
 
             // Prompt user to save scene, or changes won't be loaded in the game
             if (EditorSceneManager.playModeStartScene != null)
@@ -113,7 +119,7 @@ public static class PlaymodeTools
         switch (playModeCommandType)
         {
             case PlayModeCommands.Host:
-                CommandLine.editorCommands = $"-host -scene \"{EditorSceneManager.GetActiveScene().path}\"";
+                CommandLine.editorCommands = $"-host -scene \"{playModeStartScene}\"";
                 break;
             case PlayModeCommands.Connect:
                 CommandLine.editorCommands = $"-connect 127.0.0.1";
@@ -194,7 +200,6 @@ public static class PlaymodeTools
         window.position = new Rect(Screen.width / 2, Screen.height / 2, 250, 150);
         window.tempCommands = playModeAdditionalCommandLine;
         window.ShowUtility();
-        UpdateEditorCommands();
         ReassignBootScene();
     }
 
