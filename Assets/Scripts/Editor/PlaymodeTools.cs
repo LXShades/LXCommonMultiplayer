@@ -110,28 +110,24 @@ public static class PlaymodeTools
     /// </summary>
     private static void UpdateEditorCommands()
     {
-        // Avoid overriding Playtest menu settings
-        if (CommandLine.editorCommands == null || CommandLine.editorCommands.Length == 0)
+        switch (playModeCommandType)
         {
-            switch (playModeCommandType)
-            {
-                case PlayModeCommands.Host:
-                    CommandLine.editorCommands = $"-host -scene \"{EditorSceneManager.GetActiveScene().path}\"";
-                    break;
-                case PlayModeCommands.Connect:
-                    CommandLine.editorCommands = $"-connect 127.0.0.1";
-                    break;
-                case PlayModeCommands.NoneWithBoot:
-                case PlayModeCommands.NoneWithoutBoot:
-                    CommandLine.editorCommands = "";
-                    break;
-            }
-
-            if (!string.IsNullOrEmpty(playModeAdditionalCommandLine))
-                CommandLine.editorCommands += $" {playModeAdditionalCommandLine}";
-
-            Debug.Log($"Running PlayMode with command line: {CommandLine.editorCommands}");
+            case PlayModeCommands.Host:
+                CommandLine.editorCommands = $"-host -scene \"{EditorSceneManager.GetActiveScene().path}\"";
+                break;
+            case PlayModeCommands.Connect:
+                CommandLine.editorCommands = $"-connect 127.0.0.1";
+                break;
+            case PlayModeCommands.NoneWithBoot:
+            case PlayModeCommands.NoneWithoutBoot:
+                CommandLine.editorCommands = "";
+                break;
         }
+
+        if (!string.IsNullOrEmpty(playModeAdditionalCommandLine))
+            CommandLine.editorCommands += $" {playModeAdditionalCommandLine}";
+
+        Debug.Log($"Running PlayMode with command line: {CommandLine.editorCommands}");
     }
 
     [MenuItem(kPlaymodeMenu + "None (no change)", false, kNoPlaymodePrio)]
