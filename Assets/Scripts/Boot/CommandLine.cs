@@ -1,5 +1,6 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
+using UnityEngine;
 #endif
 
 public static class CommandLine
@@ -14,7 +15,8 @@ public static class CommandLine
     }
 #endif
 
-    static CommandLine()
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void OnStartup()
     {
         ReceiveCommandsFromEditorOrSystem();
     }
@@ -38,6 +40,8 @@ public static class CommandLine
 #else
         commands = System.Environment.GetCommandLineArgs();
 #endif
+
+        UnityEngine.Debug.Log($"[CommandLine] Startup command line: {string.Join(" ", commands)}");
     }
 
     public static bool HasCommand(string commandName)

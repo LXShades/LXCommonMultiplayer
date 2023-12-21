@@ -68,8 +68,7 @@ public static class PlaymodeTools
         EditorBuildSettings.sceneListChanged += ReassignBootScene;
     }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    private static void OnGameInit()
+    static PlaymodeTools()
     {
         // Set default command parameters if they haven't been set
         UpdateEditorCommands();
