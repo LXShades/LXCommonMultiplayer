@@ -39,6 +39,12 @@ public static class PlaymodeTools
     }
 
     public const string kPlaymodeMenu = "Multiplayer/Playmode/";
+    public const string kPlaymode_NoneWithBoot     = kPlaymodeMenu + "None (use Boot)";
+    public const string kPlaymode_NoneWithoutBoot  = kPlaymodeMenu + "None (no change)";
+    public const string kPlaymode_Host             = kPlaymodeMenu + "Host";
+    public const string kPlaymode_Connect          = kPlaymodeMenu + "Connect";
+    public const string kPlaymode_AdditionalParams = kPlaymodeMenu + "Additional command line params...";
+
     public const int kNoPlaymodePrio = PlaytestTools.kBuildTypePrio + 20;
     public const int kPlaymodePrio = kNoPlaymodePrio + 20;
     public const int kCustomCommandLinePrio = kPlaymodePrio + 20;
@@ -135,64 +141,64 @@ public static class PlaymodeTools
         Debug.Log($"Running PlayMode with command line: {CommandLine.editorCommands}");
     }
 
-    [MenuItem(kPlaymodeMenu + "None (no change)", false, kNoPlaymodePrio)]
+    [MenuItem(kPlaymode_NoneWithoutBoot, false, kNoPlaymodePrio)]
     static void NoneNoBoot()
     {
         playModeCommandType = PlayModeCommands.NoneWithoutBoot;
         ReassignBootScene();
     }
 
-    [MenuItem(kPlaymodeMenu + "None (no change)", validate = true)]
+    [MenuItem(kPlaymode_NoneWithoutBoot, validate = true)]
     static bool NoneNoBootValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "None (don't force Boot scene)", playModeCommandType == PlayModeCommands.NoneWithoutBoot);
+        Menu.SetChecked(kPlaymode_NoneWithoutBoot, playModeCommandType == PlayModeCommands.NoneWithoutBoot);
         return true;
     }
 
-    [MenuItem(kPlaymodeMenu + "None (use Boot)", false, kPlaymodePrio)]
+    [MenuItem(kPlaymode_NoneWithBoot, false, kPlaymodePrio)]
     static void NoneWithBoot()
     {
         playModeCommandType = PlayModeCommands.NoneWithBoot;
         ReassignBootScene();
     }
 
-    [MenuItem(kPlaymodeMenu + "None (use Boot)", validate = true)]
+    [MenuItem(kPlaymode_NoneWithBoot, validate = true)]
     static bool NoneWithBootValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "None (use Boot)", playModeCommandType == PlayModeCommands.NoneWithBoot);
+        Menu.SetChecked(kPlaymode_NoneWithBoot, playModeCommandType == PlayModeCommands.NoneWithBoot);
         return true;
     }
 
-    [MenuItem(kPlaymodeMenu + "Host", false, kPlaymodePrio+1)]
+    [MenuItem(kPlaymode_Host, false, kPlaymodePrio+1)]
     static void AutoHostOutsideBoot()
     {
         playModeCommandType = PlayModeCommands.Host;
         ReassignBootScene();
     }
 
-    [MenuItem(kPlaymodeMenu + "Host", validate = true)]
+    [MenuItem(kPlaymode_Host, validate = true)]
     static bool AutoHostOutsideBootValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "Host", playModeCommandType == PlayModeCommands.Host);
+        Menu.SetChecked(kPlaymode_Host, playModeCommandType == PlayModeCommands.Host);
         return true;
     }
 
 
-    [MenuItem(kPlaymodeMenu + "Connect", false, kPlaymodePrio+2)]
+    [MenuItem(kPlaymode_Connect, false, kPlaymodePrio+2)]
     static void AutoConnectOutsideBoot()
     {
         playModeCommandType = PlayModeCommands.Connect;
         ReassignBootScene();
     }
 
-    [MenuItem(kPlaymodeMenu + "Connect", validate = true)]
+    [MenuItem(kPlaymode_Connect, validate = true)]
     static bool AutoConnectOutsideBootValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "Connect", playModeCommandType == PlayModeCommands.Connect);
+        Menu.SetChecked(kPlaymode_Connect, playModeCommandType == PlayModeCommands.Connect);
         return true;
     }
 
-    [MenuItem(kPlaymodeMenu + "Additional command line params...", false, kCustomCommandLinePrio)]
+    [MenuItem(kPlaymode_AdditionalParams, false, kCustomCommandLinePrio)]
     static void SetCustomCommands()
     {
         DefaultCommandLineBox window = DefaultCommandLineBox.CreateInstance<DefaultCommandLineBox>();
@@ -202,10 +208,10 @@ public static class PlaymodeTools
         ReassignBootScene();
     }
 
-    [MenuItem(kPlaymodeMenu + "Additional command line params...", validate = true)]
+    [MenuItem(kPlaymode_AdditionalParams, validate = true)]
     static bool SetCustomCommandsValidate()
     {
-        Menu.SetChecked(kPlaymodeMenu + "Additional command line params...", !string.IsNullOrEmpty(playModeAdditionalCommandLine));
+        Menu.SetChecked(kPlaymode_AdditionalParams, !string.IsNullOrEmpty(playModeAdditionalCommandLine));
         return true;
     }
 
