@@ -244,6 +244,14 @@ public static class VectorExtensions
     }
 
     /// <summary>
+    /// Returns the Vector2 as a Vector3 with its x and y mapped to x and z, with y=0
+    /// </summary>
+    public static Vector3 ToVector3Horizontal(in this Vector2 vec)
+    {
+        return new Vector3(vec.x, 0f, vec.y);
+    }
+
+    /// <summary>
     /// Returns the Vector3 as a Vector2
     /// </summary>
     public static Vector2 ToVector2(in this Vector3 vec)

@@ -598,6 +598,9 @@ public static class DebugDraw
 
             GL.End();
             GL.PopMatrix();
+
+            // Clear out remaining expired shapes, continuously, just in case no shape functions are called next frame.
+            StartNewShapeBufferIfNewFrame();
         }
         else
         {
