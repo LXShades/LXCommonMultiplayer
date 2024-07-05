@@ -260,6 +260,14 @@ public static class VectorExtensions
     }
 
     /// <summary>
+    /// Returns the Vector3 as a Vector2 with its source x and z mapped to target x and y
+    /// </summary>
+    public static Vector2 ToVector2Horizontal(in this Vector3 vec)
+    {
+        return new Vector2(vec.x, vec.z);
+    }
+
+    /// <summary>
     /// Returns the horizontal distance between two vectors
     /// </summary>
     public static float HorizontalDistance(Vector3 a, Vector3 b)
