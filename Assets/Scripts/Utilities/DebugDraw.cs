@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using UnityEngine;
 
 /// <summary>
@@ -99,7 +98,7 @@ public static class DebugDraw
     }
     private static Material _lineMaterial;
 
-    private static bool isPendingRedraw = false;
+    private static bool isDrawCallbackActive = false;
 
     const float kRadsInCircle = Mathf.PI * 2f;
 
@@ -108,9 +107,11 @@ public static class DebugDraw
     private static List<DebugShape> preserveDebugShapes = new List<DebugShape>();
     private static List<DebugShape> debugShapePool = new List<DebugShape>();
 
+    private static List<Camera> ignoredCameras = new List<Camera>();
+
     private static bool hasBufferedPausedShapes = false;
 
-    private static double lastRenderFullTime = -1; // hack to detect when _all_ cameras have finished rendering in multi-camera setup
+    private static double currentBufferTime = -1; // hack to detect when _all_ cameras have finished rendering in multi-camera setup
 
     /// <summary>
     /// Default style. When merged with another style via a PushStyle or temprorily with a draw call, some properties can be overridden
@@ -320,7 +321,7 @@ public static class DebugDraw
 
         DebugShape output = GetNewShape(style);
         float radsPerLongitude = kRadsInCircle / numSegments;
-        Vector3 right = Mathf.Abs(Vector3.Dot(up, Vector3.up)) < 0.99f ? Vector3.Cross(up, Vector3.up): Vector3.right;
+        Vector3 right = Mathf.Abs(Vector3.Dot(up, Vector3.up)) < 0.99f ? Vector3.Cross(up, Vector3.up) : Vector3.right;
         Vector3 forward = Vector3.Cross(right, up);
         Vector3 last = position + forward * radius;
 
@@ -436,7 +437,7 @@ public static class DebugDraw
         styleStack.Add(styleStack[styleStack.Count - 1].Merge(style));
     }
 
-    public static void PopStyle(Style style)
+    public static void PopStyle()
     {
         if (styleStack.Count > 1)
             styleStack.RemoveAt(styleStack.Count - 1);
@@ -444,24 +445,39 @@ public static class DebugDraw
             Debug.LogError("DebugDraw.PopStyle(): style stack is empty, Pop called too many times compared to Push. Ignoring.");
     }
 
+    /// <summary>
+    /// If a camera is set as ignored, it won't render debug shapes
+    /// </summary>
+    public static void SetCameraIgnored(Camera cam, bool shouldIgnore)
+    {
+        if (shouldIgnore)
+        {
+            if (!ignoredCameras.Contains(cam))
+            {
+                ignoredCameras.Add(cam);
+
+                // this is a good time to remove dead camera entries
+                ignoredCameras.RemoveAll(x => x == null);
+            }
+        }
+        else
+            ignoredCameras.Remove(cam);
+    }
+
     private static void RequestDrawThisFrame()
     {
-        if (!isPendingRedraw)
+        StartNewShapeBufferIfNewFrame();
+
+        if (!isDrawCallbackActive)
         {
             Camera.onPostRender -= OnFinalRenderDebugShapes;
             Camera.onPostRender += OnFinalRenderDebugShapes;
-
-            if (Time.unscaledTimeAsDouble != lastRenderFullTime)
-            {
-                lastRenderFullTime = Time.unscaledTimeAsDouble;
-                SwapShapeBuffers();
-            }
 
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.pauseStateChanged -= OnPauseStateChanged;
             UnityEditor.EditorApplication.pauseStateChanged += OnPauseStateChanged;
 #endif
-            isPendingRedraw = true;
+            isDrawCallbackActive = true;
         }
     }
 
@@ -499,8 +515,14 @@ public static class DebugDraw
         }
     }
 
-    private static void SwapShapeBuffers()
+    private static void StartNewShapeBufferIfNewFrame()
     {
+        // Don't start new frame buffer if we're not on a new frame
+        if (Time.unscaledTimeAsDouble == currentBufferTime)
+            return; // <-- EARLY OUT - we're not on a new frame so won't make a new buffer
+
+        currentBufferTime = Time.unscaledTimeAsDouble;
+
         // Clear old shape buffer now
 #if UNITY_EDITOR
         if (!UnityEditor.EditorApplication.isPaused)
@@ -508,6 +530,7 @@ public static class DebugDraw
 #endif
             preserveDebugShapes.Clear();
 
+            // Collect 'preserved' persistent shapes to move into the new buffer
             float currentTime = Time.time;
             for (int i = currentDebugShapes.Count - 1; i >= 0; i--)
             {
@@ -515,6 +538,7 @@ public static class DebugDraw
                 {
                     if (currentTime - currentDebugShapes[i].creationTime <= currentDebugShapes[i].style.duration)
                     {
+                        // move this persistent shape into Preserve so that it'll appear in the next frame
                         preserveDebugShapes.Add(currentDebugShapes[i]);
                         currentDebugShapes.RemoveAt(i);
                     }
@@ -544,43 +568,45 @@ public static class DebugDraw
 
     private static void OnFinalRenderDebugShapes(Camera cam)
     {
-        if (Time.unscaledTimeAsDouble != lastRenderFullTime)
+        // Draw the debug shapes here, if there are any
+        if (currentDebugShapes.Count > 0)
         {
-            lastRenderFullTime = Time.unscaledTimeAsDouble;
+            if (ignoredCameras.Contains(cam))
+                return; // <--- Early out: This camera is not included for debug draws
 
-            SwapShapeBuffers();
+#pragma warning disable CS0618
+            lineMaterial.SetFloat("_LineThickness", lineThickness);
+            lineMaterial.SetPass(0);
+#pragma warning restore CS0618
 
-            if (currentDebugShapes.Count == 0) // persistent shapes might still exist and we'll want to keep this callback going if so
+            GL.PushMatrix();
+            GL.MultMatrix(Matrix4x4.identity);
+
+            GL.Begin(GL.LINES);
+
+            foreach (DebugShape shape in currentDebugShapes)
             {
-                Camera.onPostRender -= OnFinalRenderDebugShapes;
-                isPendingRedraw = false;
-                return;
+                GL.Color(shape.style.color);
+                GL.TexCoord(new Vector3(shape.style.thickness, 0f, 0f));
+
+                for (int i = 0, e = shape.points.Count / 2 * 2; i < e; i++)
+                {
+                    GL.Vertex(shape.points[i]);
+                }
             }
+
+            GL.End();
+            GL.PopMatrix();
+
+            // Clear out remaining expired shapes, continuously, just in case no shape functions are called next frame.
+            StartNewShapeBufferIfNewFrame();
         }
-
-        lineMaterial.SetFloat("_LineThickness", lineThickness);
-        lineMaterial.SetPass(0);
-
-        GL.PushMatrix();
-        GL.MultMatrix(Matrix4x4.identity);
-
-        GL.Begin(GL.LINES);
-
-        foreach (DebugShape shape in currentDebugShapes)
+        else
         {
-            GL.Color(shape.style.color);
-            GL.TexCoord(new Vector3(shape.style.thickness, 0f, 0f));
-
-            for (int i = 0, e = shape.points.Count / 2 * 2; i < e; i++)
-            {
-                GL.Vertex(shape.points[i]);
-            }
+            // Shapes have run out, deactivate the draw callback
+            Camera.onPostRender -= OnFinalRenderDebugShapes;
+            isDrawCallbackActive = false;
         }
-
-        GL.End();
-        GL.PopMatrix();
-
-        lastRenderFullTime = Time.unscaledTimeAsDouble;
     }
 
 #if UNITY_EDITOR

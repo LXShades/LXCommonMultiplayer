@@ -144,6 +144,15 @@ public static class VectorExtensions
     }
 
     /// <summary>
+    /// Returns the vector rotated around the Y axis
+    /// </summary>
+    public static Vector3 RotatedAroundY(this Vector3 vector, float rotationDegrees)
+    {
+        float sin = Mathf.Sin(rotationDegrees * Mathf.Deg2Rad), cos = Mathf.Cos(rotationDegrees * Mathf.Deg2Rad);
+        return new Vector3(vector.x * cos + vector.z * sin, vector.y, vector.z * cos - vector.x * sin);
+    }
+
+    /// <summary>
     /// Gets the component of the vector going along the plane with a normal of planeNormal, ignoring components that go along the planeNormal itself.
     /// For example, if planeNormal is Vector3.up, this is the same as Horizontal.
     /// </summary>

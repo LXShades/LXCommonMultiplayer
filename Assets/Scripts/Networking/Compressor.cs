@@ -143,7 +143,7 @@ public static class Compressor
         int bitMask = ~(~0 << numBits);
         float multiplier = (1 << (numBits - 1)) - 1f;
         int result = (int)(value * multiplier);
-        return (value >= 0f ? (result & ~(1 << (numBits - 1))) : (result | (1 << (numBits - 1)))) & bitMask;
+        return (result >= 0 ? (result & ~(1 << (numBits - 1))) : (result | (1 << (numBits - 1)))) & bitMask;
     }
 
     public static float BitsToUnitFloat(int value, int numBits)

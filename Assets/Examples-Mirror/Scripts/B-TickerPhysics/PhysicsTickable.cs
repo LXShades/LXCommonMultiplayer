@@ -24,7 +24,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                 {
                     position = rbSource.position,
                     rotation = rbSource.rotation,
-                    velocity = rbSource.velocity,
+                    velocity = rbSource.linearVelocity,
                     angularVelocity = rbSource.angularVelocity
                 };
             }
@@ -33,7 +33,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             {
                 target.position = position;
                 target.rotation = rotation;
-                target.velocity = velocity;
+                target.linearVelocity = velocity;
                 target.angularVelocity = angularVelocity;
             }
 
