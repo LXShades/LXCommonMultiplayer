@@ -1,5 +1,6 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
+using UnityEngine;
 #endif
 
 public static class CommandLine
@@ -10,20 +11,17 @@ public static class CommandLine
     public static string editorCommands
     {
         get => EditorPrefs.GetString("_editorCommandLine", "");
-        set
-        {
-            EditorPrefs.SetString("_editorCommandLine", value);
-            UpdateCommands();
-        }
+        set => EditorPrefs.SetString("_editorCommandLine", value);
     }
 #endif
 
-    static CommandLine()
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void OnStartup()
     {
-        UpdateCommands();
+        ReceiveCommandsFromEditorOrSystem();
     }
 
-    private static void UpdateCommands()
+    private static void ReceiveCommandsFromEditorOrSystem()
     {
 #if UNITY_EDITOR
         // Double-quotes should allow spaces
@@ -43,7 +41,7 @@ public static class CommandLine
         commands = System.Environment.GetCommandLineArgs();
 #endif
 
-        UnityEngine.Debug.Log($"[CommandLine] Starting with command line: {string.Join(" ", commands)}");
+        UnityEngine.Debug.Log($"[CommandLine] Startup command line: {string.Join(" ", commands)}");
     }
 
     public static bool HasCommand(string commandName)

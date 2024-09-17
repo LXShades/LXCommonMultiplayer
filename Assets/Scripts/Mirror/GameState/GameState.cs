@@ -31,9 +31,20 @@ public class GameState : NetworkBehaviour
 
     /// <summary>
     /// The primary GameState. This is the "default" game state that gets changed and replaced by default.
-    /// NOTE: this is only valid on the server
     /// </summary>
-    public static GameState primary { get; private set; }
+    public static GameState primary
+    {
+        get => _primary;
+        private set
+        {
+            if (_primary != null)
+                _primary.isPrimary = false;
+            if (value != null)
+                value.isPrimary = true;
+            _primary = value;
+        }
+    }
+    private static GameState _primary;
 
     /// <summary>
     /// All GameStates including primary and secondary. When created, these can also be changed and replaced if specified in the ServerChangeGameState overload.
@@ -49,6 +60,12 @@ public class GameState : NetworkBehaviour
     /// Returns time until game restart during intermission
     /// </summary>
     public float timeTilRestart { get; private set; }
+
+    /// <summary>
+    /// Whether this is the primary GameState. Used so the client knows the primary.
+    /// </summary>
+    [SyncVar(hook = nameof(OnPrimaryChanged))]
+    public bool isPrimary;
 
     /// <summary>
     /// Returns whether we're currently on the win screen
@@ -80,6 +97,9 @@ public class GameState : NetworkBehaviour
         base.OnStartClient();
 
         DontDestroyOnLoad(gameObject);
+
+        if (isPrimary)
+            primary = this;
     }
 
     public override void OnStartServer()
@@ -321,5 +341,11 @@ public class GameState : NetworkBehaviour
     {
         if (!NetworkServer.active)
             timeTilRestart = timeRemaining;
+    }
+
+    private void OnPrimaryChanged(bool oldVal, bool newVal)
+    {
+        if (!NetworkServer.active && newVal == true)
+            primary = this;
     }
 }

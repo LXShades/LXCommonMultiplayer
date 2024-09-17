@@ -230,8 +230,6 @@ public static class VectorExtensions
             // we slide down the wall a bit, but still being pushed away by the point of collision
             return VectorExtensions.SphereAvoidPointAlongNormalUnclamped(nextSpherePosition, sphereRadius + wallPadding, cornerPosition, wallNormal);
         }
-
-        return nextSpherePosition;
     }
 
     /// <summary>
@@ -255,11 +253,27 @@ public static class VectorExtensions
     }
 
     /// <summary>
+    /// Returns the Vector2 as a Vector3 with its x and y mapped to x and z, with y=0
+    /// </summary>
+    public static Vector3 ToVector3Horizontal(in this Vector2 vec)
+    {
+        return new Vector3(vec.x, 0f, vec.y);
+    }
+
+    /// <summary>
     /// Returns the Vector3 as a Vector2
     /// </summary>
     public static Vector2 ToVector2(in this Vector3 vec)
     {
         return new Vector2(vec.x, vec.y);
+    }
+
+    /// <summary>
+    /// Returns the Vector3 as a Vector2 with its source x and z mapped to target x and y
+    /// </summary>
+    public static Vector2 ToVector2Horizontal(in this Vector3 vec)
+    {
+        return new Vector2(vec.x, vec.z);
     }
 
     /// <summary>
