@@ -1,4 +1,4 @@
-# Unity Multiplayer Essentials
+# LX Common Multiplayer tools for Unity
 ## Description
 A set of **unconditionally free reusable tools** for online multiplayer Unity game development:
 
@@ -11,8 +11,8 @@ A set of **unconditionally free reusable tools** for online multiplayer Unity ga
 * Pre-made examples that can be easily built upon
 
 This package also includes [Mirror](https://github.com/vis2k/Mirror)-specific features using a [custom Mirror fork](https://github.com/LXShades/Mirror):
-* (WIP - I can't remember if this works lol) **Predictive object spawning** enabling clients to produce networked objects before the server knows they exist.
-* More WIP.
+* **Predictive object spawning** enabling clients to produce networked objects before the server knows they exist.
+* Possibly more I haven't touched most of this stuff in a long time lol
 
 ## Goals
 These tools are designed to accelerate iterative multiplayer development in Unity. It recognises the need for:
