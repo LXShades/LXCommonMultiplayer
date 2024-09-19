@@ -23,6 +23,7 @@ These tools are designed to accelerate iterative multiplayer development in Unit
 * An **easy, minimally confusing** solution to **hack-proof character movement**
 * **Debugging** tools
 
+
 ## Todo
 Among current todo's are:
 
@@ -38,9 +39,9 @@ Among current todo's are:
 Although public-facing, this toolset currently comes with no warranty or instruction manual. Code should be considered beta, with inline documentation and usage examples under occasional ongoing development. However, it is majorly functional, and ready to be tweaked to suit a multiplayer project's needs and accelerate development.
 
 # Mirror Features and License
-Features in the Mirror subfolder rely on a custom Mirror fork, which may or may not suit your needs. You can grab this fork [here](https://github.com/LXShades/Mirror). All Mirror code is held [under an MIT License](https://github.com/LXShades/Mirror/blob/master/LICENSE), which is not identical to this repo's license but still highly permissive (read it!).
+Features in the Mirror subfolders rely on a custom Mirror fork, which may or may not suit your needs. You can grab this fork [here](https://github.com/LXShades/Mirror). All Mirror code is held [under an MIT License](https://github.com/LXShades/Mirror/blob/master/LICENSE), which is not identical to this repo's license but still highly permissive (read it!).
 
-To remove this dependency and related features, **delete the Mirror folder**. The remaining tools will still be available for you to use.
+To activate this piece of the project, define MIRROR_LXSHADES_BRANCH in the player settings.
 
 # Remaining License
 Free, free, free! Creative Commons Zero v1.0 means you can use this code for any diddly-darn old thing you want, no credit required, no strings attached. You just aren't allowed to sue me when it breaks. ;)

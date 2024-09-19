@@ -1,5 +1,5 @@
 {
-    "name": "UnityMultiplayerEssentials.MirrorTools",
+    "name": "LXShades.Common.Multiplayer.Mirror",
     "rootNamespace": "",
     "references": [
         "GUID:30817c1a0e6d646d99c048fc403f5979",
@@ -11,7 +11,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "MIRROR_LXSHADES_BRANCH"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }
