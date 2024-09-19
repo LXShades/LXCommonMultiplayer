@@ -1,0 +1,16 @@
+{
+    "name": "LX.Common.Multiplayer",
+    "rootNamespace": "",
+    "references": [
+        "GUID:8732d2a7e4191f143b45b7e3728a5435"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

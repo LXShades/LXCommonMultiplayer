@@ -1,0 +1,23 @@
+{
+  "name": "com.lxshades.common.multiplayer",
+  "version": "1.0.0",
+  "displayName": "LXShades Common (Multiplayer)",
+  "description": "LXShades' Common (Multiplayer) essentials for Unity: Tools and utilities for Unity Engine multiplayer game development. Quick multiplayer build tests, 'timeline'-based prediction/reconciliation, and more.",
+  "unity": "6000.0",
+  "unityRelease": "1f1",
+  "documentationUrl": "N/A",
+  "changelogUrl": "N/A",
+  "licensesUrl": "N/A",
+  "keywords": [
+    "debug",
+    "draw",
+    "tool"
+  ],
+  "dependencies": {
+    "com.lxshades.common.core": "0.9.0"
+  },
+  "author": {
+    "name": "LXShades",
+    "email": "plzdonttalk@me.ifearsocialsituations"
+  }
+}
