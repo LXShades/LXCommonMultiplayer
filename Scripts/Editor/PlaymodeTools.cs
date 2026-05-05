@@ -139,7 +139,7 @@ public static class PlaymodeTools
         if (!string.IsNullOrEmpty(playModeAdditionalCommandLine))
             CommandLine.editorCommands += $" {playModeAdditionalCommandLine}";
 
-        Debug.Log($"Running PlayMode with command line: {CommandLine.editorCommands}");
+        Debug.Log($"PlayMode command line set to: {CommandLine.editorCommands}");
     }
 
     [MenuItem(kPlaymode_NoneWithoutBoot, false, kNoPlaymodePrio)]
