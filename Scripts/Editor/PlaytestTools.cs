@@ -449,6 +449,7 @@ public class PlaytestTools : MonoBehaviour
             if (!string.IsNullOrEmpty(PlaymodeTools.playModeAdditionalCommandLine))
                 CommandLine.editorCommands += $" {PlaymodeTools.playModeAdditionalCommandLine}";
 
+            PlaymodeTools.wasPlaymodeTriggeredByPlaytest = true;
             EditorApplication.isPlaying = true;
         }
     }

@@ -38,6 +38,12 @@ public static class PlaymodeTools
         set => EditorPrefs.SetString("_playModeStartScene", value);
     }
 
+    public static bool wasPlaymodeTriggeredByPlaytest
+    {
+        get => EditorPrefs.GetBool("_wasPlaymodeTriggeredByPlaytest", false);
+        set => EditorPrefs.SetBool("_wasPlaymodeTriggeredByPlaytest", value);
+    }
+
     public const string kPlaymodeMenu = "Multiplayer/Playmode/";
     public const string kPlaymode_NoneWithBoot     = kPlaymodeMenu + "None (use Boot)";
     public const string kPlaymode_NoneWithoutBoot  = kPlaymodeMenu + "None (no change)";
@@ -104,8 +110,11 @@ public static class PlaymodeTools
     {
         // when finished playing, do not let previous editor commands persist to the next test
         if (change == PlayModeStateChange.ExitingPlayMode)
+        {
             CommandLine.editorCommands = "";
-        if (change == PlayModeStateChange.ExitingEditMode)
+            wasPlaymodeTriggeredByPlaytest = false;
+        }
+        else if (change == PlayModeStateChange.ExitingEditMode)
         {
             playModeStartScene = EditorSceneManager.GetActiveScene().path;
 
@@ -122,6 +131,12 @@ public static class PlaymodeTools
     /// </summary>
     private static void UpdateEditorCommands()
     {
+        if (wasPlaymodeTriggeredByPlaytest)
+        {
+            // Play mode was triggered by Playtest tools which have already initialized the editor commands
+            return;
+        }
+
         switch (playModeCommandType)
         {
             case PlayModeCommands.Host:

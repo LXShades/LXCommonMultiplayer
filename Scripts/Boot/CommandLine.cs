@@ -1,11 +1,21 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
-using UnityEngine;
 #endif
+using UnityEngine;
 
 public static class CommandLine
 {
-    private static string[] commands;
+    private static string[] commands
+    {
+        get
+        {
+            // Lazy init because some requesters run _super_ early
+            if (_commands == null)
+                ReceiveCommandsFromEditorOrSystem();
+            return _commands;
+        }
+    }
+    private static string[] _commands = null;
 
 #if UNITY_EDITOR
     public static string editorCommands
@@ -14,12 +24,6 @@ public static class CommandLine
         set => EditorPrefs.SetString("_editorCommandLine", value);
     }
 #endif
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    static void OnStartup()
-    {
-        ReceiveCommandsFromEditorOrSystem();
-    }
 
     private static void ReceiveCommandsFromEditorOrSystem()
     {
@@ -36,9 +40,9 @@ public static class CommandLine
                 joinedAsList.AddRange(splitByQuotes[i].Split(new char[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries));
         }
 
-        commands = joinedAsList.ToArray();
+        _commands = joinedAsList.ToArray();
 #else
-        commands = System.Environment.GetCommandLineArgs();
+        _commands = System.Environment.GetCommandLineArgs();
 #endif
 
         UnityEngine.Debug.Log($"[CommandLine] Startup command line: {string.Join(" ", commands)}");
