@@ -454,6 +454,9 @@ public class PlaytestTools : MonoBehaviour
         }
     }
 
+    // If playing with a host and the editor is a client, there need to be at least 2 players
+    private static bool CanPlayWithOnePlayerInCurrentSettings() => editorRole != EditorRole.Client || !serverIsHost;
+
     [MenuItem(kEditorRoleMenu + "Standalone Only", priority = kEditorRolePrio)]
     private static void Standalone() { editorRole = EditorRole.Standalone; }
 
@@ -488,14 +491,14 @@ public class PlaytestTools : MonoBehaviour
     private static void OneTestPlayer() { numTestPlayers = 1; }
 
     [MenuItem(kPlayerCountMenu + "1 player", true)]
-    private static bool OneTestPlayerValidate() { Menu.SetChecked(kPlayerCountMenu + "1 player", numTestPlayers == 1); return true; }
+    private static bool OneTestPlayerValidate() { Menu.SetChecked(kPlayerCountMenu + "1 player", numTestPlayers == 1); return CanPlayWithOnePlayerInCurrentSettings(); }
 
 
     [MenuItem(kPlayerCountMenu + "2 players", priority = kPlayerCountPrio+1)]
     private static void TwoTestPlayers() { numTestPlayers = 2; }
 
     [MenuItem(kPlayerCountMenu + "2 players", true)]
-    private static bool TwoTestPlayersValidate() { Menu.SetChecked(kPlayerCountMenu + "2 players", numTestPlayers == 2); return true; }
+    private static bool TwoTestPlayersValidate() { Menu.SetChecked(kPlayerCountMenu + "2 players", numTestPlayers == 2 || (!CanPlayWithOnePlayerInCurrentSettings() && numTestPlayers == 1)); return true; }
 
 
     [MenuItem(kPlayerCountMenu + "3 players", priority = kPlayerCountPrio+2)]
