@@ -116,6 +116,7 @@ public class PlaytestTools : MonoBehaviour
     public const int kBuildTypePrio = kServerTypePrio + 20;
     public const int kBuildPlatformPrio = PlaymodeTools.kCustomCommandLinePrio + 100;
     public const int kFinalBuildPrio = kBuildPlatformPrio + 100;
+    public const int kOpenBuildFolderPrio = kFinalBuildPrio + 20;
 
 
     [InitializeOnLoadMethod]
@@ -454,6 +455,9 @@ public class PlaytestTools : MonoBehaviour
         }
     }
 
+    [MenuItem(kMultiplayerMenu + "Add Client", priority = kPlaytestPrio + 3)]
+    public static void AddClient() => RunBuild("-connect 127.0.0.1");
+
     // If playing with a host and the editor is a client, there need to be at least 2 players
     private static bool CanPlayWithOnePlayerInCurrentSettings() => editorRole != EditorRole.Client || !serverIsHost;
 
@@ -621,6 +625,14 @@ public class PlaytestTools : MonoBehaviour
         {
             EditorUtility.DisplayDialog("Someone goofed", $"Build failed ({buildReport.summary.totalErrors} errors)", "OK");
         }
+    }
+
+    [MenuItem("Multiplayer/Open Build Folder", priority = kOpenBuildFolderPrio)]
+    public static void OpenBuildFolder()
+    {
+        var directory = Path.GetDirectoryName(playtestBuildPath);
+        if (Directory.Exists(directory))
+            System.Diagnostics.Process.Start(directory);
     }
 
     private static string MakeDimensionParam(RectInt dimensions) => $"" +
