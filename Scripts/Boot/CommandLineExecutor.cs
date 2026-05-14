@@ -112,26 +112,28 @@ public abstract class CommandLineExecutor : MonoBehaviour
     /// <summary>
     /// Loads a scene by name/path or build index
     /// </summary>
-    protected AsyncOperation LoadScene(string sceneNameOrIndex)
+    protected AsyncOperation LoadScene(string scenePathOrNameOrIndex)
     {
-        bool isInt = int.TryParse(sceneNameOrIndex, out int sceneIndex);
-        int activeSceneIndex = SceneManager.GetActiveScene().buildIndex;
+        bool isInt = int.TryParse(scenePathOrNameOrIndex, out int sceneIndex);
+        string scenePathOrName = isInt ? SceneUtility.GetScenePathByBuildIndex(sceneIndex) : scenePathOrNameOrIndex;
 
-        Debug.Log($"Loading scene {sceneNameOrIndex}...");
+        Debug.Log($"Loading scene {scenePathOrNameOrIndex}...");
 
-        if ((isInt && sceneIndex == activeSceneIndex)
-            || SceneManager.GetSceneByName(sceneNameOrIndex).IsValid() && SceneManager.GetSceneByName(sceneNameOrIndex).buildIndex == activeSceneIndex
-            || SceneManager.GetSceneByPath(sceneNameOrIndex).IsValid() && SceneManager.GetSceneByPath(sceneNameOrIndex).buildIndex == activeSceneIndex)
+        var sceneByName = SceneManager.GetSceneByName(scenePathOrName);
+        var sceneByPath = SceneManager.GetSceneByPath(scenePathOrName);
+        if (sceneByName.IsValid() || sceneByPath.IsValid())
         {
             Debug.LogError($"Infinite loop detected: we appear to be loading the scene we're already in. Stopping.");
             return null;
         }
 
-        if (isInt)
-            return SceneManager.LoadSceneAsync(sceneIndex);
-        else
-            return SceneManager.LoadSceneAsync(sceneNameOrIndex);
+        return LoadSceneByPathAsync(scenePathOrName);
     }
+
+    /// <summary>
+    /// Overridable scene load function for cases where a network manager etc needs to intervene
+    /// </summary>
+    protected virtual AsyncOperation LoadSceneByPathAsync(string path) => SceneManager.LoadSceneAsync(path);
 
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR // why does !UNITY_EDITOR need to be here, shouldn't standalone be standalone? Oh well, doesn't seem to work that way
     // Window management functions
