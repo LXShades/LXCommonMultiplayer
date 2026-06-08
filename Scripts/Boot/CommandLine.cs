@@ -50,14 +50,10 @@ public static class CommandLine
 
     public static bool HasCommand(string commandName)
     {
-        commandName = commandName.ToLower();
-
         for (int i = 0; i < commands.Length; i++)
         {
-            if (commands[i].ToLower() == commandName)
-            {
+            if (commands[i].Equals(commandName, System.StringComparison.OrdinalIgnoreCase))
                 return true;
-            }
         }
 
         return false;
