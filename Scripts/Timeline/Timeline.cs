@@ -399,7 +399,7 @@ public class Timeline
 
             if (owner.settings.maxTickRate <= 0 || closestPriorInputIndex == -1
                 || (owner.settings.maxTickRateConstraint == TimelineTickRateConstraint.Variable && time * owner.settings.maxTickRate - inputTrack.TimeAt(closestPriorInputIndex) * owner.settings.maxTickRate >= 0.999f)
-                || (owner.settings.maxTickRateConstraint == TimelineTickRateConstraint.QuantizedTime && TimeTool.Quantize(time, owner.settings.maxTickRate) != TimeTool.Quantize(inputTrack.TimeAt(closestPriorInputIndex), owner.settings.maxTickRate)))
+                || (owner.settings.maxTickRateConstraint == TimelineTickRateConstraint.QuantizedTime && TimeUtils.Quantize(time, owner.settings.maxTickRate) != TimeUtils.Quantize(inputTrack.TimeAt(closestPriorInputIndex), owner.settings.maxTickRate)))
             {
                 // Add current player input to input history
                 inputTrack.Set(time, input);
@@ -411,7 +411,7 @@ public class Timeline
         /// </summary>
         public void InsertQuantizedInput(TInput input, double time)
         {
-            InsertInput(input, TimeTool.Quantize(time, owner.settings.maxTickRate));
+            InsertInput(input, TimeUtils.Quantize(time, owner.settings.maxTickRate));
         }
 
         /// <summary>
@@ -690,7 +690,7 @@ public class Timeline
                 startTime = Math.Min(entity.stateTrackBase.TimeAt(priorStateIdx), startTime);
         }
 
-        startTime = TimeTool.Quantize(startTime, settings.fixedTickRate);
+        startTime = TimeUtils.Quantize(startTime, settings.fixedTickRate);
 
         SeekOpSequence debugSequence = (flags & TimelineSeekFlags.NoDebugSequence) != 0 ? null : lastSeekDebugSequence;
 
@@ -726,8 +726,8 @@ public class Timeline
         // Run each proper tick
         while (currentTime < targetTime && numIterations <= settings.maxSeekIterations)
         {
-            double nextTime = Math.Min(TimeTool.Quantize(currentTime + tickrateDelta + 0.00001f, settings.fixedTickRate), targetTime);
-            bool canStoreNextState = nextTime != targetTime || targetTime == TimeTool.Quantize(targetTime, settings.fixedTickRate);
+            double nextTime = Math.Min(TimeUtils.Quantize(currentTime + tickrateDelta + 0.00001f, settings.fixedTickRate), targetTime);
+            bool canStoreNextState = nextTime != targetTime || targetTime == TimeUtils.Quantize(targetTime, settings.fixedTickRate);
 
             // Warn if this is the last iteration we can handle
             if (numIterations == settings.maxSeekIterations && nextTime != targetTime)
@@ -772,8 +772,8 @@ public class Timeline
                 // Previous input is quantized to our tickrate, meaning if there are multiple inputs between a single interval in our low tickrate (ie tickrate < input rate), we accept the quantized one only
                 // This is unique to the multi seek. In regular Seek, inputs will define the deltas, this one uses a fixed delta so needs to ensure it uses the inputs closest to those deltas
                 // TODO - quantize all - end the suffering
-                int currentInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(currentTime, settings.fixedTickRate));
-                int prevInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeTool.Quantize(currentTime - (tickrateDelta - 0.00001f), settings.fixedTickRate));
+                int currentInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeUtils.Quantize(currentTime, settings.fixedTickRate));
+                int prevInput = entity.inputTrackBase.ClosestIndexBeforeOrEarliestInclusive(TimeUtils.Quantize(currentTime - (tickrateDelta - 0.00001f), settings.fixedTickRate));
 
                 debugSequence?.AddOp(SeekOp.Tick(entity, currentTime, nextTime, prevInput, currentInput, seekOpFlags));
 
