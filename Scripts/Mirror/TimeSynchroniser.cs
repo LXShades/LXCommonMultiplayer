@@ -133,7 +133,7 @@ public class TimeSynchroniser : NetworkBehaviour
             }
         }
 
-        if (TimeTool.IsTick(timeOnLastUpdate, lastFrameTime, syncsPerSecond))
+        if (TimeUtils.IsTick(timeOnLastUpdate, lastFrameTime, syncsPerSecond))
         {
             if (NetworkServer.active)
             {

@@ -71,7 +71,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
         private void Update()
         {
-            if (TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
+            if (TimeUtils.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
             {
                 // add inputs to our input history, then send recent inputs to server
                 if (hasAuthority)
@@ -152,7 +152,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
 
         public Input GetInputAtTime(double time)
         {
-            int index = myInputs.ClosestIndexBeforeOrEarliest(TimeTool.Quantize(time, physicsTickable.inputsPerSecond));
+            int index = myInputs.ClosestIndexBeforeOrEarliest(TimeUtils.Quantize(time, physicsTickable.inputsPerSecond));
 
             if (index != -1)
                 return myInputs[index];

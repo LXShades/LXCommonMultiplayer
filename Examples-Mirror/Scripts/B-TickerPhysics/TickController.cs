@@ -59,7 +59,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
                     // we continually adjust our game time based on this feedback
                     if (NetworkClient.localPlayer && NetworkClient.localPlayer.TryGetComponent(out PhysicsPlayer localPhysPlayer))
                     {
-                        if (TimeTool.IsTick(Time.timeAsDouble, Time.deltaTime, 2))
+                        if (TimeUtils.IsTick(Time.timeAsDouble, Time.deltaTime, 2))
                         {
                             float bestTimeOffset = float.MaxValue;
 
@@ -75,7 +75,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             }
 
             // send target ticker's state to clients
-            if (NetworkServer.active && TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
+            if (NetworkServer.active && TimeUtils.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, updatesPerSecond))
                 RpcState(physTimelineEntity.stateTrack.Latest, physTimelineEntity.stateTrack.LatestTime, (float)(Time.timeAsDouble - physTimelineEntity.stateTrack.LatestTime));
         }
 

@@ -192,7 +192,7 @@ namespace UnityMultiplayerEssentials.Examples.Mirror
             }
         }
 
-        private bool IsNetUpdate() => TimeTool.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, netUpdateRate);
+        private bool IsNetUpdate() => TimeUtils.IsTick(Time.unscaledTime, Time.unscaledDeltaTime, netUpdateRate);
         #endregion
     }
 }

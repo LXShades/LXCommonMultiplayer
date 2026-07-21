@@ -55,7 +55,7 @@ public enum TimelineTickRateConstraint
 
     /// <summary>
     /// A new input is ignored if it is inserted in under 1/maxInputRate seconds since the last input was inserted. Otherwise, it can be inserted at any time.
-    /// Works for many cases, but can fail when using TimeTool.Quantize intervals after long periods of time even if that interval is the tick rate, as the floating points become fuzzy and begin to overlap
+    /// Works for many cases, but can fail when using TimeUtils.Quantize intervals after long periods of time even if that interval is the tick rate, as the floating points become fuzzy and begin to overlap
     /// </summary>
     Variable
 }
