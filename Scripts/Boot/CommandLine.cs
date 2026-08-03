@@ -2,6 +2,8 @@
 using UnityEditor;
 #endif
 using UnityEngine;
+using Unity.Multiplayer.PlayMode;
+using System.Collections.Generic;
 
 public static class CommandLine
 {
@@ -16,6 +18,10 @@ public static class CommandLine
         }
     }
     private static string[] _commands = null;
+
+    public static string MultiplayerPlayModeServerTag = "PlayModeServer";
+    public static string MultiplayerPlayModeHostTag = "PlayModeHost";
+    public static string MultiplayerPlayModeClientTag = "PlayModeClient";
 
 #if UNITY_EDITOR
     public static string editorCommands
@@ -44,6 +50,40 @@ public static class CommandLine
 #else
         _commands = System.Environment.GetCommandLineArgs();
 #endif
+
+        // Multiplayer Play Mode support.
+        // If this is the main editor, we'll use the default play mode the user has selected via our own menu. Otherwise, if this is an additional instance, we need to make some tweaks.
+        if (CurrentPlayer.Tags.Count > 0 && !CurrentPlayer.IsMainEditor)
+        {
+            List<string> commandsAsList = new(_commands);
+
+            // I'm not fully sure how other instances handle the existing play mode settings - they probably all take a copy of them
+            // but differnet players have different roles, so we might actually need to _remove_ some command lines here to cancel out that copy effect
+            foreach (string tag in CurrentPlayer.Tags)
+            {
+                if (tag.Equals(MultiplayerPlayModeClientTag, System.StringComparison.InvariantCultureIgnoreCase))
+                {
+                    commandsAsList.Add("-connect");
+                    commandsAsList.Add("127.0.0.1");
+                    commandsAsList.Remove("-host");
+                    commandsAsList.Remove("-server");
+                }
+                else if (tag.Equals(MultiplayerPlayModeServerTag, System.StringComparison.InvariantCultureIgnoreCase))
+                {
+                    commandsAsList.Add("-server");
+                    commandsAsList.Remove("-host");
+                    commandsAsList.Remove("-connect");
+                }
+                else if (tag.Equals(MultiplayerPlayModeHostTag, System.StringComparison.InvariantCultureIgnoreCase))
+                {
+                    commandsAsList.Add("-host");
+                    commandsAsList.Remove("-server");
+                    commandsAsList.Remove("-connect");
+                }
+            }
+
+            _commands = commandsAsList.ToArray();
+        }
 
         UnityEngine.Debug.Log($"[CommandLine] Startup command line: {string.Join(" ", commands)}");
     }
