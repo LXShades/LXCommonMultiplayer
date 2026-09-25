@@ -2,6 +2,10 @@
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using LX.Common.Core;
+using System.Collections.Generic;
+using System;
+using Unity.Multiplayer.PlayMode;
 
 /// <summary>
 /// Tools to decide how the editor loads in playmode
@@ -55,6 +59,10 @@ public static class PlaymodeTools
     public const int kPlaymodePrio = kNoPlaymodePrio + 20;
     public const int kCustomCommandLinePrio = kPlaymodePrio + 20;
 
+    public static string MultiplayerPlayModeServerTag = "PlayModeServer";
+    public static string MultiplayerPlayModeHostTag = "PlayModeHost";
+    public static string MultiplayerPlayModeClientTag = "PlayModeClient";
+
     [InitializeOnLoadMethod]
     private static void OnEditorInit()
     {
@@ -72,6 +80,8 @@ public static class PlaymodeTools
                 ReassignBootScene();
             }
         };
+
+        CommandLine.onPostProcessEditorCommands += OnPostProcessEditorCommandLine;
 
         // Be prepared to set editor commands on play mode
         EditorApplication.playModeStateChanged += OnPlayStateChanged;
@@ -155,6 +165,39 @@ public static class PlaymodeTools
             CommandLine.editorCommands += $" {playModeAdditionalCommandLine}";
 
         Debug.Log($"PlayMode command line set to: {CommandLine.editorCommands}");
+    }
+
+    private static void OnPostProcessEditorCommandLine(List<string> list)
+    {
+        // Multiplayer Play Mode support
+        // If this isn't the main editor, we'll apply some custom command line settings they can join the main editor. Otherwise, we'll use the default play mode the user has selected via our own menu.
+        if (CurrentPlayer.Tags.Count > 0 && !CurrentPlayer.IsMainEditor)
+        {
+            // I'm not fully sure how other instances handle the existing play mode settings - they probably all take a copy of them
+            // but differnet players have different roles, so we might actually need to _remove_ some command lines here to cancel out that copy effect
+            foreach (string tag in CurrentPlayer.Tags)
+            {
+                if (tag.Equals(MultiplayerPlayModeClientTag, System.StringComparison.InvariantCultureIgnoreCase))
+                {
+                    list.Add("-connect");
+                    list.Add("127.0.0.1");
+                    list.Remove("-host");
+                    list.Remove("-server");
+                }
+                else if (tag.Equals(MultiplayerPlayModeServerTag, System.StringComparison.InvariantCultureIgnoreCase))
+                {
+                    list.Add("-server");
+                    list.Remove("-host");
+                    list.Remove("-connect");
+                }
+                else if (tag.Equals(MultiplayerPlayModeHostTag, System.StringComparison.InvariantCultureIgnoreCase))
+                {
+                    list.Add("-host");
+                    list.Remove("-server");
+                    list.Remove("-connect");
+                }
+            }
+        }
     }
 
     [MenuItem(kPlaymode_NoneWithoutBoot, false, kNoPlaymodePrio)]

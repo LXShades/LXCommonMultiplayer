@@ -50,6 +50,12 @@ public class PlaytestTools : MonoBehaviour
         set => EditorPrefs.SetInt("playtestBuildType", (int)value);
     }
 
+    public static string additionalStandaloneCommands
+    {
+        get => EditorPrefs.GetString("playtestAdditionalStandaloneCommands", "");
+        set => EditorPrefs.SetString("playtestAdditionalStandaloneCommands", value);
+    }
+
     /// <summary>
     /// Called before the build is made
     /// </summary>
@@ -114,6 +120,7 @@ public class PlaytestTools : MonoBehaviour
     public const int kEditorRolePrio = kPlayerCountPrio + 20;
     public const int kServerTypePrio = kEditorRolePrio + 20;
     public const int kBuildTypePrio = kServerTypePrio + 20;
+    public const int kExtraPrio = kBuildTypePrio + 20;
     public const int kBuildPlatformPrio = PlaymodeTools.kCustomCommandLinePrio + 100;
     public const int kFinalBuildPrio = kBuildPlatformPrio + 100;
     public const int kOpenBuildFolderPrio = kFinalBuildPrio + 20;
@@ -442,7 +449,7 @@ public class PlaytestTools : MonoBehaviour
 
         // Connect the remaining players
         for (int i = 0; i < effectiveNumTestPlayers - numExistingPlayers; i++)
-            RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numGraphicalWindows))}");
+            RunBuild($"-connect 127.0.0.1 {MakeDimensionParam(CalculateWindowDimensionsForPlayer(playerIndex++, numGraphicalWindows))} {additionalStandaloneCommands}");
 
         // Start the editor if applicable
         if (editorRole != EditorRole.Standalone)
@@ -548,6 +555,8 @@ public class PlaytestTools : MonoBehaviour
     [MenuItem(kBuildTypeMenu + "BuildType: Autocompile", true)]
     private static bool BuildTypeAutoCompileValidate() { Menu.SetChecked(kBuildTypeMenu + "BuildType: Autocompile", buildType == BuildType.AutoCompile); return true; }
 
+    [MenuItem(kEditorRoleMenu + "Additional command lines...", priority = kExtraPrio + 1)]
+    private static void AdditionalCommandLine() { EditorWindow.GetWindow<MultiplayerBuildCommandLineWindow>("Standalone Command Line...").Show(); }
 
     [MenuItem(kBuildPlatformMenu + "BuildPlatform: Win64", priority = kBuildPlatformPrio)]
     private static void BuildPlatform64() { isWin64 = true; }
@@ -650,5 +659,41 @@ public class PlaytestTools : MonoBehaviour
         else if (numPlayers <= 4)
             return new RectInt(screen.width / 2 * (playerIndex % 2), screen.height / 2 * (playerIndex / 2), screen.width / 2, screen.height / 2);
         return default;
+    }
+}
+
+/// <summary>
+/// Window to let the user assign custom command line parameters
+/// </summary>
+public class MultiplayerBuildCommandLineWindow : EditorWindow
+{
+    public string commands = "";
+
+    private void OnBecameVisible()
+    {
+        commands = PlaytestTools.additionalStandaloneCommands;
+    }
+
+    void OnGUI()
+    {
+        GUILayout.Space(10);
+        EditorGUILayout.LabelField("These commands are applied to all standalone builds in addition to the automatically-supplied host/client related commands", EditorStyles.wordWrappedLabel);
+        GUILayout.Space(10);
+        GUILayout.BeginHorizontal();
+        commands = EditorGUILayout.TextField("Standalone Commands:", commands);
+        GUILayout.EndHorizontal();
+        GUILayout.Space(20);
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Done") || Event.current.keyCode == KeyCode.Return)
+        {
+            PlaytestTools.additionalStandaloneCommands = commands;
+            Close();
+        }
+        if (GUILayout.Button("Cancel"))
+        {
+            Close();
+        }
+        EditorGUILayout.EndHorizontal();
     }
 }
