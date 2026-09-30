@@ -169,34 +169,43 @@ public static class PlaymodeTools
 
     private static void OnPostProcessEditorCommandLine(List<string> list)
     {
-        // Multiplayer Play Mode support
-        // If this isn't the main editor, we'll apply some custom command line settings they can join the main editor. Otherwise, we'll use the default play mode the user has selected via our own menu.
-        if (CurrentPlayer.Tags.Count > 0 && !CurrentPlayer.IsMainEditor)
+        // uh, this just throws nullrefs sometimes, when I'm in a new project without Multiplayer Play Mode setup.
+        // and seemingly no way to check it's usable, except for the evidently bad nullrefs
+        try
         {
-            // I'm not fully sure how other instances handle the existing play mode settings - they probably all take a copy of them
-            // but differnet players have different roles, so we might actually need to _remove_ some command lines here to cancel out that copy effect
-            foreach (string tag in CurrentPlayer.Tags)
+            // Multiplayer Play Mode support
+            // If this isn't the main editor, we'll apply some custom command line settings they can join the main editor. Otherwise, we'll use the default play mode the user has selected via our own menu.
+            if (CurrentPlayer.Tags.Count > 0 && !CurrentPlayer.IsMainEditor)
             {
-                if (tag.Equals(MultiplayerPlayModeClientTag, System.StringComparison.InvariantCultureIgnoreCase))
+                // I'm not fully sure how other instances handle the existing play mode settings - they probably all take a copy of them
+                // but differnet players have different roles, so we might actually need to _remove_ some command lines here to cancel out that copy effect
+                foreach (string tag in CurrentPlayer.Tags)
                 {
-                    list.Add("-connect");
-                    list.Add("127.0.0.1");
-                    list.Remove("-host");
-                    list.Remove("-server");
-                }
-                else if (tag.Equals(MultiplayerPlayModeServerTag, System.StringComparison.InvariantCultureIgnoreCase))
-                {
-                    list.Add("-server");
-                    list.Remove("-host");
-                    list.Remove("-connect");
-                }
-                else if (tag.Equals(MultiplayerPlayModeHostTag, System.StringComparison.InvariantCultureIgnoreCase))
-                {
-                    list.Add("-host");
-                    list.Remove("-server");
-                    list.Remove("-connect");
+                    if (tag.Equals(MultiplayerPlayModeClientTag, System.StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        list.Add("-connect");
+                        list.Add("127.0.0.1");
+                        list.Remove("-host");
+                        list.Remove("-server");
+                    }
+                    else if (tag.Equals(MultiplayerPlayModeServerTag, System.StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        list.Add("-server");
+                        list.Remove("-host");
+                        list.Remove("-connect");
+                    }
+                    else if (tag.Equals(MultiplayerPlayModeHostTag, System.StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        list.Add("-host");
+                        list.Remove("-server");
+                        list.Remove("-connect");
+                    }
                 }
             }
+        }
+        catch
+        {
+            // ¯\(ツ)/¯
         }
     }
 
