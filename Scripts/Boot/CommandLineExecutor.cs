@@ -39,7 +39,7 @@ public abstract class CommandLineExecutor : MonoBehaviour
     {
         if (disableInReleaseBuilds && !Debug.isDebugBuild && loadDefaultScene)
         {
-            LoadScene(defaultScene);
+            LoadDefaultScene();
             return; // commands ignored in release builds
         }
 
@@ -50,7 +50,7 @@ public abstract class CommandLineExecutor : MonoBehaviour
         if (CommandLine.GetCommand(kSceneParam, 1, out string[] sceneParams))
             op = LoadScene(sceneParams[0]);
         else if (SceneManager.GetActiveScene().buildIndex == 0 && loadDefaultScene)
-            op = LoadScene(defaultScene);
+            op = LoadDefaultScene();
 
         // Execute remaining command line commands
         if (op != null)
@@ -93,6 +93,8 @@ public abstract class CommandLineExecutor : MonoBehaviour
             Debug.LogWarning("No -connect, -host or -server parameter was specified.");
         }
     }
+
+    protected virtual AsyncOperation LoadDefaultScene() => LoadScene(defaultScene);
 
     /// <summary>
     /// Called when command line wants to connect to an IP
