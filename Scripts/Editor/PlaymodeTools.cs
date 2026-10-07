@@ -130,7 +130,10 @@ public static class PlaymodeTools
 
             // Prompt user to save scene, or changes won't be loaded in the game
             if (EditorSceneManager.playModeStartScene != null)
-                EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+            {
+                if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                    EditorApplication.ExitPlaymode();
+            }
             UpdateEditorCommands();
         }
 
